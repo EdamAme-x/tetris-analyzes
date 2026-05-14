@@ -543,7 +543,9 @@ pub(crate) fn search_opener_states(
     }];
 
     for _depth in 0..max_depth {
-        let mut next_by_key = HashMap::<SearchKey, SearchState>::new();
+        let mut next_by_key = HashMap::<SearchKey, SearchState>::with_capacity(
+            next_search_map_capacity(beam.len(), beam_width, hold_enabled),
+        );
 
         for state in &beam {
             for choice in piece_choices(pieces, state, hold_enabled)
@@ -676,6 +678,13 @@ fn retain_best_search_states(beam: &mut Vec<SearchState>, beam_width: usize) {
 
 fn setup_candidate_pool_width(beam_width: usize) -> usize {
     beam_width.saturating_mul(14).max(beam_width)
+}
+
+fn next_search_map_capacity(active_states: usize, beam_width: usize, hold_enabled: bool) -> usize {
+    let choices_per_state = if hold_enabled { 2 } else { 1 };
+    let state_expansion_hint = active_states.saturating_mul(choices_per_state * 40);
+    let prune_pool_hint = setup_candidate_pool_width(beam_width).saturating_mul(8);
+    state_expansion_hint.min(prune_pool_hint).max(beam_width)
 }
 
 fn score_t_spin_setup_potential(
