@@ -97,6 +97,36 @@ describe("opener fumen preview pages", () => {
       }
     }
   });
+
+  test("real native hold and clear histories remain exact fumen operations", () => {
+    const [node] = searchOpenerBeamWithPlacements({
+      queue: "JLSTZIOT",
+      beamWidth: 64,
+      hold: true,
+      maxDepth: 5,
+      kickTable: "SRS-X",
+      spinMode: "ALL-SPINS",
+      comboTable: "MULTIPLIER"
+    });
+    expect(node?.placements.some((placement) => placement.usedHold)).toBe(true);
+    expect(node?.placements.some((placement) => placement.clearedLines > 0)).toBe(true);
+
+    const pages = createOpenerFumenPages(node!, { title: "real native" });
+    expect(pages).toHaveLength(node!.placements.length);
+    for (const [index, placement] of node!.placements.entries()) {
+      const operation = pages[index]?.operation;
+      expect(operation?.type).toBe(assertFumenMino(placement.piece));
+      expect(canonicalCells(Mino.from(operation!).positions())).toBe(canonicalCells(placement.cells));
+    }
+
+    const codec = new TetrisFumenCodec();
+    const decoded = codec.decode(codec.encodePages(pages));
+    for (const [index, placement] of node!.placements.entries()) {
+      const operation = decoded[index]?.operation;
+      expect(operation?.type).toBe(assertFumenMino(placement.piece));
+      expect(canonicalCells(Mino.from(operation!).positions())).toBe(canonicalCells(placement.cells));
+    }
+  });
 });
 
 const PIECES = ["I", "O", "T", "S", "Z", "J", "L"] as const satisfies readonly FumenMino[];
@@ -137,6 +167,13 @@ function fumenRotation(rotationIndex: number): FumenRotation {
     throw new Error(`Unsupported native rotation index ${rotationIndex}.`);
   }
   return rotation;
+}
+
+function assertFumenMino(piece: string): FumenMino {
+  if ((PIECES as readonly string[]).includes(piece)) {
+    return piece as FumenMino;
+  }
+  throw new Error(`Unsupported fumen mino ${piece}.`);
 }
 
 function placementFromOperation(operation: FumenOperation): NativeBeamPlacement {

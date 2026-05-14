@@ -64,3 +64,4 @@ Executable examples live in `tests/`.
 - [x] Cache native quad-well continuation potential by board rows during beam rescoring
 - [x] Model native HANDHELD non-T spins with 4-corner detection and halved attack
 - [x] Skip native T immobility checks for spin modes that cannot use immobile T minis
+- [x] Add fumen parity coverage for real native hold and line-clear placement histories
