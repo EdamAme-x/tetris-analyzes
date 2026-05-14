@@ -126,6 +126,10 @@ describe("opener fumen preview pages", () => {
       expect(operation?.type).toBe(assertFumenMino(placement.piece));
       expect(canonicalCells(Mino.from(operation!).positions())).toBe(canonicalCells(placement.cells));
     }
+
+    const lockedPages = createOpenerFumenPages(node!, { title: "real native", includeOperations: false });
+    const decodedLocked = codec.decode(codec.encodePages(lockedPages));
+    expect(fieldRowsToBitRows(decodedLocked.at(-1)?.fieldRows ?? [])).toEqual(node!.rows);
   });
 });
 
@@ -252,4 +256,19 @@ function canonicalCells(cells: readonly NativePlacementCell[]): string {
 function bottomRow(page: { readonly fieldRows?: readonly FumenCellRow[] } | undefined): string | undefined {
   const row = page?.fieldRows?.at(-1);
   return typeof row === "string" || row === undefined ? row : row.join("");
+}
+
+function fieldRowsToBitRows(fieldRows: readonly string[]): number[] {
+  const rows: number[] = [];
+  for (let y = 0; y < 20; y += 1) {
+    const row = fieldRows[fieldRows.length - 1 - y] ?? "";
+    let mask = 0;
+    for (let x = 0; x < 10; x += 1) {
+      if (row[x] !== "_") {
+        mask |= 1 << x;
+      }
+    }
+    rows.push(mask);
+  }
+  return rows;
 }
