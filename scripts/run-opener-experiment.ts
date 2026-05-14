@@ -17,19 +17,22 @@ const top = readNumberOption(args, "--top");
 const preset = args.get("--preset") ?? "default";
 const scenarios = scenarioPreset(preset);
 const survivabilityReplay = readNonNegativeNumberOption(args, "--survivability-replay") ?? defaultSurvivabilityReplay(preset);
+const displayTop = top ?? 5;
+const replayTopTemplates = readNumberOption(args, "--replay-top-templates") ?? defaultReplayTemplatePool(preset, displayTop);
+const experimentTop = survivabilityReplay === 0 ? top : Math.max(displayTop, replayTopTemplates);
 const report = runOpenerExperiment({
   scenarios,
   environment: {
     runtime: `bun ${Bun.version}`,
     nativeProfile: "release"
   },
-  ...(top === undefined ? {} : { top }),
+  ...(experimentTop === undefined ? {} : { top: experimentTop }),
   ...(survivabilityReplay === 0
     ? {}
     : {
         templateReplay: {
           scenarios: createTemplateReplayScenarios(survivabilityReplay, templateReplayOptions(scenarios)),
-          topTemplates: top ?? 5
+          topTemplates: replayTopTemplates
         }
       })
 });
@@ -40,13 +43,13 @@ await mkdir(outDir, { recursive: true });
 await writeFile(join(outDir, `${filenameBase}.json`), `${JSON.stringify(report, null, 2)}\n`);
 await writeFile(join(outDir, `${filenameBase}.md`), markdown);
 
-console.log(renderOpenerExperimentConsoleSummary(report, top ?? 5));
+console.log(renderOpenerExperimentConsoleSummary(report, displayTop));
 console.log("");
 console.log(`full report: ${join(outDir, `${filenameBase}.md`)}`);
 console.log(`json: ${join(outDir, `${filenameBase}.json`)}`);
 
 function parseArgs(argv: readonly string[]): Map<string, string> {
-  const allowed = new Set(["--out-dir", "--top", "--preset", "--survivability-replay"]);
+  const allowed = new Set(["--out-dir", "--top", "--preset", "--survivability-replay", "--replay-top-templates"]);
   const parsed = new Map<string, string>();
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
@@ -103,6 +106,11 @@ function readNonNegativeNumberOption(args: ReadonlyMap<string, string>, name: st
 
 function defaultSurvivabilityReplay(presetName: string): number {
   return presetName === "discovery" ? 24 : 0;
+}
+
+function defaultReplayTemplatePool(presetName: string, displayTop: number): number {
+  const minimum = presetName === "continuation" || presetName === "discovery" ? 64 : 16;
+  return Math.max(displayTop, minimum);
 }
 
 function scenarioPreset(name: string) {

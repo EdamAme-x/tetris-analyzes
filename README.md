@@ -84,3 +84,4 @@ Executable examples live in `tests/`.
 - [x] Reuse native bag permutation buffers during sampled opener evaluation
 - [x] Key opener template replay by board, hold, queue progress, and B2B state
 - [x] Prioritize replay-hit survivability before firepower inside replay reports
+- [x] Keep console top compact while using a wider internal replay template pool
