@@ -334,10 +334,11 @@ export function renderOpenerExperimentMarkdown(report: OpenerExperimentReport): 
 }
 
 export function renderOpenerExperimentConsoleSummary(report: OpenerExperimentReport, topCount = 5): string {
-  const lines = ["Best opener candidates", ""];
-  for (const candidate of rankOpenerCandidates(report, topCount)) {
+  const lines = ["Best opener templates", ""];
+  for (const template of rankOpenerTemplates(report, topCount)) {
+    const candidate = template.best;
     lines.push(
-      `#${candidate.rank} source=${candidate.sourceScenario} survival=${formatSurvival(candidate)} attack=${candidate.attack} difficultAttack=${candidate.difficultAttack} otherAttack=${candidate.nonDifficultAttack} tspin=${candidate.tSpinClears} tspinAttack=${candidate.tSpinAttack} b2b=${candidate.backToBackChain} tspinPotential=${candidate.tSpinPotential} points=${candidate.points} score=${candidate.score.toFixed(1)} holes=${candidate.holes} bump=${candidate.bumpiness}`,
+      `#${template.rank} sources=${template.sources.join(",")} survival=${formatTemplateSurvival(template)} attack=${candidate.attack} difficultAttack=${candidate.difficultAttack} otherAttack=${candidate.nonDifficultAttack} tspin=${candidate.tSpinClears} tspinAttack=${candidate.tSpinAttack} b2b=${candidate.backToBackChain} tspinPotential=${candidate.tSpinPotential} points=${candidate.points} score=${candidate.score.toFixed(1)} holes=${candidate.holes} bump=${candidate.bumpiness}`,
       `clears: ${formatClearSequence(candidate.clearSequence)}`,
       `path: ${candidate.path.join(" ")}`,
       `view: ${candidate.previewUrl}`,
