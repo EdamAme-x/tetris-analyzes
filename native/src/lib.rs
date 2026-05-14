@@ -756,6 +756,7 @@ fn score_t_spin_setup_potential(
     spin_mode: SpinMode,
 ) {
     let mut potential_by_rows = FastHashMap::<BoardRows, u32>::default();
+    let mut quad_well_by_rows = FastHashMap::<BoardRows, u32>::default();
     let allows_t_spin_potential = spin_mode_allows_t_spin_potential(spin_mode);
     for state in beam {
         let future_pieces = future_pieces_by_queue_index
@@ -780,7 +781,9 @@ fn score_t_spin_setup_potential(
             0
         };
         let quad_well_potential = if has_b2b_i_continuation {
-            estimate_quad_well_potential(&state.rows)
+            *quad_well_by_rows
+                .entry(state.rows)
+                .or_insert_with(|| estimate_quad_well_potential(&state.rows))
         } else {
             0
         };
