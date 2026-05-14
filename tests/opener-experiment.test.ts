@@ -816,7 +816,7 @@ describe("opener experiment runner", () => {
       }
     });
 
-    expect(calls).toBe(4);
+    expect(calls).toBe(3);
     expect(report.templateReplay?.templates[0]).toMatchObject({
       replayHitCount: 0,
       phaseReplayHitCount: 1,

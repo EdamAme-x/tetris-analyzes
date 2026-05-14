@@ -101,3 +101,4 @@ Executable examples live in `tests/`.
 - [x] Promote additional measured TL-gated three-bag queues into continuation discovery
 - [x] Replay continuation phase survivability against the native fourteen-piece frontier
 - [x] Preserve native continuation phase diversity by hold and B2B state
+- [x] Compute continuation phase frontiers lazily during replay instead of every source search

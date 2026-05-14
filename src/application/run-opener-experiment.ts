@@ -715,6 +715,16 @@ export function replayOpenerTemplateSurvivability(
           scenarioPhaseProfileHits
         );
       }
+      for (const reachablePhase of createReachablePhaseFrontiers(searchPhaseFrontierNodes(scenario, [], search), scenario)) {
+        addPhaseReplayHits(phaseHitsByTemplate, templateKeysByPhase, reachablePhase.phaseKey, scenario.name, scenarioPhaseHits);
+        addPhaseReplayHits(
+          phaseProfileHitsByTemplate,
+          templateKeysByPhaseProfile,
+          reachablePhase.phaseProfileKey,
+          scenario.name,
+          scenarioPhaseProfileHits
+        );
+      }
       for (const quality of cachedScenario.reachableQualities) {
         addQualityReplayHits(qualityHitsByTemplate, templates, quality, scenario.name, scenarioQualityHits);
       }
@@ -852,7 +862,6 @@ function runScenario(
   const stats = summarizeTimings(timings);
   const rules = scenarioRules(scenario);
   const topCandidates = createTopCandidates(lastNodes, scenario, topOverride ?? scenario.top ?? 5, fumenCodec);
-  const phaseFrontierNodes = searchPhaseFrontierNodes(scenario, lastNodes, search);
   assertScenarioQualityGate(scenario, topCandidates[0]);
   return {
     name: scenario.name,
@@ -872,7 +881,7 @@ function runScenario(
     searchesPerSecond: stats.median === 0 ? 0 : 1_000 / stats.median,
     reachableTemplates: createReachableTemplates(lastNodes),
     reachableTemplatePhases: createReachableTemplatePhases(lastNodes, scenario),
-    reachablePhaseFrontiers: createReachablePhaseFrontiers(phaseFrontierNodes, scenario),
+    reachablePhaseFrontiers: createReachablePhaseFrontiers(lastNodes, scenario),
     reachableQualities: createReachableQualities(lastNodes),
     top: topCandidates,
     tags: scenario.tags ?? []
