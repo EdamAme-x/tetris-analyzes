@@ -56,3 +56,4 @@ Executable examples live in `tests/`.
 - [x] Skip non-T immobility spin detection on the TETR.IO TL T-spin path
 - [x] Limit native continuation potential credit to T/I pieces reachable within remaining search depth
 - [x] Use native shape row masks for faster collision and lock operations
+- [x] Add regression tests for B2B carry/reset, empty-hold queue consumption, grounded placements, and TL non-T spin suppression

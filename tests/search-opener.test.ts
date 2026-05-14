@@ -53,6 +53,25 @@ describe("native opener beam search", () => {
     );
   });
 
+  test("consumes the next queue piece when holding from an empty hold slot", () => {
+    const twoPieceNodes = searchOpenerBeamWithPlacements({ queue: "ZI", beamWidth: 128, hold: true, maxDepth: 1 });
+    const heldFromEmpty = twoPieceNodes.find((node) => node.hold === "Z" && node.path[0]?.startsWith("hold:I@"));
+
+    expect(heldFromEmpty).toMatchObject({
+      queueIndex: 2,
+      depth: 1,
+      hold: "Z"
+    });
+    expect(heldFromEmpty?.placements[0]).toMatchObject({
+      piece: "I",
+      usedHold: true
+    });
+
+    const onePieceNodes = searchOpenerBeamWithPlacements({ queue: "Z", beamWidth: 128, hold: true, maxDepth: 1 });
+    expect(onePieceNodes.every((node) => node.queueIndex === 1)).toBe(true);
+    expect(onePieceNodes.some((node) => node.path[0]?.startsWith("hold:"))).toBe(false);
+  });
+
   test("filters placements that are geometrically possible but unreachable from spawn", () => {
     const empty = bitBoardFromRows(new Array(20).fill(0));
     const blockedLateralEntry = new Array(20).fill(1 << 3);
@@ -67,6 +86,7 @@ describe("native opener beam search", () => {
     sealedCave[7] = 496;
 
     expect(canReachOpenerPlacement({ rows: empty, piece: "I", rotation: 0, x: 3, y: 0 })).toBe(true);
+    expect(canReachOpenerPlacement({ rows: empty, piece: "I", rotation: 0, x: 3, y: 5 })).toBe(false);
     expect(
       canReachOpenerPlacement({ rows: bitBoardFromRows(blockedLateralEntry), piece: "O", rotation: 0, x: 0, y: 0, kickTable: "NONE" })
     ).toBe(false);
@@ -161,6 +181,13 @@ describe("native opener beam search", () => {
       mini: false
     });
     expect(
+      detectOpenerSpin({ rows: bitBoardFromRows(immobileIRows), piece: "I", rotation: 0, x: 3, y: 0, spinMode: "T-SPINS" })
+    ).toMatchObject({
+      kind: "NONE",
+      spin: false,
+      mini: false
+    });
+    expect(
       detectOpenerSpin({ rows: bitBoardFromRows(immobileIRows), piece: "I", rotation: 0, x: 3, y: 0, spinMode: "ALL-MINI" })
     ).toMatchObject({
       kind: "T_SPIN_MINI",
@@ -196,6 +223,28 @@ describe("native opener beam search", () => {
       attack: 4,
       points: 1200,
       combo: 1
+    });
+  });
+
+  test("preserves B2B through no-line setup moves and resets it on ordinary clears", () => {
+    const setupBetweenQuads = evaluateOpenerFirepower([{ clearName: "QUAD" }, { clearName: "NONE" }, { clearName: "QUAD" }]);
+    expect(setupBetweenQuads).toMatchObject({
+      backToBackChain: 2,
+      maxCombo: 1
+    });
+    expect(setupBetweenQuads.events[2]).toMatchObject({
+      clearName: "QUAD",
+      backToBack: true
+    });
+
+    const singleBetweenQuads = evaluateOpenerFirepower([{ clearName: "QUAD" }, { clearName: "SINGLE" }, { clearName: "QUAD" }]);
+    expect(singleBetweenQuads).toMatchObject({
+      backToBackChain: 1,
+      maxCombo: 3
+    });
+    expect(singleBetweenQuads.events[2]).toMatchObject({
+      clearName: "QUAD",
+      backToBack: false
     });
   });
 
