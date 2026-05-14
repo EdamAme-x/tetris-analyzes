@@ -1,11 +1,11 @@
 import { describe, expect, test } from "bun:test";
 import { createOpenerFumenPages } from "../src/application/create-opener-fumen";
-import { searchOpenerBeam } from "../src/application/search-opener";
+import { searchOpenerBeamWithPlacements } from "../src/application/search-opener";
 import { TetrisFumenCodec } from "../src/infrastructure/fumen/tetris-fumen-codec";
 
 describe("opener fumen preview pages", () => {
   test("renders native placement history as colored multi-page fumen", () => {
-    const [node] = searchOpenerBeam({ queue: "TI", hold: false, beamWidth: 1, maxDepth: 2 });
+    const [node] = searchOpenerBeamWithPlacements({ queue: "TI", hold: false, beamWidth: 1, maxDepth: 2 });
     expect(node).toBeDefined();
 
     const pages = createOpenerFumenPages(node!, { title: "candidate" });

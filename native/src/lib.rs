@@ -80,7 +80,8 @@ struct Placement {
 
 struct PlacedBoard {
     rows: [u16; BOARD_HEIGHT],
-    placement: Placement,
+    y: i8,
+    placement: Option<Placement>,
 }
 
 #[napi(object)]
@@ -279,6 +280,26 @@ pub fn search_opener_beam(
     hold_enabled: bool,
     max_depth: u32,
 ) -> Result<Vec<BeamSearchNode>> {
+    search_opener_beam_internal(queue, beam_width, hold_enabled, max_depth, false)
+}
+
+#[napi(js_name = "searchOpenerBeamWithPlacements")]
+pub fn search_opener_beam_with_placements(
+    queue: String,
+    beam_width: u32,
+    hold_enabled: bool,
+    max_depth: u32,
+) -> Result<Vec<BeamSearchNode>> {
+    search_opener_beam_internal(queue, beam_width, hold_enabled, max_depth, true)
+}
+
+fn search_opener_beam_internal(
+    queue: String,
+    beam_width: u32,
+    hold_enabled: bool,
+    max_depth: u32,
+    include_placements: bool,
+) -> Result<Vec<BeamSearchNode>> {
     let pieces = parse_queue(&queue)?;
     let max_depth = usize::min(max_depth as usize, pieces.len());
     let beam_width = usize::try_from(beam_width)
@@ -307,7 +328,9 @@ pub fn search_opener_beam(
             for choice in piece_choices(&pieces, state, hold_enabled) {
                 for shape in piece_shapes(choice.piece).iter().copied() {
                     for x in 0..=(BOARD_WIDTH as i8 - shape.width) {
-                        if let Some(placed) = place_and_clear(&state.rows, choice, shape, x) {
+                        if let Some(placed) =
+                            place_and_clear(&state.rows, choice, shape, x, include_placements)
+                        {
                             let rows = placed.rows;
                             let metrics = evaluate_board_unchecked(&rows);
                             let score = score_metrics(metrics);
@@ -316,11 +339,18 @@ pub fn search_opener_beam(
                                 choice.piece,
                                 shape.rotation,
                                 x,
-                                placed.placement.y,
+                                placed.y,
                                 choice.used_hold,
                             ));
-                            let mut placements = state.placements.clone();
-                            placements.push(placed.placement);
+                            let placements = if include_placements {
+                                let mut placements = state.placements.clone();
+                                if let Some(placement) = placed.placement {
+                                    placements.push(placement);
+                                }
+                                placements
+                            } else {
+                                Vec::new()
+                            };
                             let next_state = SearchState {
                                 rows,
                                 hold: choice.hold,
@@ -622,11 +652,16 @@ fn place_and_clear(
     choice: PieceChoice,
     shape: Shape,
     x: i8,
+    include_placement: bool,
 ) -> Option<PlacedBoard> {
     for y in 0..=(BOARD_HEIGHT as i8 - shape.height) {
         if can_place(rows, shape, x, y) && (y == 0 || !can_place(rows, shape, x, y - 1)) {
             let mut placed = *rows;
-            let mut cells = Vec::with_capacity(shape.cells.len());
+            let mut cells = if include_placement {
+                Some(Vec::with_capacity(shape.cells.len()))
+            } else {
+                None
+            };
             for cell in shape.cells {
                 let absolute = Cell {
                     x: x + cell.x,
@@ -635,18 +670,21 @@ fn place_and_clear(
                 let row_index = usize::try_from(absolute.y).ok()?;
                 let column = u32::try_from(absolute.x).ok()?;
                 placed[row_index] |= 1_u16 << column;
-                cells.push(absolute);
+                if let Some(cells) = &mut cells {
+                    cells.push(absolute);
+                }
             }
             return Some(PlacedBoard {
                 rows: clear_full_lines_array(placed),
-                placement: Placement {
+                y,
+                placement: cells.map(|cells| Placement {
                     piece: choice.piece,
                     rotation: shape.rotation,
                     x,
                     y,
                     used_hold: choice.used_hold,
                     cells,
-                },
+                }),
             });
         }
     }

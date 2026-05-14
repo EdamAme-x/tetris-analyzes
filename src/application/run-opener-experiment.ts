@@ -1,7 +1,7 @@
 import { createFumenCodec } from "../infrastructure/fumen/tetris-fumen-codec";
 import type { FumenCodec, FumenUrls } from "../domain/fumen";
 import { createOpenerFumenPages } from "./create-opener-fumen";
-import { searchOpenerBeam, type SearchOpenerBeamInput, type SearchOpenerBeamNode } from "./search-opener";
+import { searchOpenerBeamWithPlacements, type SearchOpenerBeamInput, type SearchOpenerBeamNode } from "./search-opener";
 
 export interface OpenerExperimentScenario {
   readonly name: string;
@@ -117,7 +117,7 @@ export function runOpenerExperiment(input: RunOpenerExperimentInput): OpenerExpe
   }
 
   const clock = input.clock ?? systemClock;
-  const search = input.search ?? searchOpenerBeam;
+  const search = input.search ?? searchOpenerBeamWithPlacements;
   const fumenCodec = input.fumenCodec ?? createFumenCodec();
   const environment = input.environment ?? { runtime: "bun", nativeProfile: "release" };
 

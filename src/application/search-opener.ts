@@ -16,3 +16,13 @@ export function searchOpenerBeam(input: SearchOpenerBeamInput): SearchOpenerBeam
   const queue = typeof input.queue === "string" ? input.queue : input.queue.join("");
   return loadNativeBinding().searchOpenerBeam(queue, input.beamWidth ?? 64, input.hold ?? true, input.maxDepth ?? queue.length);
 }
+
+export function searchOpenerBeamWithPlacements(input: SearchOpenerBeamInput): SearchOpenerBeamNode[] {
+  const queue = typeof input.queue === "string" ? input.queue : input.queue.join("");
+  return loadNativeBinding().searchOpenerBeamWithPlacements(
+    queue,
+    input.beamWidth ?? 64,
+    input.hold ?? true,
+    input.maxDepth ?? queue.length
+  );
+}

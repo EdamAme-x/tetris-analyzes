@@ -1,4 +1,4 @@
-import { searchOpenerBeam } from "../src/application/search-opener";
+import { searchOpenerBeam, searchOpenerBeamWithPlacements } from "../src/application/search-opener";
 
 interface BenchCase {
   readonly name: string;
@@ -30,6 +30,11 @@ const cases: BenchCase[] = [
     name: "beam64 depth5 no-hold",
     iterations: 10,
     run: () => checksum(searchOpenerBeam({ queue: "TILJSZOTIL", beamWidth: 64, hold: false, maxDepth: 5 }))
+  },
+  {
+    name: "beam64 depth5 hold detailed",
+    iterations: 10,
+    run: () => checksum(searchOpenerBeamWithPlacements({ queue: "TILJSZOTIL", beamWidth: 64, hold: true, maxDepth: 5 }))
   }
 ];
 

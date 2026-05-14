@@ -29,7 +29,9 @@ describe("native binding loader", () => {
     expect(() => assertNativeBinding({ ...binding, extraExport: () => undefined }, "test-binding")).toThrow(
       "unexpected bindings: extraExport"
     );
-    expect(() => assertNativeBinding({ ...binding, searchOpenerBeam: 1 }, "test-binding")).toThrow("does not export searchOpenerBeam");
+    expect(() => assertNativeBinding({ ...binding, searchOpenerBeamWithPlacements: 1 }, "test-binding")).toThrow(
+      "does not export searchOpenerBeamWithPlacements"
+    );
   });
 });
 
@@ -47,6 +49,7 @@ function createValidBinding(): NativeBinding {
     applyGarbage: (rows) => rows,
     rowsToFumenField: () => "",
     batchRowsToFumenFields: () => [],
-    searchOpenerBeam: () => []
+    searchOpenerBeam: () => [],
+    searchOpenerBeamWithPlacements: () => []
   };
 }

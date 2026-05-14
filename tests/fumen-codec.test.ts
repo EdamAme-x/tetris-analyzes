@@ -107,7 +107,8 @@ describe("TetrisFumenCodec", () => {
         expect(boardCount).toBe(2);
         return ["_".repeat(230), "_".repeat(230)];
       },
-      searchOpenerBeam: () => []
+      searchOpenerBeam: () => [],
+      searchOpenerBeamWithPlacements: () => []
     };
 
     const codec = new TetrisFumenCodec(fakeNative);
