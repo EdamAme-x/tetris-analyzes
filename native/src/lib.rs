@@ -94,7 +94,9 @@ pub(crate) struct SearchState {
     rows: BoardRows,
     hold: Option<Piece>,
     queue_index: usize,
+    pub(crate) depth: usize,
     pub(crate) path: Vec<PlacementStep>,
+    path_tie_breaker: u64,
     placements: Vec<Placement>,
     pub(crate) score: f64,
     pub(crate) metrics: BoardEvaluation,
@@ -190,6 +192,16 @@ fn placement_piece_order(piece: Piece) -> u8 {
         Piece::T => 5,
         Piece::Z => 6,
     }
+}
+
+fn next_path_tie_breaker(current: u64, step: PlacementStep) -> u64 {
+    let used_hold = u64::from(step.used_hold);
+    let piece = u64::from(placement_piece_order(step.piece));
+    let rotation = u64::from(step.rotation);
+    let x = u64::from(step.x as u8);
+    let y = u64::from(step.y as u8);
+    let rank = (((used_hold * 7 + piece) * 4 + rotation) * 32 + x) * 32 + y;
+    current.wrapping_mul(16_384).wrapping_add(rank + 1)
 }
 
 #[derive(Clone)]
@@ -645,6 +657,7 @@ fn search_opener_beam_internal(
         hold_enabled,
         max_depth,
         include_placements,
+        include_path,
         combo_table,
         kick_table,
         spin_mode,
@@ -661,6 +674,7 @@ pub(crate) fn search_opener_states(
     hold_enabled: bool,
     max_depth: usize,
     include_placements: bool,
+    store_path: bool,
     combo_table: ComboTable,
     kick_table: KickTable,
     spin_mode: SpinMode,
@@ -675,7 +689,9 @@ pub(crate) fn search_opener_states(
         rows: empty_rows,
         hold: None,
         queue_index: 0,
+        depth: 0,
         path: Vec::new(),
+        path_tie_breaker: 0,
         placements: Vec::new(),
         score: score_state(initial_metrics, initial_firepower, initial_t_spin_potential),
         metrics: initial_metrics,
@@ -736,7 +752,7 @@ pub(crate) fn search_opener_states(
                                 let phase_family_key = next_phase_family_key(
                                     state.phase_family_key,
                                     &rows,
-                                    state.path.len() + 1,
+                                    state.depth + 1,
                                     choice.hold,
                                     firepower.back_to_back_chain,
                                 );
@@ -753,7 +769,7 @@ pub(crate) fn search_opener_states(
                                             entry.get(),
                                             score,
                                             firepower,
-                                            state.path.len() + 1,
+                                            state.depth + 1,
                                         ) == std::cmp::Ordering::Greater
                                         {
                                             entry.insert(build_next_search_state(
@@ -767,6 +783,7 @@ pub(crate) fn search_opener_states(
                                                 firepower_event,
                                                 score,
                                                 phase_family_key,
+                                                store_path,
                                             ));
                                         }
                                     }
@@ -782,6 +799,7 @@ pub(crate) fn search_opener_states(
                                             firepower_event,
                                             score,
                                             phase_family_key,
+                                            store_path,
                                         ));
                                     }
                                 }
@@ -839,16 +857,23 @@ fn build_next_search_state(
     firepower_event: FirepowerEvent,
     score: f64,
     phase_family_key: u64,
+    store_path: bool,
 ) -> SearchState {
-    let mut path = Vec::with_capacity(state.path.len() + 1);
-    path.extend_from_slice(&state.path);
-    path.push(PlacementStep {
+    let step = PlacementStep {
         piece: choice.piece,
         rotation: shape.rotation,
         x,
         y: placed.y,
         used_hold: choice.used_hold,
-    });
+    };
+    let path = if store_path {
+        let mut path = Vec::with_capacity(state.depth + 1);
+        path.extend_from_slice(&state.path);
+        path.push(step);
+        path
+    } else {
+        Vec::new()
+    };
 
     let mut placements = Vec::new();
     if let Some(mut placement) = placed.placement {
@@ -862,7 +887,13 @@ fn build_next_search_state(
         rows: placed.rows,
         hold: choice.hold,
         queue_index: choice.queue_index,
+        depth: state.depth + 1,
         path,
+        path_tie_breaker: if store_path {
+            0
+        } else {
+            next_path_tie_breaker(state.path_tie_breaker, step)
+        },
         placements,
         score,
         metrics,
@@ -1139,7 +1170,7 @@ fn score_t_spin_setup_potential(
             .get(state.queue_index)
             .copied()
             .unwrap_or_default();
-        let remaining_depth = max_depth.saturating_sub(state.path.len());
+        let remaining_depth = max_depth.saturating_sub(state.depth);
         let has_future_t = allows_t_spin_potential
             && can_access_future_piece(state, future_pieces, Piece::T, remaining_depth);
         let has_b2b_i_continuation = state.firepower.back_to_back_chain > 0
@@ -1413,11 +1444,14 @@ fn compare_search_state(left: &SearchState, right: &SearchState) -> std::cmp::Or
     if ordering != std::cmp::Ordering::Equal {
         return ordering;
     }
-    let ordering = left.path.len().cmp(&right.path.len());
+    let ordering = left.depth.cmp(&right.depth);
     if ordering != std::cmp::Ordering::Equal {
         return ordering;
     }
-    left.path.cmp(&right.path)
+    if !left.path.is_empty() || !right.path.is_empty() {
+        return left.path.cmp(&right.path);
+    }
+    left.path_tie_breaker.cmp(&right.path_tie_breaker)
 }
 
 fn compare_search_state_to_candidate(
@@ -1480,7 +1514,7 @@ fn compare_search_state_to_candidate(
     if ordering != std::cmp::Ordering::Equal {
         return ordering;
     }
-    left.path.len().cmp(&right_path_len)
+    left.depth.cmp(&right_path_len)
 }
 
 pub(crate) fn validate_beam_width(beam_width: u32) -> Result<usize> {
@@ -1534,7 +1568,7 @@ impl BeamSearchNode {
         Self {
             score: state.score,
             firepower_score: firepower_score(state.firepower),
-            depth: state.path.len() as u32,
+            depth: state.depth as u32,
             queue_index: state.queue_index as u32,
             hold: state.hold.map(piece_name).map(String::from),
             rows: state.rows.to_vec(),
@@ -1662,7 +1696,9 @@ mod tests {
             rows,
             hold,
             queue_index,
+            depth: 0,
             path: Vec::new(),
+            path_tie_breaker: 0,
             placements: Vec::new(),
             score: score_state(metrics, firepower, 0),
             metrics,

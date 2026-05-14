@@ -94,6 +94,7 @@ pub(crate) fn evaluate_opener_bag_internal(
             hold_enabled,
             max_depth,
             false,
+            false,
             combo_table,
             kick_table,
             spin_mode,
@@ -273,8 +274,8 @@ fn evaluate_queue(
         };
     };
 
-    let depth = state.path.len() as u32;
-    let buildable = state.path.len() == target_depth;
+    let depth = state.depth as u32;
+    let buildable = state.depth == target_depth;
     let firepower_score = firepower_score(state.firepower);
     let weighted_score = opener_weighted_score(&state, buildable);
     OpenerQueueEvaluation {
@@ -312,7 +313,7 @@ fn opener_weighted_score(state: &SearchState, buildable: bool) -> f64 {
         + f64::from(state.firepower.difficult_clears) * 1_200.0
         + f64::from(state.firepower.back_to_back_chain) * 1_000.0
         + f64::from(state.t_spin_potential) * 800.0
-        + state.path.len() as f64 * 250.0
+        + state.depth as f64 * 250.0
         - f64::from(state.metrics[3]) * 120.0
         - f64::from(state.metrics[4]) * 20.0
 }

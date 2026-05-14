@@ -117,3 +117,4 @@ Executable examples live in `tests/`.
 - [x] Reserve equivalent-firepower holeless candidates during native beam pruning
 - [x] Include continuation potential in replay quality matching
 - [x] Promote measured holeless 3T-spin/3B2B/12-attack continuation queues into the TL preset
+- [x] Skip native path-history cloning for compact replay and bag evaluation searches
