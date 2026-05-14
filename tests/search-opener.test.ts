@@ -166,6 +166,8 @@ describe("native opener beam search", () => {
     fullTSpinRows[1] = (1 << 3) | (1 << 5);
     const immobileIRows = new Array(20).fill(0);
     immobileIRows[0] = (1 << 2) | (1 << 7);
+    const handheldCornerRows = new Array(20).fill(0);
+    handheldCornerRows[1] = 1 << 2;
 
     expect(
       detectOpenerSpin({ rows: bitBoardFromRows(fullTSpinRows), piece: "T", rotation: 0, x: 3, y: 0, spinMode: "NONE" })
@@ -193,6 +195,19 @@ describe("native opener beam search", () => {
       kind: "T_SPIN_MINI",
       spin: true,
       mini: true
+    });
+    expect(
+      detectOpenerSpin({ rows: bitBoardFromRows(handheldCornerRows), piece: "I", rotation: 0, x: 3, y: 0, spinMode: "ALL-SPINS" })
+    ).toMatchObject({
+      kind: "NONE",
+      spin: false
+    });
+    expect(
+      detectOpenerSpin({ rows: bitBoardFromRows(handheldCornerRows), piece: "I", rotation: 0, x: 3, y: 0, spinMode: "HANDHELD" })
+    ).toMatchObject({
+      kind: "T_SPIN",
+      spin: true,
+      occupiedCorners: 3
     });
     expect(() => searchOpenerBeam({ queue: "TIL", spinMode: "HANDHELD" })).not.toThrow();
     expect(() => searchOpenerBeam({ queue: "TIL", spinMode: "BAD SPINS" as "T-SPINS" })).toThrow("Unsupported native opener spin mode");

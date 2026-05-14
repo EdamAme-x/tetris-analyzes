@@ -200,6 +200,7 @@ pub(crate) fn advance_firepower_with_combo_table(
         all_clear,
         combo_table,
         spin.force_back_to_back,
+        spin.halve_attack,
     )
 }
 
@@ -210,6 +211,7 @@ pub(crate) fn advance_firepower_for_clear_with_combo_table(
     all_clear: bool,
     combo_table: ComboTable,
     force_back_to_back: bool,
+    halve_attack: bool,
 ) -> (FirepowerState, FirepowerEvent) {
     let base_attack = clear_kind_attack(clear_kind);
     let mut attack = base_attack as f64;
@@ -254,7 +256,11 @@ pub(crate) fn advance_firepower_for_clear_with_combo_table(
     } else {
         0
     };
-    let event_attack = attack.floor() as u32 + all_clear_bonus;
+    let event_attack = if halve_attack {
+        (attack * 0.5).floor() as u32
+    } else {
+        attack.floor() as u32
+    } + all_clear_bonus;
     let event_points = points + all_clear_points;
     let all_clears = previous.all_clears + u32::from(all_clear);
     let difficult_clear = difficult && cleared_lines > 0;
@@ -413,6 +419,7 @@ mod tests {
             mini: kind == SpinKind::TSpinMini,
             immobile: kind == SpinKind::ImmobileSpin,
             force_back_to_back,
+            halve_attack: false,
             occupied_corners: 0,
             cleared_lines,
         }
@@ -427,6 +434,7 @@ mod tests {
             false,
             ComboTable::Multiplier,
             false,
+            false,
         );
         let (quad_state, quad_event) = advance_firepower_for_clear_with_combo_table(
             FirepowerState::empty(),
@@ -434,6 +442,7 @@ mod tests {
             4,
             false,
             ComboTable::Multiplier,
+            false,
             false,
         );
 
@@ -465,6 +474,22 @@ mod tests {
         assert_eq!(second_state.back_to_back_chain, 2);
         assert_eq!(second_state.difficult_clears, 2);
         assert!(second_event.back_to_back);
+    }
+
+    #[test]
+    fn spin_halve_attack_halves_non_t_handheld_attack() {
+        let mut spin = spin_detection(SpinKind::TSpin, 2, false);
+        spin.halve_attack = true;
+
+        let (_, event) = advance_firepower_with_combo_table(
+            FirepowerState::empty(),
+            spin,
+            &[1_u16; BOARD_HEIGHT],
+            ComboTable::Multiplier,
+        );
+
+        assert_eq!(event.base_attack, 4);
+        assert_eq!(event.attack, 2);
     }
 
     #[test]

@@ -11,6 +11,7 @@ pub(crate) struct SpinDetection {
     pub(crate) mini: bool,
     pub(crate) immobile: bool,
     pub(crate) force_back_to_back: bool,
+    pub(crate) halve_attack: bool,
     pub(crate) occupied_corners: u32,
     pub(crate) cleared_lines: u32,
 }
@@ -61,6 +62,7 @@ pub(crate) fn detect_spin(
                 mini,
                 immobile,
                 force_back_to_back: false,
+                halve_attack: false,
                 occupied_corners,
                 cleared_lines,
             };
@@ -72,6 +74,7 @@ pub(crate) fn detect_spin(
             mini: false,
             immobile,
             force_back_to_back: false,
+            halve_attack: false,
             occupied_corners,
             cleared_lines,
         };
@@ -84,6 +87,7 @@ pub(crate) fn detect_spin(
             mini: false,
             immobile,
             force_back_to_back: false,
+            halve_attack: false,
             occupied_corners: 0,
             cleared_lines,
         };
@@ -95,6 +99,7 @@ pub(crate) fn detect_spin(
         mini: false,
         immobile,
         force_back_to_back: false,
+        halve_attack: false,
         occupied_corners: 0,
         cleared_lines,
     }
@@ -121,7 +126,26 @@ pub(crate) fn detect_spin_for_mode(
             mini: false,
             immobile: false,
             force_back_to_back: false,
+            halve_attack: false,
             occupied_corners: 0,
+            cleared_lines,
+        };
+    }
+
+    if piece != Piece::T && mode == SpinMode::Handheld {
+        let occupied_corners = count_piece_occupied_corners(locked_rows, shape, x, y);
+        return SpinDetection {
+            kind: if occupied_corners >= 3 {
+                SpinKind::TSpin
+            } else {
+                SpinKind::None
+            },
+            spin: occupied_corners >= 3,
+            mini: false,
+            immobile: false,
+            force_back_to_back: false,
+            halve_attack: occupied_corners >= 3,
+            occupied_corners,
             cleared_lines,
         };
     }
@@ -216,6 +240,7 @@ fn without_spin(detection: SpinDetection) -> SpinDetection {
         spin: false,
         mini: false,
         force_back_to_back: false,
+        halve_attack: false,
         ..detection
     }
 }
@@ -257,6 +282,27 @@ pub(crate) fn count_t_front_corners(rows: &BoardRows, rotation: u8, x: i8, y: i8
         .into_iter()
         .filter(|cell| is_occupied_or_wall(rows, cell.x, cell.y))
         .count() as u32
+}
+
+pub(crate) fn count_piece_occupied_corners(rows: &BoardRows, shape: Shape, x: i8, y: i8) -> u32 {
+    [
+        Cell { x: x - 1, y: y - 1 },
+        Cell {
+            x: x + shape.width,
+            y: y - 1,
+        },
+        Cell {
+            x: x - 1,
+            y: y + shape.height,
+        },
+        Cell {
+            x: x + shape.width,
+            y: y + shape.height,
+        },
+    ]
+    .into_iter()
+    .filter(|cell| is_occupied_or_wall(rows, cell.x, cell.y))
+    .count() as u32
 }
 
 pub(crate) fn t_corner_cells(rotation: u8, x: i8, y: i8) -> [Cell; 4] {
@@ -357,6 +403,8 @@ pub(crate) fn spin_kind_name(kind: SpinKind) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::movement::lock_shape;
+    use crate::pieces::piece_shapes;
 
     #[test]
     fn all_mini_non_t_spins_force_back_to_back_without_full_spin_attack() {
@@ -366,6 +414,7 @@ mod tests {
             mini: false,
             immobile: true,
             force_back_to_back: false,
+            halve_attack: false,
             occupied_corners: 0,
             cleared_lines: 1,
         };
@@ -378,5 +427,23 @@ mod tests {
         let tl = apply_spin_mode(detection, Piece::I, SpinMode::TSpins);
         assert!(tl.kind == SpinKind::None);
         assert!(!tl.force_back_to_back);
+    }
+
+    #[test]
+    fn handheld_non_t_uses_four_corner_detection_and_half_attack() {
+        let mut rows = [0_u16; BOARD_HEIGHT];
+        rows[1] = 1 << 2;
+        let shape = piece_shapes(Piece::I)[0];
+        let locked = lock_shape(&rows, shape, 3, 0).expect("I piece should lock on floor");
+
+        let handheld = detect_spin_for_mode(&locked, Piece::I, shape, 3, 0, 2, SpinMode::Handheld);
+        assert!(handheld.kind == SpinKind::TSpin);
+        assert!(handheld.spin);
+        assert_eq!(handheld.occupied_corners, 3);
+        assert!(handheld.halve_attack);
+
+        let all_spins = detect_spin_for_mode(&locked, Piece::I, shape, 3, 0, 2, SpinMode::AllSpins);
+        assert!(all_spins.kind == SpinKind::None);
+        assert!(!all_spins.spin);
     }
 }

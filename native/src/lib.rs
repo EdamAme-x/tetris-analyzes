@@ -29,8 +29,7 @@ use pieces::{
     placement_shape_indices, Cell, Piece, Shape,
 };
 use spin::{
-    apply_spin_mode, detect_spin, detect_spin_for_mode, parse_spin_mode, spin_kind_name,
-    SpinDetection, SpinMode,
+    detect_spin, detect_spin_for_mode, parse_spin_mode, spin_kind_name, SpinDetection, SpinMode,
 };
 use tetrio_tables::{ComboTable, KickTable};
 
@@ -402,17 +401,18 @@ pub fn detect_opener_spin(
             piece_name(piece)
         )));
     };
-    let detected = detect_spin(
-        &locked,
-        piece,
-        shape,
-        x,
-        y,
-        board::count_full_lines_array(&locked),
-    );
+    let cleared_lines = board::count_full_lines_array(&locked);
     let spin = match spin_mode {
-        Some(spin_mode) => apply_spin_mode(detected, piece, parse_spin_mode(&spin_mode)?),
-        None => detected,
+        Some(spin_mode) => detect_spin_for_mode(
+            &locked,
+            piece,
+            shape,
+            x,
+            y,
+            cleared_lines,
+            parse_spin_mode(&spin_mode)?,
+        ),
+        None => detect_spin(&locked, piece, shape, x, y, cleared_lines),
     };
     Ok(BeamSpinDetection::from(spin))
 }
@@ -447,6 +447,7 @@ pub fn evaluate_opener_firepower(events: Vec<BeamFirepowerInput>) -> Result<Beam
             cleared_lines,
             cleared_lines > 0 && event.all_clear.unwrap_or(false),
             combo_table,
+            false,
             false,
         );
         state = next_state;

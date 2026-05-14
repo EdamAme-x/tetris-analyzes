@@ -62,3 +62,4 @@ Executable examples live in `tests/`.
 - [x] Stop native T-spin potential scans once the maximum reachable continuation value is found
 - [x] Make native ALL-MINI and MINI-ONLY non-T spin clears advance Back-to-Back chains
 - [x] Cache native quad-well continuation potential by board rows during beam rescoring
+- [x] Model native HANDHELD non-T spins with 4-corner detection and halved attack
