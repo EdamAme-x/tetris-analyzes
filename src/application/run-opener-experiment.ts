@@ -2,12 +2,7 @@ import { createFumenCodec } from "../infrastructure/fumen/tetris-fumen-codec";
 import type { FumenCodec, FumenUrls } from "../domain/fumen";
 import type { NativeComboTable, NativeKickTable, NativeSpinMode } from "../infrastructure/native/binding-types";
 import { createOpenerFumenPages } from "./create-opener-fumen";
-import {
-  estimateOpenerTSpinPotential,
-  searchOpenerBeamWithPlacements,
-  type SearchOpenerBeamInput,
-  type SearchOpenerBeamNode
-} from "./search-opener";
+import { searchOpenerBeamWithPlacements, type SearchOpenerBeamInput, type SearchOpenerBeamNode } from "./search-opener";
 
 export interface OpenerExperimentSearchRules {
   readonly spinMode: NativeSpinMode;
@@ -77,6 +72,41 @@ export interface RankedOpenerTemplate {
   readonly best: RankedOpenerCandidate;
 }
 
+export interface OpenerTemplateReplayHit {
+  readonly scenario: string;
+  readonly queue: string;
+  readonly rank: number;
+  readonly score?: number;
+  readonly attack?: number;
+  readonly difficultAttack?: number;
+  readonly tSpinClears?: number;
+  readonly tSpinAttack?: number;
+  readonly backToBackChain?: number;
+  readonly tSpinPotential?: number;
+  readonly path?: readonly string[];
+  readonly clearSequence?: readonly string[];
+  readonly cached: boolean;
+}
+
+export interface OpenerTemplateReplayEntry {
+  readonly rank: number;
+  readonly key: string;
+  readonly groupedSurvivalCount: number;
+  readonly groupedSurvivalRate: number;
+  readonly replayScenarioCount: number;
+  readonly replayHitCount: number;
+  readonly replayHitRate: number;
+  readonly sources: readonly string[];
+  readonly best: RankedOpenerCandidate;
+  readonly hits: readonly OpenerTemplateReplayHit[];
+}
+
+export interface OpenerTemplateReplayReport {
+  readonly topTemplateCount: number;
+  readonly replayScenarioCount: number;
+  readonly templates: readonly OpenerTemplateReplayEntry[];
+}
+
 export interface OpenerExperimentScenarioResult {
   readonly name: string;
   readonly queue: string;
@@ -91,8 +121,14 @@ export interface OpenerExperimentScenarioResult {
   readonly minMs: number;
   readonly maxMs: number;
   readonly searchesPerSecond: number;
+  readonly reachableTemplates: readonly OpenerScenarioReachableTemplate[];
   readonly top: readonly OpenerExperimentCandidate[];
   readonly tags: readonly string[];
+}
+
+export interface OpenerScenarioReachableTemplate {
+  readonly key: string;
+  readonly rank: number;
 }
 
 export interface OpenerExperimentReport {
@@ -100,6 +136,7 @@ export interface OpenerExperimentReport {
   readonly engine: "native-rust-beam";
   readonly environment: OpenerExperimentEnvironment;
   readonly scenarios: readonly OpenerExperimentScenarioResult[];
+  readonly templateReplay?: OpenerTemplateReplayReport;
 }
 
 export interface OpenerExperimentClock {
@@ -121,6 +158,12 @@ export interface RunOpenerExperimentInput {
   readonly search?: OpenerSearch;
   readonly fumenCodec?: FumenCodec;
   readonly top?: number;
+  readonly templateReplay?: OpenerTemplateReplayInput;
+}
+
+export interface OpenerTemplateReplayInput {
+  readonly scenarios: readonly OpenerExperimentScenario[];
+  readonly topTemplates?: number;
 }
 
 const TWO_BAG_TL_SURVEY_QUEUES = [
@@ -183,6 +226,24 @@ export const DISCOVERY_OPENER_EXPERIMENT_SCENARIOS: readonly OpenerExperimentSce
   tags: ["discovery", "hold", "two-bag", "t-spin", "tetrio-tl"]
 }));
 
+export function createTemplateReplayScenarios(sampleSize: number): OpenerExperimentScenario[] {
+  if (!Number.isInteger(sampleSize) || sampleSize < 0) {
+    throw new Error("Template replay sample size must be a non-negative integer.");
+  }
+  return createDiscoveryTwoBagQueues(sampleSize).map((queue, index) => ({
+    name: `replay-${String(index + 1).padStart(2, "0")}`,
+    queue,
+    hold: true,
+    beamWidth: 1024,
+    maxDepth: 14,
+    rules: TETRIO_TL_OPENER_SEARCH_RULES,
+    warmups: 0,
+    iterations: 1,
+    top: 1,
+    tags: ["replay", "hold", "two-bag", "t-spin", "tetrio-tl"]
+  }));
+}
+
 export function runOpenerExperiment(input: RunOpenerExperimentInput): OpenerExperimentReport {
   if (input.scenarios.length === 0) {
     throw new Error("At least one opener experiment scenario is required.");
@@ -192,12 +253,19 @@ export function runOpenerExperiment(input: RunOpenerExperimentInput): OpenerExpe
   const search = input.search ?? searchOpenerBeamWithPlacements;
   const fumenCodec = input.fumenCodec ?? createFumenCodec();
   const environment = input.environment ?? { runtime: "bun", nativeProfile: "release" };
-
-  return {
+  const scenarios = input.scenarios.map((scenario) => runScenario(scenario, input.top, search, fumenCodec, clock));
+  const reportWithoutReplay: OpenerExperimentReport = {
     generatedAt: clock.isoNow(),
     engine: "native-rust-beam",
     environment,
-    scenarios: input.scenarios.map((scenario) => runScenario(scenario, input.top, search, fumenCodec, clock))
+    scenarios
+  };
+  const templateReplay =
+    input.templateReplay === undefined ? undefined : replayOpenerTemplateSurvivability(reportWithoutReplay, input.templateReplay, search);
+
+  return {
+    ...reportWithoutReplay,
+    ...(templateReplay === undefined ? {} : { templateReplay })
   };
 }
 
@@ -267,6 +335,34 @@ export function renderOpenerExperimentMarkdown(report: OpenerExperimentReport): 
     );
   }
 
+  if (report.templateReplay !== undefined) {
+    lines.push(
+      "",
+      "## Template replay",
+      "",
+      "| rank | replay hits | grouped survival | sources | attack | difficult attack | tspin | tspin attack | b2b | best replay rank | clears | preview |",
+      "| ---: | ---: | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- |"
+    );
+    for (const template of report.templateReplay.templates.slice(0, 12)) {
+      lines.push(
+        [
+          String(template.rank),
+          formatReplaySurvival(template),
+          formatGroupedReplaySurvival(template),
+          template.sources.join(" "),
+          String(template.best.attack),
+          String(template.best.difficultAttack),
+          String(template.best.tSpinClears),
+          String(template.best.tSpinAttack),
+          String(template.best.backToBackChain),
+          String(template.hits[0]?.rank ?? "-"),
+          formatClearSequence(template.best.clearSequence),
+          `[view](${template.best.previewUrl})`
+        ].join(" | ")
+      );
+    }
+  }
+
   lines.push(
     "",
     "## Search run",
@@ -334,6 +430,21 @@ export function renderOpenerExperimentMarkdown(report: OpenerExperimentReport): 
 }
 
 export function renderOpenerExperimentConsoleSummary(report: OpenerExperimentReport, topCount = 5): string {
+  if (report.templateReplay !== undefined) {
+    const lines = ["Best opener templates (replayed)", ""];
+    for (const template of report.templateReplay.templates.slice(0, topCount)) {
+      const candidate = template.best;
+      lines.push(
+        `#${template.rank} sources=${template.sources.join(",")} replay=${formatReplaySurvival(template)} grouped=${formatGroupedReplaySurvival(template)} attack=${candidate.attack} difficultAttack=${candidate.difficultAttack} otherAttack=${candidate.nonDifficultAttack} tspin=${candidate.tSpinClears} tspinAttack=${candidate.tSpinAttack} b2b=${candidate.backToBackChain} tspinPotential=${candidate.tSpinPotential} points=${candidate.points} score=${candidate.score.toFixed(1)} holes=${candidate.holes} bump=${candidate.bumpiness}`,
+        `clears: ${formatClearSequence(candidate.clearSequence)}`,
+        `path: ${candidate.path.join(" ")}`,
+        `view: ${candidate.previewUrl}`,
+        ""
+      );
+    }
+    return lines.join("\n").trimEnd();
+  }
+
   const lines = ["Best opener templates", ""];
   for (const template of rankOpenerTemplates(report, topCount)) {
     const candidate = template.best;
@@ -393,6 +504,102 @@ export function rankOpenerTemplates(report: OpenerExperimentReport, topCount: nu
     .map((template, index) => ({ ...template, rank: index + 1 }));
 }
 
+export function replayOpenerTemplateSurvivability(
+  report: OpenerExperimentReport,
+  input: OpenerTemplateReplayInput,
+  search: OpenerSearch = searchOpenerBeamWithPlacements
+): OpenerTemplateReplayReport {
+  const topTemplateCount = input.topTemplates ?? 5;
+  if (!Number.isInteger(topTemplateCount) || topTemplateCount <= 0) {
+    throw new Error("Template replay topTemplates must be a positive integer.");
+  }
+  if (input.scenarios.length === 0) {
+    return {
+      topTemplateCount,
+      replayScenarioCount: 0,
+      templates: []
+    };
+  }
+
+  const templates = rankOpenerTemplates(report, topTemplateCount);
+  const hitsByTemplate = new Map<string, OpenerTemplateReplayHit[]>();
+  const templateKeys = new Set(templates.map((template) => template.key));
+  const cachedScenarios = new Map(report.scenarios.map((scenario) => [scenarioResultSignature(scenario), scenario]));
+  for (const scenario of input.scenarios) {
+    const scenarioHits = new Set<string>();
+    const cachedScenario = cachedScenarios.get(scenarioSignature(scenario));
+    if (cachedScenario !== undefined) {
+      for (const reachableTemplate of cachedScenario.reachableTemplates) {
+        const key = reachableTemplate.key;
+        if (!templateKeys.has(key) || scenarioHits.has(key)) {
+          continue;
+        }
+        scenarioHits.add(key);
+        hitsByTemplate.set(key, [
+          ...(hitsByTemplate.get(key) ?? []),
+          {
+            scenario: scenario.name,
+            queue: scenario.queue,
+            rank: reachableTemplate.rank,
+            cached: true
+          }
+        ]);
+      }
+      continue;
+    }
+
+    const nodes = search(searchInput(scenario));
+    for (const [index, node] of nodes.entries()) {
+      const key = rowsTemplateKey(node.rows);
+      if (!templateKeys.has(key) || scenarioHits.has(key)) {
+        continue;
+      }
+      scenarioHits.add(key);
+      hitsByTemplate.set(key, [
+        ...(hitsByTemplate.get(key) ?? []),
+        {
+          scenario: scenario.name,
+          queue: scenario.queue,
+          rank: index + 1,
+          score: node.score,
+          attack: node.attack,
+          difficultAttack: difficultAttack(node),
+          tSpinClears: node.tSpinClears,
+          tSpinAttack: node.tSpinAttack,
+          backToBackChain: node.backToBackChain,
+          tSpinPotential: node.tSpinPotential,
+          path: node.path,
+          clearSequence: clearSequence(node),
+          cached: false
+        }
+      ]);
+    }
+  }
+
+  return {
+    topTemplateCount,
+    replayScenarioCount: input.scenarios.length,
+    templates: templates
+      .map((template) => {
+        const hits = hitsByTemplate.get(template.key) ?? [];
+        return {
+          rank: 0,
+          key: template.key,
+          groupedSurvivalCount: template.survivalCount,
+          groupedSurvivalRate: template.survivalRate,
+          replayScenarioCount: input.scenarios.length,
+          replayHitCount: hits.length,
+          replayHitRate: hits.length / input.scenarios.length,
+          sources: template.sources,
+          best: template.best,
+          hits
+        };
+      })
+      .sort(compareReplayTemplates)
+      .map((template, index) => ({ ...template, rank: index + 1 }))
+  };
+}
+
 function runScenario(
   scenario: OpenerExperimentScenario,
   topOverride: number | undefined,
@@ -437,6 +644,7 @@ function runScenario(
     minMs: stats.min,
     maxMs: stats.max,
     searchesPerSecond: stats.median === 0 ? 0 : 1_000 / stats.median,
+    reachableTemplates: createReachableTemplates(lastNodes),
     top: createTopCandidates(lastNodes, scenario, topOverride ?? scenario.top ?? 5, fumenCodec),
     tags: scenario.tags ?? []
   };
@@ -459,21 +667,35 @@ function scenarioRules(scenario: OpenerExperimentScenario): OpenerExperimentSear
   return scenario.rules ?? TETRIO_TL_OPENER_SEARCH_RULES;
 }
 
+function scenarioSignature(scenario: OpenerExperimentScenario): string {
+  const rules = scenarioRules(scenario);
+  return [scenario.queue, String(scenario.hold), String(scenario.beamWidth), String(scenario.maxDepth), formatRules(rules)].join("|");
+}
+
+function scenarioResultSignature(scenario: OpenerExperimentScenarioResult): string {
+  return [scenario.queue, String(scenario.hold), String(scenario.beamWidth), String(scenario.maxDepth), formatRules(scenario.rules)].join(
+    "|"
+  );
+}
+
+function createReachableTemplates(nodes: readonly SearchOpenerBeamNode[]): OpenerScenarioReachableTemplate[] {
+  const ranksByTemplate = new Map<string, number>();
+  for (const [index, node] of nodes.entries()) {
+    const key = rowsTemplateKey(node.rows);
+    if (!ranksByTemplate.has(key)) {
+      ranksByTemplate.set(key, index + 1);
+    }
+  }
+  return [...ranksByTemplate.entries()].map(([key, rank]) => ({ key, rank }));
+}
+
 function createTopCandidates(
   nodes: readonly SearchOpenerBeamNode[],
   scenario: OpenerExperimentScenario,
   topCount: number,
   fumenCodec: FumenCodec
 ): OpenerExperimentCandidate[] {
-  const rules = scenarioRules(scenario);
-  return [...nodes]
-    .map((node) => ({
-      node,
-      tSpinPotential:
-        spinModeAllowsTSpinPotential(rules.spinMode) && hasFutureT(node, scenario)
-          ? estimateOpenerTSpinPotential(Uint16Array.from(node.rows), rules.kickTable)
-          : 0
-    }))
+  return rankSearchNodes(nodes, scenario)
     .sort(compareSearchNodesForOpener)
     .slice(0, topCount)
     .map(({ node, tSpinPotential }, index) => {
@@ -500,9 +722,7 @@ function createTopCandidates(
         tSpinClears: node.tSpinClears,
         tSpinAttack: node.tSpinAttack,
         tSpinPotential,
-        clearSequence: node.placements
-          .filter((placement) => placement.clearName !== "NONE" && placement.clearedLines > 0)
-          .map((placement) => `${placement.clearName}:${placement.attack}`),
+        clearSequence: clearSequence(node),
         occupiedCells: node.occupiedCells,
         clearedLines: node.clearedLines,
         aggregateHeight: node.aggregateHeight,
@@ -511,6 +731,16 @@ function createTopCandidates(
         urls
       };
     });
+}
+
+function rankSearchNodes(nodes: readonly SearchOpenerBeamNode[], scenario: OpenerExperimentScenario): SearchNodeWithReportPotential[] {
+  const rules = scenarioRules(scenario);
+  return [...nodes]
+    .map((node) => ({
+      node,
+      tSpinPotential: spinModeAllowsTSpinPotential(rules.spinMode) && hasFutureT(node, scenario) ? node.tSpinPotential : 0
+    }))
+    .sort(compareSearchNodesForOpener);
 }
 
 function compareSearchNodesForOpener(left: SearchNodeWithReportPotential, right: SearchNodeWithReportPotential): number {
@@ -560,10 +790,25 @@ function compareRankedOpenerTemplates(left: RankedOpenerTemplate, right: RankedO
   );
 }
 
+function compareReplayTemplates(left: OpenerTemplateReplayEntry, right: OpenerTemplateReplayEntry): number {
+  return (
+    right.replayHitCount - left.replayHitCount ||
+    right.groupedSurvivalCount - left.groupedSurvivalCount ||
+    compareRankedOpenerCandidates(left.best, right.best) ||
+    left.key.localeCompare(right.key)
+  );
+}
+
 function difficultAttack(node: SearchOpenerBeamNode): number {
   return node.placements
     .filter((placement) => placement.clearedLines > 0 && isDifficultClearName(placement.clearName))
     .reduce((attack, placement) => attack + placement.attack, 0);
+}
+
+function clearSequence(node: SearchOpenerBeamNode): string[] {
+  return node.placements
+    .filter((placement) => placement.clearName !== "NONE" && placement.clearedLines > 0)
+    .map((placement) => `${placement.clearName}:${placement.attack}`);
 }
 
 function isDifficultClearName(clearName: string): boolean {
@@ -597,7 +842,11 @@ function countTemplateSurvivors(report: OpenerExperimentReport): Map<string, num
 }
 
 function templateKey(candidate: Pick<OpenerExperimentCandidate, "finalRows">): string {
-  return candidate.finalRows.join(",");
+  return rowsTemplateKey(candidate.finalRows);
+}
+
+function rowsTemplateKey(rows: readonly number[]): string {
+  return rows.join(",");
 }
 
 function formatSurvival(candidate: Pick<RankedOpenerCandidate, "survivalCount" | "survivalRate">): string {
@@ -606,6 +855,16 @@ function formatSurvival(candidate: Pick<RankedOpenerCandidate, "survivalCount" |
 
 function formatTemplateSurvival(template: Pick<RankedOpenerTemplate, "survivalCount" | "survivalRate">): string {
   return `${template.survivalCount} (${formatPercent(template.survivalRate)})`;
+}
+
+function formatReplaySurvival(
+  template: Pick<OpenerTemplateReplayEntry, "replayHitCount" | "replayHitRate" | "replayScenarioCount">
+): string {
+  return `${template.replayHitCount}/${template.replayScenarioCount} (${formatPercent(template.replayHitRate)})`;
+}
+
+function formatGroupedReplaySurvival(template: Pick<OpenerTemplateReplayEntry, "groupedSurvivalCount" | "groupedSurvivalRate">): string {
+  return `${template.groupedSurvivalCount} (${formatPercent(template.groupedSurvivalRate)})`;
 }
 
 function formatPercent(value: number): string {

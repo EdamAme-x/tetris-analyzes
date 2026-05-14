@@ -4,6 +4,7 @@ import {
   DEFAULT_OPENER_EXPERIMENT_SCENARIOS,
   DISCOVERY_OPENER_EXPERIMENT_SCENARIOS,
   SURVEY_OPENER_EXPERIMENT_SCENARIOS,
+  createTemplateReplayScenarios,
   renderOpenerExperimentConsoleSummary,
   renderOpenerExperimentMarkdown,
   runOpenerExperiment
@@ -12,13 +13,22 @@ import {
 const outDir = readOption("--out-dir") ?? "experiments/runs";
 const top = readNumberOption("--top");
 const preset = readOption("--preset") ?? "default";
+const survivabilityReplay = readNonNegativeNumberOption("--survivability-replay") ?? defaultSurvivabilityReplay(preset);
 const report = runOpenerExperiment({
   scenarios: scenarioPreset(preset),
   environment: {
     runtime: `bun ${Bun.version}`,
     nativeProfile: "release"
   },
-  ...(top === undefined ? {} : { top })
+  ...(top === undefined ? {} : { top }),
+  ...(survivabilityReplay === 0
+    ? {}
+    : {
+        templateReplay: {
+          scenarios: createTemplateReplayScenarios(survivabilityReplay),
+          topTemplates: top ?? 5
+        }
+      })
 });
 const markdown = renderOpenerExperimentMarkdown(report);
 const filenameBase = `${report.generatedAt.replaceAll(":", "-").replaceAll(".", "-")}-opener`;
@@ -47,6 +57,22 @@ function readNumberOption(name: string): number | undefined {
     throw new Error(`${name} must be a positive integer.`);
   }
   return value;
+}
+
+function readNonNegativeNumberOption(name: string): number | undefined {
+  const raw = readOption(name);
+  if (raw === undefined) {
+    return undefined;
+  }
+  const value = Number(raw);
+  if (!Number.isInteger(value) || value < 0) {
+    throw new Error(`${name} must be a non-negative integer.`);
+  }
+  return value;
+}
+
+function defaultSurvivabilityReplay(presetName: string): number {
+  return presetName === "discovery" ? 24 : 0;
 }
 
 function scenarioPreset(name: string) {

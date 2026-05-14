@@ -38,4 +38,4 @@ Executable examples live in `tests/`.
 - [x] Native bag ranking exposes and prefers TL B2B/T-spin continuation metrics over perfect-clear bias
 - [x] Native pruning rewards B2B-preserving quad wells when a future I piece exists
 - [x] Add opener-template survivability grouping across experiment queue permutations
-- [ ] Expand survivability from top-candidate grouping to full template replay across wider queues
+- [x] Expand survivability from top-candidate grouping to full template replay across wider queues

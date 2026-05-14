@@ -6,7 +6,9 @@ import {
   DISCOVERY_OPENER_EXPERIMENT_SCENARIOS,
   SURVEY_OPENER_EXPERIMENT_SCENARIOS,
   TETRIO_TL_OPENER_SEARCH_RULES,
+  createTemplateReplayScenarios,
   rankOpenerTemplates,
+  replayOpenerTemplateSurvivability,
   renderOpenerExperimentConsoleSummary,
   renderOpenerExperimentMarkdown,
   runOpenerExperiment,
@@ -246,7 +248,7 @@ describe("opener experiment runner", () => {
       fumenCodec: fakeCodec,
       search: () => [
         { ...candidateNode("exhausted"), queueIndex: 2, rows: readyRows },
-        { ...candidateNode("held-t"), hold: "T", queueIndex: 2, rows: readyRows }
+        { ...candidateNode("held-t"), hold: "T", queueIndex: 2, rows: readyRows, tSpinPotential: 1 }
       ]
     });
 
@@ -293,6 +295,151 @@ describe("opener experiment runner", () => {
     expect(renderOpenerExperimentMarkdown(report)).toContain("2 (100.0%) | left right");
   });
 
+  test("creates deterministic replay scenarios for wider template survivability checks", () => {
+    const scenarios = createTemplateReplayScenarios(3);
+
+    expect(scenarios).toHaveLength(3);
+    expect(scenarios.map((scenario) => scenario.name)).toEqual(["replay-01", "replay-02", "replay-03"]);
+    expect(scenarios.every((scenario) => isTwoBagQueue(scenario.queue))).toBe(true);
+    expect(scenarios.every((scenario) => scenario.rules === TETRIO_TL_OPENER_SEARCH_RULES)).toBe(true);
+    expect(createTemplateReplayScenarios(0)).toEqual([]);
+    expect(() => createTemplateReplayScenarios(-1)).toThrow("Template replay sample size");
+  });
+
+  test("replays templates against full search results instead of only scenario top candidates", () => {
+    const targetRows = [1, 2, 3, ...new Array(17).fill(0)];
+    const missRows = [9, 8, 7, ...new Array(17).fill(0)];
+    const report = runOpenerExperiment({
+      scenarios: [
+        {
+          name: "source",
+          queue: "IO",
+          hold: false,
+          beamWidth: 4,
+          maxDepth: 1,
+          warmups: 0,
+          iterations: 1,
+          top: 1,
+          rules: { spinMode: "NONE", comboTable: "MULTIPLIER", kickTable: "SRS+" }
+        }
+      ],
+      templateReplay: {
+        scenarios: [replayScenario("replay-hit", "JO"), replayScenario("replay-miss", "LO")],
+        topTemplates: 1
+      },
+      clock: createClock("2026-05-14T00:00:00.000Z", [0, 2]),
+      fumenCodec: fakeCodec,
+      search: (input) => {
+        switch (input.queue) {
+          case "IO":
+            return [{ ...candidateNode("source-template"), rows: targetRows }];
+          case "JO":
+            return [
+              { ...candidateNode("better-ranked-miss"), score: 100, rows: missRows },
+              { ...candidateNode("lower-ranked-template"), score: 10, rows: targetRows }
+            ];
+          case "LO":
+            return [{ ...candidateNode("miss-only"), rows: missRows }];
+          default:
+            throw new Error(`Unexpected queue ${input.queue}`);
+        }
+      }
+    });
+
+    const replay = report.templateReplay?.templates[0];
+    expect(replay).toMatchObject({
+      replayScenarioCount: 2,
+      replayHitCount: 1,
+      replayHitRate: 0.5,
+      groupedSurvivalCount: 1,
+      groupedSurvivalRate: 1
+    });
+    expect(replay?.hits[0]).toMatchObject({
+      scenario: "replay-hit",
+      queue: "JO",
+      rank: 2,
+      path: ["lower-ranked-template"]
+    });
+
+    const summary = renderOpenerExperimentConsoleSummary(report, 1);
+    expect(summary).toContain("Best opener templates (replayed)");
+    expect(summary).toContain("replay=1/2 (50.0%) grouped=1 (100.0%)");
+    expect(renderOpenerExperimentMarkdown(report)).toContain("## Template replay");
+    expect(renderOpenerExperimentMarkdown(report)).toContain("1/2 (50.0%) | 1 (100.0%) | source");
+  });
+
+  test("reuses full template indexes from already searched scenarios during replay", () => {
+    const rows = [6, 5, 4, ...new Array(17).fill(0)];
+    let calls = 0;
+    const report = runOpenerExperiment({
+      scenarios: [
+        {
+          name: "source",
+          queue: "IO",
+          hold: false,
+          beamWidth: 4,
+          maxDepth: 1,
+          warmups: 0,
+          iterations: 1,
+          top: 1,
+          rules: { spinMode: "NONE", comboTable: "MULTIPLIER", kickTable: "SRS+" }
+        }
+      ],
+      templateReplay: {
+        scenarios: [replayScenario("cached-replay", "IO")],
+        topTemplates: 1
+      },
+      clock: createClock("2026-05-14T00:00:00.000Z", [0, 2]),
+      fumenCodec: fakeCodec,
+      search: () => {
+        calls += 1;
+        return [{ ...candidateNode("source"), rows }];
+      }
+    });
+
+    expect(calls).toBe(1);
+    expect(report.scenarios[0]?.reachableTemplates).toEqual([{ key: rows.join(","), rank: 1 }]);
+    expect(report.templateReplay?.templates[0]?.hits[0]).toMatchObject({
+      scenario: "cached-replay",
+      rank: 1,
+      cached: true
+    });
+  });
+
+  test("can replay survivability separately from report generation", () => {
+    const rows = [4, 5, 6, ...new Array(17).fill(0)];
+    const report = runOpenerExperiment({
+      scenarios: [
+        {
+          name: "source",
+          queue: "IO",
+          hold: false,
+          beamWidth: 4,
+          maxDepth: 1,
+          warmups: 0,
+          iterations: 1,
+          top: 1,
+          rules: { spinMode: "NONE", comboTable: "MULTIPLIER", kickTable: "SRS+" }
+        }
+      ],
+      clock: createClock("2026-05-14T00:00:00.000Z", [0, 2]),
+      fumenCodec: fakeCodec,
+      search: () => [{ ...candidateNode("source"), rows }]
+    });
+
+    const replay = replayOpenerTemplateSurvivability(
+      report,
+      {
+        scenarios: [replayScenario("hit", "JO")],
+        topTemplates: 1
+      },
+      () => [{ ...candidateNode("hit"), rows }]
+    );
+
+    expect(replay.templates[0]).toMatchObject({ replayHitCount: 1, replayHitRate: 1 });
+    expect(() => replayOpenerTemplateSurvivability(report, { scenarios: [], topTemplates: 0 })).toThrow("Template replay topTemplates");
+  });
+
   test("keeps T-spin continuation potential before slicing scenario top candidates", () => {
     const readyRows = new Array(20).fill(0);
     readyRows[1] = (1 << 3) | (1 << 5);
@@ -313,7 +460,7 @@ describe("opener experiment runner", () => {
       fumenCodec: fakeCodec,
       search: () => [
         { ...candidateNode("aaa-quiet"), queueIndex: 1, rows: new Array(20).fill(0) },
-        { ...candidateNode("zzz-potential"), queueIndex: 1, rows: readyRows }
+        { ...candidateNode("zzz-potential"), queueIndex: 1, rows: readyRows, tSpinPotential: 1 }
       ]
     });
 
@@ -343,7 +490,7 @@ describe("opener experiment runner", () => {
       ],
       clock: createClock("2026-05-14T00:00:00.000Z", [0, 2]),
       fumenCodec: fakeCodec,
-      search: () => [{ ...candidateNode("ready-but-spinless"), queueIndex: 1, rows: readyRows }]
+      search: () => [{ ...candidateNode("ready-but-spinless"), queueIndex: 1, rows: readyRows, tSpinPotential: 1 }]
     });
 
     expect(report.scenarios[0]?.top[0]).toMatchObject({
@@ -608,6 +755,20 @@ function isTwoBagQueue(queue: string): boolean {
 
 function isSingleBag(queue: string): boolean {
   return queue.split("").sort().join("") === "IJLOSTZ";
+}
+
+function replayScenario(name: string, queue: string) {
+  return {
+    name,
+    queue,
+    hold: false,
+    beamWidth: 4,
+    maxDepth: 1,
+    warmups: 0,
+    iterations: 1,
+    top: 1,
+    rules: { spinMode: "NONE", comboTable: "MULTIPLIER", kickTable: "SRS+" } as const
+  };
 }
 
 function createClock(iso: string, readings: readonly number[]): OpenerExperimentClock {
