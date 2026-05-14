@@ -7,6 +7,8 @@ use crate::spin::{detect_spin, SpinDetection, SpinKind};
 use crate::tetrio_tables::KickTable;
 use crate::tetrio_tables::{self, ClearKind, ComboTable};
 
+const MAX_T_SPIN_POTENTIAL: u32 = 4;
+
 #[derive(Clone, Copy)]
 pub(crate) struct FirepowerState {
     pub(crate) attack: u32,
@@ -157,6 +159,9 @@ pub(crate) fn estimate_t_spin_potential(rows: &BoardRows, kick_table: KickTable)
                     )
                 {
                     best = value;
+                    if best == MAX_T_SPIN_POTENTIAL {
+                        return best;
+                    }
                 }
                 can_place_below = can_place_here;
             }
