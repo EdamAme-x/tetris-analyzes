@@ -5,6 +5,9 @@ interface OpenerRegressionCase {
   readonly input: SearchOpenerBeamInput;
   readonly iterations: number;
   readonly minDepth: number;
+  readonly minAttack?: number;
+  readonly minTSpinClears?: number;
+  readonly minBackToBackChain?: number;
 }
 
 interface OpenerRegressionResult {
@@ -62,6 +65,15 @@ const cases: OpenerRegressionCase[] = [
     input: { queue: "TILJSZO", beamWidth: 48, hold: false, maxDepth: 5 },
     iterations: 4,
     minDepth: 5
+  },
+  {
+    name: "three-bag-continuation",
+    input: { queue: "JLSTZIOJLSTZIOTIJLOSZ", beamWidth: 256, hold: true, maxDepth: 21 },
+    iterations: 1,
+    minDepth: 20,
+    minAttack: 12,
+    minTSpinClears: 3,
+    minBackToBackChain: 3
   }
 ];
 
@@ -128,6 +140,15 @@ function runCase(bench: OpenerRegressionCase): OpenerRegressionResult {
   const top = nodes[0];
   if (top === undefined || top.depth < bench.minDepth) {
     throw new Error(`Regression case ${bench.name} did not build to depth ${bench.minDepth}.`);
+  }
+  if (top.attack < (bench.minAttack ?? 0)) {
+    throw new Error(`Regression case ${bench.name} attack ${top.attack} fell below ${bench.minAttack}.`);
+  }
+  if (top.tSpinClears < (bench.minTSpinClears ?? 0)) {
+    throw new Error(`Regression case ${bench.name} T-spin clears ${top.tSpinClears} fell below ${bench.minTSpinClears}.`);
+  }
+  if (top.backToBackChain < (bench.minBackToBackChain ?? 0)) {
+    throw new Error(`Regression case ${bench.name} B2B chain ${top.backToBackChain} fell below ${bench.minBackToBackChain}.`);
   }
   return {
     name: bench.name,
