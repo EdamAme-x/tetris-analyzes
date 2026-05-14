@@ -48,36 +48,7 @@ pub(crate) fn detect_spin(
 ) -> SpinDetection {
     let immobile = is_placement_immobile(locked_rows, shape, x, y);
     if piece == Piece::T {
-        let occupied_corners = count_t_occupied_corners(locked_rows, shape.rotation, x, y);
-        if occupied_corners >= 3 {
-            let front_corners = count_t_front_corners(locked_rows, shape.rotation, x, y);
-            let mini = front_corners < 2;
-            return SpinDetection {
-                kind: if mini {
-                    SpinKind::TSpinMini
-                } else {
-                    SpinKind::TSpin
-                },
-                spin: true,
-                mini,
-                immobile,
-                force_back_to_back: false,
-                halve_attack: false,
-                occupied_corners,
-                cleared_lines,
-            };
-        }
-
-        return SpinDetection {
-            kind: SpinKind::None,
-            spin: false,
-            mini: false,
-            immobile,
-            force_back_to_back: false,
-            halve_attack: false,
-            occupied_corners,
-            cleared_lines,
-        };
+        return detect_t_spin_corners(locked_rows, shape.rotation, x, y, cleared_lines, immobile);
     }
 
     if immobile {
@@ -150,11 +121,59 @@ pub(crate) fn detect_spin_for_mode(
         };
     }
 
+    if piece == Piece::T && !mode_allows_immobile_t_mini(mode) {
+        return apply_spin_mode(
+            detect_t_spin_corners(locked_rows, shape.rotation, x, y, cleared_lines, false),
+            piece,
+            mode,
+        );
+    }
+
     apply_spin_mode(
         detect_spin(locked_rows, piece, shape, x, y, cleared_lines),
         piece,
         mode,
     )
+}
+
+fn detect_t_spin_corners(
+    locked_rows: &BoardRows,
+    rotation: u8,
+    x: i8,
+    y: i8,
+    cleared_lines: u32,
+    immobile: bool,
+) -> SpinDetection {
+    let occupied_corners = count_t_occupied_corners(locked_rows, rotation, x, y);
+    if occupied_corners >= 3 {
+        let front_corners = count_t_front_corners(locked_rows, rotation, x, y);
+        let mini = front_corners < 2;
+        return SpinDetection {
+            kind: if mini {
+                SpinKind::TSpinMini
+            } else {
+                SpinKind::TSpin
+            },
+            spin: true,
+            mini,
+            immobile,
+            force_back_to_back: false,
+            halve_attack: false,
+            occupied_corners,
+            cleared_lines,
+        };
+    }
+
+    SpinDetection {
+        kind: SpinKind::None,
+        spin: false,
+        mini: false,
+        immobile,
+        force_back_to_back: false,
+        halve_attack: false,
+        occupied_corners,
+        cleared_lines,
+    }
 }
 
 pub(crate) fn apply_spin_mode(
