@@ -34,7 +34,8 @@ export function loadNativeBinding(): NativeBinding {
     "createGarbageRows",
     "applyGarbage",
     "rowsToFumenField",
-    "batchRowsToFumenFields"
+    "batchRowsToFumenFields",
+    "searchOpenerBeam"
   ];
   for (const exportName of requiredExports) {
     if (typeof binding[exportName] !== "function") {

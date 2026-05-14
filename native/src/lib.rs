@@ -1,5 +1,6 @@
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
+use std::collections::HashMap;
 use std::sync::OnceLock;
 
 const BOARD_WIDTH: usize = 10;
@@ -7,6 +8,71 @@ const BOARD_HEIGHT: usize = 20;
 const BOARD_EVALUATION_STRIDE: usize = 5;
 const FUMEN_FIELD_HEIGHT: usize = 23;
 const ROW_MASK: u16 = (1 << BOARD_WIDTH) - 1;
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+enum Piece {
+    I,
+    O,
+    T,
+    S,
+    Z,
+    J,
+    L,
+}
+
+#[derive(Clone, Copy)]
+struct Cell {
+    x: i8,
+    y: i8,
+}
+
+#[derive(Clone, Copy)]
+struct Shape {
+    rotation: u8,
+    width: i8,
+    height: i8,
+    cells: &'static [Cell],
+}
+
+#[derive(Clone)]
+struct SearchState {
+    rows: [u16; BOARD_HEIGHT],
+    hold: Option<Piece>,
+    queue_index: usize,
+    path: Vec<String>,
+    score: f64,
+    metrics: [u32; BOARD_EVALUATION_STRIDE],
+}
+
+#[derive(Eq, Hash, PartialEq)]
+struct SearchKey {
+    rows: [u16; BOARD_HEIGHT],
+    hold: Option<Piece>,
+    queue_index: usize,
+}
+
+#[napi(object)]
+pub struct BeamSearchNode {
+    pub score: f64,
+    pub depth: u32,
+    pub queue_index: u32,
+    pub hold: Option<String>,
+    pub rows: Vec<u16>,
+    pub path: Vec<String>,
+    pub occupied_cells: u32,
+    pub cleared_lines: u32,
+    pub aggregate_height: u32,
+    pub holes: u32,
+    pub bumpiness: u32,
+}
+
+#[derive(Clone, Copy)]
+struct PieceChoice {
+    piece: Piece,
+    hold: Option<Piece>,
+    queue_index: usize,
+    used_hold: bool,
+}
 
 #[napi(js_name = "createEmptyBoard")]
 pub fn create_empty_board() -> Uint16Array {
@@ -172,6 +238,83 @@ pub fn batch_rows_to_fumen_fields(rows: Uint16Array, board_count: u32) -> Result
     Ok(fields)
 }
 
+#[napi(js_name = "searchOpenerBeam")]
+pub fn search_opener_beam(
+    queue: String,
+    beam_width: u32,
+    hold_enabled: bool,
+    max_depth: u32,
+) -> Result<Vec<BeamSearchNode>> {
+    let pieces = parse_queue(&queue)?;
+    let max_depth = usize::min(max_depth as usize, pieces.len());
+    let beam_width = usize::try_from(beam_width)
+        .ok()
+        .filter(|width| *width > 0)
+        .ok_or_else(|| {
+            Error::from_reason(format!("beamWidth must be positive, got {beam_width}."))
+        })?;
+
+    let empty_rows = [0_u16; BOARD_HEIGHT];
+    let initial_metrics = evaluate_board_unchecked(&empty_rows);
+    let mut beam = vec![SearchState {
+        rows: empty_rows,
+        hold: None,
+        queue_index: 0,
+        path: Vec::new(),
+        score: score_metrics(initial_metrics),
+        metrics: initial_metrics,
+    }];
+
+    for _depth in 0..max_depth {
+        let mut next_by_key = HashMap::<SearchKey, SearchState>::new();
+
+        for state in &beam {
+            for choice in piece_choices(&pieces, state, hold_enabled) {
+                for shape in piece_shapes(choice.piece).iter().copied() {
+                    for x in 0..=(BOARD_WIDTH as i8 - shape.width) {
+                        if let Some(rows) = place_and_clear(&state.rows, shape, x) {
+                            let metrics = evaluate_board_unchecked(&rows);
+                            let score = score_metrics(metrics);
+                            let mut path = state.path.clone();
+                            path.push(format_placement(choice, shape, x));
+                            let next_state = SearchState {
+                                rows,
+                                hold: choice.hold,
+                                queue_index: choice.queue_index,
+                                path,
+                                score,
+                                metrics,
+                            };
+                            let key = SearchKey {
+                                rows,
+                                hold: choice.hold,
+                                queue_index: choice.queue_index,
+                            };
+                            match next_by_key.get(&key) {
+                                Some(existing) if existing.score >= next_state.score => {}
+                                _ => {
+                                    next_by_key.insert(key, next_state);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if next_by_key.is_empty() {
+            break;
+        }
+
+        beam = next_by_key.into_values().collect();
+        beam.sort_by(compare_search_state);
+        beam.truncate(beam_width);
+    }
+
+    beam.sort_by(compare_search_state);
+    Ok(beam.into_iter().map(BeamSearchNode::from).collect())
+}
+
 fn validate_board_shape(rows: &[u16], board_count: usize) -> Result<()> {
     let expected_rows = board_count.checked_mul(BOARD_HEIGHT).ok_or_else(|| {
         Error::from_reason(format!(
@@ -285,6 +428,469 @@ fn evaluate_board(rows: &[u16], row_offset: usize) -> Result<[u32; BOARD_EVALUAT
         holes,
         bumpiness,
     ])
+}
+
+fn evaluate_board_unchecked(rows: &[u16; BOARD_HEIGHT]) -> [u32; BOARD_EVALUATION_STRIDE] {
+    let mut occupied_cells = 0;
+    let mut cleared_lines = 0;
+    let mut column_masks = [0_u32; BOARD_WIDTH];
+
+    for (y, row) in rows.iter().copied().enumerate() {
+        occupied_cells += row.count_ones();
+        if row == ROW_MASK {
+            cleared_lines += 1;
+        }
+        for (x, column_mask) in column_masks.iter_mut().enumerate() {
+            if row & (1_u16 << x) != 0 {
+                *column_mask |= 1_u32 << y;
+            }
+        }
+    }
+
+    let mut aggregate_height = 0;
+    let mut holes = 0;
+    let mut previous_height: Option<u32> = None;
+    let mut bumpiness = 0;
+    for column_mask in column_masks {
+        let height = if column_mask == 0 {
+            0
+        } else {
+            u32::BITS - column_mask.leading_zeros()
+        };
+        aggregate_height += height;
+        holes += height - column_mask.count_ones();
+        if let Some(previous) = previous_height {
+            bumpiness += previous.abs_diff(height);
+        }
+        previous_height = Some(height);
+    }
+
+    [
+        occupied_cells,
+        cleared_lines,
+        aggregate_height,
+        holes,
+        bumpiness,
+    ]
+}
+
+fn score_metrics(metrics: [u32; BOARD_EVALUATION_STRIDE]) -> f64 {
+    let cleared_lines = metrics[1] as f64;
+    let aggregate_height = metrics[2] as f64;
+    let holes = metrics[3] as f64;
+    let bumpiness = metrics[4] as f64;
+    cleared_lines * 120.0 - holes * 90.0 - aggregate_height * 2.2 - bumpiness * 7.0
+}
+
+fn compare_search_state(left: &SearchState, right: &SearchState) -> std::cmp::Ordering {
+    right
+        .score
+        .total_cmp(&left.score)
+        .then_with(|| left.path.len().cmp(&right.path.len()))
+        .then_with(|| left.queue_index.cmp(&right.queue_index))
+}
+
+fn parse_queue(queue: &str) -> Result<Vec<Piece>> {
+    let mut pieces = Vec::new();
+    for char in queue
+        .chars()
+        .filter(|char| !char.is_whitespace() && *char != ',')
+    {
+        pieces.push(parse_piece(char)?);
+    }
+    if pieces.is_empty() {
+        return Err(Error::from_reason(
+            "queue must contain at least one tetromino.",
+        ));
+    }
+    Ok(pieces)
+}
+
+fn parse_piece(char: char) -> Result<Piece> {
+    match char.to_ascii_uppercase() {
+        'I' => Ok(Piece::I),
+        'O' => Ok(Piece::O),
+        'T' => Ok(Piece::T),
+        'S' => Ok(Piece::S),
+        'Z' => Ok(Piece::Z),
+        'J' => Ok(Piece::J),
+        'L' => Ok(Piece::L),
+        _ => Err(Error::from_reason(format!("Unknown tetromino {char}."))),
+    }
+}
+
+fn piece_name(piece: Piece) -> &'static str {
+    match piece {
+        Piece::I => "I",
+        Piece::O => "O",
+        Piece::T => "T",
+        Piece::S => "S",
+        Piece::Z => "Z",
+        Piece::J => "J",
+        Piece::L => "L",
+    }
+}
+
+fn piece_choices(pieces: &[Piece], state: &SearchState, hold_enabled: bool) -> Vec<PieceChoice> {
+    let Some(current) = pieces.get(state.queue_index).copied() else {
+        return Vec::new();
+    };
+
+    let mut choices = vec![PieceChoice {
+        piece: current,
+        hold: state.hold,
+        queue_index: state.queue_index + 1,
+        used_hold: false,
+    }];
+
+    if hold_enabled {
+        match state.hold {
+            Some(held) => choices.push(PieceChoice {
+                piece: held,
+                hold: Some(current),
+                queue_index: state.queue_index + 1,
+                used_hold: true,
+            }),
+            None => {
+                if let Some(next) = pieces.get(state.queue_index + 1).copied() {
+                    choices.push(PieceChoice {
+                        piece: next,
+                        hold: Some(current),
+                        queue_index: state.queue_index + 2,
+                        used_hold: true,
+                    });
+                }
+            }
+        }
+    }
+
+    choices
+}
+
+fn format_placement(choice: PieceChoice, shape: Shape, x: i8) -> String {
+    let prefix = if choice.used_hold { "hold:" } else { "" };
+    format!(
+        "{prefix}{}@r{},x{}",
+        piece_name(choice.piece),
+        shape.rotation,
+        x
+    )
+}
+
+fn place_and_clear(rows: &[u16; BOARD_HEIGHT], shape: Shape, x: i8) -> Option<[u16; BOARD_HEIGHT]> {
+    for y in 0..=(BOARD_HEIGHT as i8 - shape.height) {
+        if can_place(rows, shape, x, y) && (y == 0 || !can_place(rows, shape, x, y - 1)) {
+            let mut placed = *rows;
+            for cell in shape.cells {
+                let row_index = usize::try_from(y + cell.y).ok()?;
+                placed[row_index] |= 1_u16 << (x + cell.x);
+            }
+            return Some(clear_full_lines_array(placed));
+        }
+    }
+    None
+}
+
+fn can_place(rows: &[u16; BOARD_HEIGHT], shape: Shape, x: i8, y: i8) -> bool {
+    for cell in shape.cells {
+        let board_x = x + cell.x;
+        let board_y = y + cell.y;
+        if board_x < 0
+            || board_x >= BOARD_WIDTH as i8
+            || board_y < 0
+            || board_y >= BOARD_HEIGHT as i8
+        {
+            return false;
+        }
+        if rows[board_y as usize] & (1_u16 << board_x) != 0 {
+            return false;
+        }
+    }
+    true
+}
+
+fn clear_full_lines_array(rows: [u16; BOARD_HEIGHT]) -> [u16; BOARD_HEIGHT] {
+    let mut output = [0_u16; BOARD_HEIGHT];
+    let mut write_y = 0;
+    for row in rows {
+        if row != ROW_MASK {
+            output[write_y] = row;
+            write_y += 1;
+        }
+    }
+    output
+}
+
+impl From<SearchState> for BeamSearchNode {
+    fn from(state: SearchState) -> Self {
+        Self {
+            score: state.score,
+            depth: state.path.len() as u32,
+            queue_index: state.queue_index as u32,
+            hold: state.hold.map(piece_name).map(String::from),
+            rows: state.rows.to_vec(),
+            path: state.path,
+            occupied_cells: state.metrics[0],
+            cleared_lines: state.metrics[1],
+            aggregate_height: state.metrics[2],
+            holes: state.metrics[3],
+            bumpiness: state.metrics[4],
+        }
+    }
+}
+
+const I0: &[Cell] = &[
+    Cell { x: 0, y: 0 },
+    Cell { x: 1, y: 0 },
+    Cell { x: 2, y: 0 },
+    Cell { x: 3, y: 0 },
+];
+const I1: &[Cell] = &[
+    Cell { x: 0, y: 0 },
+    Cell { x: 0, y: 1 },
+    Cell { x: 0, y: 2 },
+    Cell { x: 0, y: 3 },
+];
+const O0: &[Cell] = &[
+    Cell { x: 0, y: 0 },
+    Cell { x: 1, y: 0 },
+    Cell { x: 0, y: 1 },
+    Cell { x: 1, y: 1 },
+];
+const T0: &[Cell] = &[
+    Cell { x: 0, y: 0 },
+    Cell { x: 1, y: 0 },
+    Cell { x: 2, y: 0 },
+    Cell { x: 1, y: 1 },
+];
+const T1: &[Cell] = &[
+    Cell { x: 0, y: 0 },
+    Cell { x: 0, y: 1 },
+    Cell { x: 0, y: 2 },
+    Cell { x: 1, y: 1 },
+];
+const T2: &[Cell] = &[
+    Cell { x: 0, y: 1 },
+    Cell { x: 1, y: 1 },
+    Cell { x: 2, y: 1 },
+    Cell { x: 1, y: 0 },
+];
+const T3: &[Cell] = &[
+    Cell { x: 1, y: 0 },
+    Cell { x: 1, y: 1 },
+    Cell { x: 1, y: 2 },
+    Cell { x: 0, y: 1 },
+];
+const S0: &[Cell] = &[
+    Cell { x: 0, y: 0 },
+    Cell { x: 1, y: 0 },
+    Cell { x: 1, y: 1 },
+    Cell { x: 2, y: 1 },
+];
+const S1: &[Cell] = &[
+    Cell { x: 1, y: 0 },
+    Cell { x: 0, y: 1 },
+    Cell { x: 1, y: 1 },
+    Cell { x: 0, y: 2 },
+];
+const Z0: &[Cell] = &[
+    Cell { x: 1, y: 0 },
+    Cell { x: 2, y: 0 },
+    Cell { x: 0, y: 1 },
+    Cell { x: 1, y: 1 },
+];
+const Z1: &[Cell] = &[
+    Cell { x: 0, y: 0 },
+    Cell { x: 0, y: 1 },
+    Cell { x: 1, y: 1 },
+    Cell { x: 1, y: 2 },
+];
+const J0: &[Cell] = &[
+    Cell { x: 0, y: 0 },
+    Cell { x: 1, y: 0 },
+    Cell { x: 2, y: 0 },
+    Cell { x: 0, y: 1 },
+];
+const J1: &[Cell] = &[
+    Cell { x: 0, y: 0 },
+    Cell { x: 0, y: 1 },
+    Cell { x: 0, y: 2 },
+    Cell { x: 1, y: 0 },
+];
+const J2: &[Cell] = &[
+    Cell { x: 0, y: 0 },
+    Cell { x: 0, y: 1 },
+    Cell { x: 1, y: 1 },
+    Cell { x: 2, y: 1 },
+];
+const J3: &[Cell] = &[
+    Cell { x: 1, y: 0 },
+    Cell { x: 1, y: 1 },
+    Cell { x: 1, y: 2 },
+    Cell { x: 0, y: 2 },
+];
+const L0: &[Cell] = &[
+    Cell { x: 0, y: 0 },
+    Cell { x: 1, y: 0 },
+    Cell { x: 2, y: 0 },
+    Cell { x: 2, y: 1 },
+];
+const L1: &[Cell] = &[
+    Cell { x: 0, y: 0 },
+    Cell { x: 0, y: 1 },
+    Cell { x: 0, y: 2 },
+    Cell { x: 1, y: 2 },
+];
+const L2: &[Cell] = &[
+    Cell { x: 0, y: 1 },
+    Cell { x: 1, y: 1 },
+    Cell { x: 2, y: 1 },
+    Cell { x: 0, y: 0 },
+];
+const L3: &[Cell] = &[
+    Cell { x: 1, y: 0 },
+    Cell { x: 1, y: 1 },
+    Cell { x: 1, y: 2 },
+    Cell { x: 0, y: 0 },
+];
+
+const I_SHAPES: &[Shape] = &[
+    Shape {
+        rotation: 0,
+        width: 4,
+        height: 1,
+        cells: I0,
+    },
+    Shape {
+        rotation: 1,
+        width: 1,
+        height: 4,
+        cells: I1,
+    },
+];
+const O_SHAPES: &[Shape] = &[Shape {
+    rotation: 0,
+    width: 2,
+    height: 2,
+    cells: O0,
+}];
+const T_SHAPES: &[Shape] = &[
+    Shape {
+        rotation: 0,
+        width: 3,
+        height: 2,
+        cells: T0,
+    },
+    Shape {
+        rotation: 1,
+        width: 2,
+        height: 3,
+        cells: T1,
+    },
+    Shape {
+        rotation: 2,
+        width: 3,
+        height: 2,
+        cells: T2,
+    },
+    Shape {
+        rotation: 3,
+        width: 2,
+        height: 3,
+        cells: T3,
+    },
+];
+const S_SHAPES: &[Shape] = &[
+    Shape {
+        rotation: 0,
+        width: 3,
+        height: 2,
+        cells: S0,
+    },
+    Shape {
+        rotation: 1,
+        width: 2,
+        height: 3,
+        cells: S1,
+    },
+];
+const Z_SHAPES: &[Shape] = &[
+    Shape {
+        rotation: 0,
+        width: 3,
+        height: 2,
+        cells: Z0,
+    },
+    Shape {
+        rotation: 1,
+        width: 2,
+        height: 3,
+        cells: Z1,
+    },
+];
+const J_SHAPES: &[Shape] = &[
+    Shape {
+        rotation: 0,
+        width: 3,
+        height: 2,
+        cells: J0,
+    },
+    Shape {
+        rotation: 1,
+        width: 2,
+        height: 3,
+        cells: J1,
+    },
+    Shape {
+        rotation: 2,
+        width: 3,
+        height: 2,
+        cells: J2,
+    },
+    Shape {
+        rotation: 3,
+        width: 2,
+        height: 3,
+        cells: J3,
+    },
+];
+const L_SHAPES: &[Shape] = &[
+    Shape {
+        rotation: 0,
+        width: 3,
+        height: 2,
+        cells: L0,
+    },
+    Shape {
+        rotation: 1,
+        width: 2,
+        height: 3,
+        cells: L1,
+    },
+    Shape {
+        rotation: 2,
+        width: 3,
+        height: 2,
+        cells: L2,
+    },
+    Shape {
+        rotation: 3,
+        width: 2,
+        height: 3,
+        cells: L3,
+    },
+];
+
+fn piece_shapes(piece: Piece) -> &'static [Shape] {
+    match piece {
+        Piece::I => I_SHAPES,
+        Piece::O => O_SHAPES,
+        Piece::T => T_SHAPES,
+        Piece::S => S_SHAPES,
+        Piece::Z => Z_SHAPES,
+        Piece::J => J_SHAPES,
+        Piece::L => L_SHAPES,
+    }
 }
 
 fn rows_to_fumen_field_string(rows: &[u16]) -> Result<String> {

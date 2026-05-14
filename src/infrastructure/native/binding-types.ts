@@ -1,3 +1,17 @@
+export interface NativeBeamSearchNode {
+  score: number;
+  depth: number;
+  queueIndex: number;
+  hold?: string | null;
+  rows: number[];
+  path: string[];
+  occupiedCells: number;
+  clearedLines: number;
+  aggregateHeight: number;
+  holes: number;
+  bumpiness: number;
+}
+
 export interface NativeBinding {
   createEmptyBoard(): Uint16Array;
   copyBoardRows(rows: Uint16Array): Uint16Array;
@@ -11,4 +25,5 @@ export interface NativeBinding {
   applyGarbage(rows: Uint16Array, holes: Uint8Array): Uint16Array;
   rowsToFumenField(rows: Uint16Array): string;
   batchRowsToFumenFields(rows: Uint16Array, boardCount: number): string[];
+  searchOpenerBeam(queue: string, beamWidth: number, holdEnabled: boolean, maxDepth: number): NativeBeamSearchNode[];
 }
