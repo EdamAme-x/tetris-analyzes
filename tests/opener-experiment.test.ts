@@ -73,7 +73,7 @@ describe("opener experiment runner", () => {
   });
 
   test("provides a three-bag continuation preset for B2B T-spin chain experiments", () => {
-    expect(CONTINUATION_OPENER_EXPERIMENT_SCENARIOS).toHaveLength(23);
+    expect(CONTINUATION_OPENER_EXPERIMENT_SCENARIOS).toHaveLength(26);
     expect(CONTINUATION_OPENER_EXPERIMENT_SCENARIOS.every((scenario) => scenario.name.startsWith("continuation-"))).toBe(true);
     expect(new Set(CONTINUATION_OPENER_EXPERIMENT_SCENARIOS.map((scenario) => scenario.queue)).size).toBe(
       CONTINUATION_OPENER_EXPERIMENT_SCENARIOS.length
@@ -83,6 +83,11 @@ describe("opener experiment runner", () => {
     expect(CONTINUATION_OPENER_EXPERIMENT_SCENARIOS.every((scenario) => scenario.maxDepth === 21)).toBe(true);
     expect(CONTINUATION_OPENER_EXPERIMENT_SCENARIOS.every((scenario) => scenario.qualityGate?.minBackToBackChain === 2)).toBe(true);
     expect(CONTINUATION_OPENER_EXPERIMENT_SCENARIOS.every((scenario) => scenario.tags?.includes("three-bag"))).toBe(true);
+    expect(
+      CONTINUATION_OPENER_EXPERIMENT_SCENARIOS.filter((scenario) => scenario.name.startsWith("continuation-tl-3spin-")).map(
+        (scenario) => scenario.queue
+      )
+    ).toEqual(["OISLJZTIJTSOZLSJZTIOL", "ZTSLOJIZJTILSOLTIZJSO", "SZLITJOOZTLSIJJOSZTLI"]);
   });
 
   test("defaults continuation CLI runs to wide template replay instead of firepower-only output", () => {
