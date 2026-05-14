@@ -98,3 +98,4 @@ Executable examples live in `tests/`.
 - [x] Report replay firepower quality hits separately from exact template reconstruction
 - [x] Curate continuation source queues to TL-gated three-bag B2B/T-spin lines
 - [x] Rank replay reports by reproducible B2B/T-spin firepower instead of brittle peak firepower
+- [x] Promote additional measured TL-gated three-bag queues into continuation discovery
