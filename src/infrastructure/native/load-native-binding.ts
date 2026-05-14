@@ -23,7 +23,8 @@ const nativeBindingSpec = {
   detectOpenerSpin: "function",
   evaluateOpenerFirepower: "function",
   searchOpenerBeam: "function",
-  searchOpenerBeamWithPlacements: "function"
+  searchOpenerBeamWithPlacements: "function",
+  evaluateOpenerBag: "function"
 } satisfies { readonly [K in keyof NativeBinding]: "function" };
 const nativeBindingExportNames = Object.keys(nativeBindingSpec) as readonly (keyof NativeBinding)[];
 const nativeBindingExportNameSet = new Set<string>(nativeBindingExportNames);

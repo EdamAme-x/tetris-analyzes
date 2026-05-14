@@ -120,7 +120,24 @@ describe("TetrisFumenCodec", () => {
         events: []
       }),
       searchOpenerBeam: () => [],
-      searchOpenerBeamWithPlacements: () => []
+      searchOpenerBeamWithPlacements: () => [],
+      evaluateOpenerBag: () => ({
+        bag: "TIJLOSZ",
+        totalQueues: 0,
+        searchedQueues: 0,
+        exact: true,
+        buildableQueues: 0,
+        buildRate: 0,
+        averageScore: 0,
+        averageAttack: 0,
+        averageFirepowerScore: 0,
+        averageHoles: 0,
+        averageBumpiness: 0,
+        worstScore: 0,
+        bestScore: 0,
+        paretoFront: [],
+        topQueues: []
+      })
     };
 
     const codec = new TetrisFumenCodec(fakeNative);

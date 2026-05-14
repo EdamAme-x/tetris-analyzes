@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
   canReachOpenerPlacement,
   detectOpenerSpin,
+  evaluateOpenerBag,
   evaluateOpenerFirepower,
   searchOpenerBeam,
   searchOpenerBeamWithPlacements
@@ -183,7 +184,34 @@ describe("native opener beam search", () => {
     });
   });
 
+  test("aggregates buildability and Pareto ranking over bag permutations in native code", () => {
+    const evaluation = evaluateOpenerBag({ bag: "TIO", beamWidth: 16, hold: true, maxDepth: 3, topQueueCount: 4 });
+
+    expect(evaluation.bag).toBe("TIO");
+    expect(evaluation.totalQueues).toBe(6);
+    expect(evaluation.searchedQueues).toBe(6);
+    expect(evaluation.exact).toBe(true);
+    expect(evaluation.buildableQueues).toBe(6);
+    expect(evaluation.buildRate).toBe(1);
+    expect(evaluation.averageScore).toBeGreaterThan(Number.NEGATIVE_INFINITY);
+    expect(evaluation.topQueues).toHaveLength(4);
+    expect(evaluation.paretoFront.length).toBeGreaterThan(0);
+    expect(evaluation.topQueues[0]?.paretoFront).toBe(true);
+    expect(evaluation.topQueues[0]?.dominatedBy).toBe(0);
+  });
+
+  test("can sample a capped number of 7-bag queue branches", () => {
+    const evaluation = evaluateOpenerBag({ bag: "TIJLOSZ", beamWidth: 8, hold: true, maxDepth: 3, maxQueues: 12, topQueueCount: 3 });
+
+    expect(evaluation.totalQueues).toBe(5040);
+    expect(evaluation.searchedQueues).toBe(12);
+    expect(evaluation.exact).toBe(false);
+    expect(evaluation.buildableQueues).toBeGreaterThan(0);
+    expect(evaluation.topQueues).toHaveLength(3);
+  });
+
   test("rejects invalid queues before searching", () => {
     expect(() => searchOpenerBeam({ queue: "TX", beamWidth: 8 })).toThrow("Unknown tetromino");
+    expect(() => evaluateOpenerBag({ bag: "TT" })).toThrow("must not repeat");
   });
 });

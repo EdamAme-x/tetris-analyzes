@@ -3,6 +3,7 @@ import type {
   NativeBeamSearchNode,
   NativeFirepowerInput,
   NativeFirepowerSummary,
+  NativeOpenerBagEvaluation,
   NativeSpinDetection
 } from "../infrastructure/native/binding-types";
 
@@ -15,7 +16,17 @@ export interface SearchOpenerBeamInput {
   readonly maxDepth?: number;
 }
 
+export interface EvaluateOpenerBagInput {
+  readonly bag?: string | readonly SearchPiece[];
+  readonly beamWidth?: number;
+  readonly hold?: boolean;
+  readonly maxDepth?: number;
+  readonly maxQueues?: number;
+  readonly topQueueCount?: number;
+}
+
 export type SearchOpenerBeamNode = NativeBeamSearchNode;
+export type OpenerBagEvaluation = NativeOpenerBagEvaluation;
 
 export interface OpenerPlacementReachabilityInput {
   readonly rows: Uint16Array;
@@ -37,6 +48,18 @@ export function searchOpenerBeamWithPlacements(input: SearchOpenerBeamInput): Se
     input.beamWidth ?? 64,
     input.hold ?? true,
     input.maxDepth ?? queue.length
+  );
+}
+
+export function evaluateOpenerBag(input: EvaluateOpenerBagInput = {}): OpenerBagEvaluation {
+  const bag = input.bag === undefined ? "TIJLOSZ" : typeof input.bag === "string" ? input.bag : input.bag.join("");
+  return loadNativeBinding().evaluateOpenerBag(
+    bag,
+    input.beamWidth ?? 64,
+    input.hold ?? true,
+    input.maxDepth ?? Math.min(4, bag.length),
+    input.maxQueues ?? 0,
+    input.topQueueCount ?? 16
   );
 }
 

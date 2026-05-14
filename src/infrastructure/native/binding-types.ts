@@ -108,6 +108,40 @@ export interface NativeBeamSearchNode {
   bumpiness: number;
 }
 
+export interface NativeOpenerQueueEvaluation {
+  queue: string;
+  buildable: boolean;
+  paretoFront: boolean;
+  dominatedBy: number;
+  weightedScore: number;
+  topScore: number;
+  firepowerScore: number;
+  attack: number;
+  points: number;
+  allClears: number;
+  depth: number;
+  holes: number;
+  bumpiness: number;
+}
+
+export interface NativeOpenerBagEvaluation {
+  bag: string;
+  totalQueues: number;
+  searchedQueues: number;
+  exact: boolean;
+  buildableQueues: number;
+  buildRate: number;
+  averageScore: number;
+  averageAttack: number;
+  averageFirepowerScore: number;
+  averageHoles: number;
+  averageBumpiness: number;
+  worstScore: number;
+  bestScore: number;
+  paretoFront: NativeOpenerQueueEvaluation[];
+  topQueues: NativeOpenerQueueEvaluation[];
+}
+
 export interface NativeBinding {
   createEmptyBoard(): Uint16Array;
   copyBoardRows(rows: Uint16Array): Uint16Array;
@@ -126,4 +160,12 @@ export interface NativeBinding {
   evaluateOpenerFirepower(events: NativeFirepowerInput[]): NativeFirepowerSummary;
   searchOpenerBeam(queue: string, beamWidth: number, holdEnabled: boolean, maxDepth: number): NativeBeamSearchNode[];
   searchOpenerBeamWithPlacements(queue: string, beamWidth: number, holdEnabled: boolean, maxDepth: number): NativeBeamSearchNode[];
+  evaluateOpenerBag(
+    bag: string,
+    beamWidth: number,
+    holdEnabled: boolean,
+    maxDepth: number,
+    maxQueues: number,
+    topQueueCount: number
+  ): NativeOpenerBagEvaluation;
 }

@@ -40,9 +40,12 @@ export const OPENER_ENGINE_TASKS = [
   {
     id: "bag-probability",
     title: "Aggregate template buildability over 7-bag queues and hold decisions.",
-    status: "pending",
+    status: "in-progress",
     implementation: "native-rust",
-    evidence: []
+    evidence: [
+      "evaluateOpenerBag enumerates unique bag permutations in native Rust and reports buildRate, expected attack, score, holes, and bumpiness.",
+      "evaluateOpenerBag exposes Pareto-front queue candidates so opener experiments can compare buildability, firepower, and board quality together."
+    ]
   },
   {
     id: "tetrio-rules-parity",

@@ -1,4 +1,4 @@
-import { searchOpenerBeam, searchOpenerBeamWithPlacements } from "../src/application/search-opener";
+import { evaluateOpenerBag, searchOpenerBeam, searchOpenerBeamWithPlacements } from "../src/application/search-opener";
 
 interface BenchCase {
   readonly name: string;
@@ -35,6 +35,14 @@ const cases: BenchCase[] = [
     name: "beam64 depth5 hold detailed",
     iterations: 10,
     run: () => checksum(searchOpenerBeamWithPlacements({ queue: "TILJSZOTIL", beamWidth: 64, hold: true, maxDepth: 5 }))
+  },
+  {
+    name: "bag sample 24 depth3 hold",
+    iterations: 10,
+    run: () => {
+      const evaluation = evaluateOpenerBag({ bag: "TIJLOSZ", beamWidth: 8, hold: true, maxDepth: 3, maxQueues: 24, topQueueCount: 4 });
+      return Math.trunc(evaluation.averageScore) ^ evaluation.buildableQueues ^ evaluation.topQueues.length;
+    }
   }
 ];
 

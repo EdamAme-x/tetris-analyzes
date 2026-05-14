@@ -2,6 +2,7 @@ use napi::bindgen_prelude::*;
 use napi_derive::napi;
 use std::collections::HashMap;
 
+mod bag;
 mod board;
 mod firepower;
 mod fumen;
@@ -10,6 +11,7 @@ mod pieces;
 mod spin;
 mod tetrio_tables;
 
+use bag::{evaluate_opener_bag_internal, OpenerBagEvaluation};
 use board::{BoardEvaluation, BoardRows, BOARD_HEIGHT, BOARD_WIDTH};
 use firepower::{
     advance_firepower, advance_firepower_for_clear_with_combo_table, clear_kind_cleared_lines,
@@ -23,15 +25,15 @@ use pieces::{
 use spin::{detect_spin, spin_kind_name, SpinDetection};
 
 #[derive(Clone)]
-struct SearchState {
+pub(crate) struct SearchState {
     rows: BoardRows,
     hold: Option<Piece>,
     queue_index: usize,
-    path: Vec<String>,
+    pub(crate) path: Vec<String>,
     placements: Vec<Placement>,
-    score: f64,
-    metrics: BoardEvaluation,
-    firepower: FirepowerState,
+    pub(crate) score: f64,
+    pub(crate) metrics: BoardEvaluation,
+    pub(crate) firepower: FirepowerState,
 }
 
 #[derive(Eq, Hash, PartialEq)]
@@ -357,6 +359,25 @@ pub fn search_opener_beam_with_placements(
     search_opener_beam_internal(queue, beam_width, hold_enabled, max_depth, true)
 }
 
+#[napi(js_name = "evaluateOpenerBag")]
+pub fn evaluate_opener_bag(
+    bag: String,
+    beam_width: u32,
+    hold_enabled: bool,
+    max_depth: u32,
+    max_queues: u32,
+    top_queue_count: u32,
+) -> Result<OpenerBagEvaluation> {
+    evaluate_opener_bag_internal(
+        &bag,
+        beam_width,
+        hold_enabled,
+        max_depth,
+        max_queues,
+        top_queue_count,
+    )
+}
+
 fn search_opener_beam_internal(
     queue: String,
     beam_width: u32,
@@ -366,13 +387,27 @@ fn search_opener_beam_internal(
 ) -> Result<Vec<BeamSearchNode>> {
     let pieces = parse_queue(&queue)?;
     let max_depth = usize::min(max_depth as usize, pieces.len());
-    let beam_width = usize::try_from(beam_width)
-        .ok()
-        .filter(|width| *width > 0)
-        .ok_or_else(|| {
-            Error::from_reason(format!("beamWidth must be positive, got {beam_width}."))
-        })?;
+    let beam_width = validate_beam_width(beam_width)?;
 
+    Ok(search_opener_states(
+        &pieces,
+        beam_width,
+        hold_enabled,
+        max_depth,
+        include_placements,
+    )
+    .into_iter()
+    .map(BeamSearchNode::from)
+    .collect())
+}
+
+pub(crate) fn search_opener_states(
+    pieces: &[Piece],
+    beam_width: usize,
+    hold_enabled: bool,
+    max_depth: usize,
+    include_placements: bool,
+) -> Vec<SearchState> {
     let empty_rows = [0_u16; BOARD_HEIGHT];
     let initial_metrics = board::evaluate_board_unchecked(&empty_rows);
     let initial_firepower = FirepowerState::empty();
@@ -464,7 +499,7 @@ fn search_opener_beam_internal(
     }
 
     beam.sort_by(compare_search_state);
-    Ok(beam.into_iter().map(BeamSearchNode::from).collect())
+    beam
 }
 
 fn piece_choices(pieces: &[Piece], state: &SearchState, hold_enabled: bool) -> Vec<PieceChoice> {
@@ -563,6 +598,13 @@ fn compare_search_state(left: &SearchState, right: &SearchState) -> std::cmp::Or
         .total_cmp(&left.score)
         .then_with(|| left.path.len().cmp(&right.path.len()))
         .then_with(|| left.queue_index.cmp(&right.queue_index))
+}
+
+pub(crate) fn validate_beam_width(beam_width: u32) -> Result<usize> {
+    usize::try_from(beam_width)
+        .ok()
+        .filter(|width| *width > 0)
+        .ok_or_else(|| Error::from_reason(format!("beamWidth must be positive, got {beam_width}.")))
 }
 
 impl From<SearchState> for BeamSearchNode {
