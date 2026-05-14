@@ -17,10 +17,21 @@ export interface OpenerExperimentScenario {
   readonly beamWidth: number;
   readonly maxDepth: number;
   readonly rules?: OpenerExperimentSearchRules;
+  readonly qualityGate?: OpenerExperimentQualityGate;
   readonly warmups?: number;
   readonly iterations?: number;
   readonly top?: number;
   readonly tags?: readonly string[];
+}
+
+export interface OpenerExperimentQualityGate {
+  readonly minQueueIndex?: number;
+  readonly minAttack?: number;
+  readonly minDifficultAttack?: number;
+  readonly minTSpinClears?: number;
+  readonly minTSpinAttack?: number;
+  readonly minBackToBackChain?: number;
+  readonly maxHoles?: number;
 }
 
 export interface OpenerExperimentEnvironment {
@@ -114,6 +125,7 @@ export interface OpenerExperimentScenarioResult {
   readonly rules: OpenerExperimentSearchRules;
   readonly beamWidth: number;
   readonly maxDepth: number;
+  readonly qualityGate?: OpenerExperimentQualityGate;
   readonly warmups: number;
   readonly iterations: number;
   readonly resultCount: number;
@@ -177,6 +189,32 @@ const TWO_BAG_TL_SURVEY_QUEUES = [
 ] as const;
 const DISCOVERY_TWO_BAG_SAMPLE_SIZE = 24;
 const DISCOVERY_BAG = "TIJLOSZ";
+const DEFAULT_TWO_BAG_QUALITY_GATE = {
+  minQueueIndex: 14,
+  minAttack: 9,
+  minDifficultAttack: 9,
+  minTSpinClears: 2,
+  minTSpinAttack: 9,
+  minBackToBackChain: 2,
+  maxHoles: 0
+} as const satisfies OpenerExperimentQualityGate;
+const SURVEY_TWO_BAG_QUALITY_GATE = {
+  minQueueIndex: 14,
+  minAttack: 4,
+  minDifficultAttack: 4,
+  minTSpinClears: 1,
+  minTSpinAttack: 2,
+  minBackToBackChain: 1
+} as const satisfies OpenerExperimentQualityGate;
+const CONTINUATION_QUALITY_GATE = {
+  minQueueIndex: 21,
+  minAttack: 9,
+  minDifficultAttack: 9,
+  minTSpinClears: 2,
+  minTSpinAttack: 7,
+  minBackToBackChain: 2,
+  maxHoles: 0
+} as const satisfies OpenerExperimentQualityGate;
 
 export const TETRIO_TL_OPENER_SEARCH_RULES = {
   spinMode: "T-SPINS",
@@ -192,6 +230,7 @@ export const DEFAULT_OPENER_EXPERIMENT_SCENARIOS: readonly OpenerExperimentScena
     beamWidth: 512,
     maxDepth: 14,
     rules: TETRIO_TL_OPENER_SEARCH_RULES,
+    qualityGate: DEFAULT_TWO_BAG_QUALITY_GATE,
     iterations: 1,
     top: 8,
     tags: ["best", "hold", "two-bag", "t-spin", "tetrio-tl"]
@@ -205,6 +244,7 @@ export const SURVEY_OPENER_EXPERIMENT_SCENARIOS: readonly OpenerExperimentScenar
   beamWidth: 512,
   maxDepth: 14,
   rules: TETRIO_TL_OPENER_SEARCH_RULES,
+  qualityGate: SURVEY_TWO_BAG_QUALITY_GATE,
   warmups: 0,
   iterations: 1,
   top: 3,
@@ -219,6 +259,7 @@ export const CONTINUATION_OPENER_EXPERIMENT_SCENARIOS: readonly OpenerExperiment
     beamWidth: 256,
     maxDepth: 21,
     rules: TETRIO_TL_OPENER_SEARCH_RULES,
+    qualityGate: CONTINUATION_QUALITY_GATE,
     warmups: 0,
     iterations: 1,
     top: 2,
@@ -382,8 +423,8 @@ export function renderOpenerExperimentMarkdown(report: OpenerExperimentReport): 
     "",
     "## Search run",
     "",
-    "| name | queue | hold | spins | combo | kicks | beam | depth | median ms | searches/s | nodes |",
-    "| --- | --- | ---: | --- | --- | --- | ---: | ---: | ---: | ---: | ---: |"
+    "| name | queue | hold | spins | combo | kicks | beam | depth | median ms | searches/s | nodes | quality gate |",
+    "| --- | --- | ---: | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | --- |"
   );
 
   for (const scenario of report.scenarios) {
@@ -399,7 +440,8 @@ export function renderOpenerExperimentMarkdown(report: OpenerExperimentReport): 
         String(scenario.maxDepth),
         scenario.medianMs.toFixed(3),
         scenario.searchesPerSecond.toFixed(1),
-        String(scenario.resultCount)
+        String(scenario.resultCount),
+        formatQualityGate(scenario.qualityGate)
       ].join(" | ")
     );
   }
@@ -645,6 +687,8 @@ function runScenario(
 
   const stats = summarizeTimings(timings);
   const rules = scenarioRules(scenario);
+  const topCandidates = createTopCandidates(lastNodes, scenario, topOverride ?? scenario.top ?? 5, fumenCodec);
+  assertScenarioQualityGate(scenario, topCandidates[0]);
   return {
     name: scenario.name,
     queue: scenario.queue,
@@ -652,6 +696,7 @@ function runScenario(
     rules,
     beamWidth: scenario.beamWidth,
     maxDepth: scenario.maxDepth,
+    ...(scenario.qualityGate === undefined ? {} : { qualityGate: scenario.qualityGate }),
     warmups,
     iterations,
     resultCount: lastNodes.length,
@@ -660,7 +705,7 @@ function runScenario(
     maxMs: stats.max,
     searchesPerSecond: stats.median === 0 ? 0 : 1_000 / stats.median,
     reachableTemplates: createReachableTemplates(lastNodes),
-    top: createTopCandidates(lastNodes, scenario, topOverride ?? scenario.top ?? 5, fumenCodec),
+    top: topCandidates,
     tags: scenario.tags ?? []
   };
 }
@@ -702,6 +747,38 @@ function createReachableTemplates(nodes: readonly SearchOpenerBeamNode[]): Opene
     }
   }
   return [...ranksByTemplate.entries()].map(([key, rank]) => ({ key, rank }));
+}
+
+function assertScenarioQualityGate(scenario: OpenerExperimentScenario, candidate: OpenerExperimentCandidate | undefined): void {
+  const gate = scenario.qualityGate;
+  if (gate === undefined) {
+    return;
+  }
+  if (candidate === undefined) {
+    throw new Error(`Scenario ${scenario.name} quality gate failed: no candidate was produced.`);
+  }
+
+  const failures = [
+    minGateFailure("queueIndex", candidate.queueIndex, gate.minQueueIndex),
+    minGateFailure("attack", candidate.attack, gate.minAttack),
+    minGateFailure("difficultAttack", candidate.difficultAttack, gate.minDifficultAttack),
+    minGateFailure("tSpinClears", candidate.tSpinClears, gate.minTSpinClears),
+    minGateFailure("tSpinAttack", candidate.tSpinAttack, gate.minTSpinAttack),
+    minGateFailure("backToBackChain", candidate.backToBackChain, gate.minBackToBackChain),
+    maxGateFailure("holes", candidate.holes, gate.maxHoles)
+  ].filter((failure) => failure !== undefined);
+
+  if (failures.length > 0) {
+    throw new Error(`Scenario ${scenario.name} quality gate failed: ${failures.join("; ")}.`);
+  }
+}
+
+function minGateFailure(name: string, actual: number, expected: number | undefined): string | undefined {
+  return expected === undefined || actual >= expected ? undefined : `${name} ${actual} < ${expected}`;
+}
+
+function maxGateFailure(name: string, actual: number, expected: number | undefined): string | undefined {
+  return expected === undefined || actual <= expected ? undefined : `${name} ${actual} > ${expected}`;
 }
 
 function createTopCandidates(
@@ -880,6 +957,31 @@ function formatReplaySurvival(
 
 function formatGroupedReplaySurvival(template: Pick<OpenerTemplateReplayEntry, "groupedSurvivalCount" | "groupedSurvivalRate">): string {
   return `${template.groupedSurvivalCount} (${formatPercent(template.groupedSurvivalRate)})`;
+}
+
+function formatQualityGate(gate: OpenerExperimentQualityGate | undefined): string {
+  if (gate === undefined) {
+    return "-";
+  }
+  return [
+    minGateLabel("queue", gate.minQueueIndex),
+    minGateLabel("attack", gate.minAttack),
+    minGateLabel("difficult", gate.minDifficultAttack),
+    minGateLabel("tspin", gate.minTSpinClears),
+    minGateLabel("tspinAttack", gate.minTSpinAttack),
+    minGateLabel("b2b", gate.minBackToBackChain),
+    maxGateLabel("holes", gate.maxHoles)
+  ]
+    .filter((item) => item !== undefined)
+    .join(" ");
+}
+
+function minGateLabel(name: string, value: number | undefined): string | undefined {
+  return value === undefined ? undefined : `${name}>=${value}`;
+}
+
+function maxGateLabel(name: string, value: number | undefined): string | undefined {
+  return value === undefined ? undefined : `${name}<=${value}`;
 }
 
 function formatPercent(value: number): string {

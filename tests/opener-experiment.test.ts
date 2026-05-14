@@ -31,7 +31,16 @@ describe("opener experiment runner", () => {
       hold: true,
       beamWidth: 512,
       maxDepth: 14,
-      rules: TETRIO_TL_OPENER_SEARCH_RULES
+      rules: TETRIO_TL_OPENER_SEARCH_RULES,
+      qualityGate: {
+        minQueueIndex: 14,
+        minAttack: 9,
+        minDifficultAttack: 9,
+        minTSpinClears: 2,
+        minTSpinAttack: 9,
+        minBackToBackChain: 2,
+        maxHoles: 0
+      }
     });
   });
 
@@ -43,6 +52,7 @@ describe("opener experiment runner", () => {
     );
     expect(SURVEY_OPENER_EXPERIMENT_SCENARIOS.every((scenario) => isTwoBagQueue(scenario.queue))).toBe(true);
     expect(SURVEY_OPENER_EXPERIMENT_SCENARIOS.every((scenario) => scenario.beamWidth === 512)).toBe(true);
+    expect(SURVEY_OPENER_EXPERIMENT_SCENARIOS.every((scenario) => scenario.qualityGate?.minAttack === 4)).toBe(true);
     expect(SURVEY_OPENER_EXPERIMENT_SCENARIOS.every((scenario) => scenario.tags?.includes("survey"))).toBe(true);
   });
 
@@ -62,6 +72,7 @@ describe("opener experiment runner", () => {
     expect(CONTINUATION_OPENER_EXPERIMENT_SCENARIOS.every((scenario) => isThreeBagQueue(scenario.queue))).toBe(true);
     expect(CONTINUATION_OPENER_EXPERIMENT_SCENARIOS.every((scenario) => scenario.beamWidth === 256)).toBe(true);
     expect(CONTINUATION_OPENER_EXPERIMENT_SCENARIOS.every((scenario) => scenario.maxDepth === 21)).toBe(true);
+    expect(CONTINUATION_OPENER_EXPERIMENT_SCENARIOS.every((scenario) => scenario.qualityGate?.minBackToBackChain === 2)).toBe(true);
     expect(CONTINUATION_OPENER_EXPERIMENT_SCENARIOS.every((scenario) => scenario.tags?.includes("three-bag"))).toBe(true);
   });
 
@@ -178,6 +189,7 @@ describe("opener experiment runner", () => {
     expect(markdown).toContain("## Best openers");
     expect(markdown).toContain("## Template survivability");
     expect(markdown).toContain("fake-scenario | TI | false | T-SPINS | MULTIPLIER | SRS+ | 4 | 1 | 2.000");
+    expect(markdown).toContain("quality gate");
     expect(markdown).toContain("## Candidate details");
     expect(markdown).toContain("[view](https://fumen.zui.jp/?m115@test)");
   });
@@ -209,6 +221,33 @@ describe("opener experiment runner", () => {
     const markdown = renderOpenerExperimentMarkdown(report);
     expect(markdown).toContain("Rules: spins=NONE, combo=NONE, kicks=NONE");
     expect(markdown).toContain("custom-rules | TI | false | NONE | NONE | NONE | 4 | 1 | 2.000");
+  });
+
+  test("fails opener experiments when a scenario quality gate is missed", () => {
+    expect(() =>
+      runOpenerExperiment({
+        scenarios: [
+          {
+            name: "weak",
+            queue: "TI",
+            hold: false,
+            beamWidth: 4,
+            maxDepth: 1,
+            warmups: 0,
+            iterations: 1,
+            qualityGate: {
+              minQueueIndex: 1,
+              minAttack: 1,
+              minTSpinClears: 1,
+              maxHoles: 0
+            }
+          }
+        ],
+        clock: createClock("2026-05-14T00:00:00.000Z", [0, 2]),
+        fumenCodec: fakeCodec,
+        search: () => [{ ...candidateNode("weak"), queueIndex: 1, holes: 1 }]
+      })
+    ).toThrow("Scenario weak quality gate failed: attack 0 < 1; tSpinClears 0 < 1; holes 1 > 0.");
   });
 
   test("renders a deduplicated best-template console summary instead of scenario noise", () => {
