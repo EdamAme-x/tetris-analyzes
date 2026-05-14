@@ -22,6 +22,7 @@ export interface NativeBeamPlacement {
   baseAttack: number;
   points: number;
   combo: number;
+  backToBackChain: number;
   backToBack: boolean;
   backToBackBonus: number;
   allClear: boolean;
@@ -110,6 +111,7 @@ export interface NativeBeamSearchNode {
   placements: NativeBeamPlacement[];
   attack: number;
   points: number;
+  combo: number;
   maxCombo: number;
   backToBackChain: number;
   allClears: number;

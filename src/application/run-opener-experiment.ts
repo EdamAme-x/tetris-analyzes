@@ -59,6 +59,7 @@ export interface OpenerExperimentCandidate {
   readonly difficultAttack: number;
   readonly nonDifficultAttack: number;
   readonly points: number;
+  readonly combo: number;
   readonly maxCombo: number;
   readonly backToBackChain: number;
   readonly allClears: number;
@@ -67,6 +68,7 @@ export interface OpenerExperimentCandidate {
   readonly tSpinAttack: number;
   readonly tSpinPotential: number;
   readonly phaseTemplateKey: string;
+  readonly phaseProfileKey: string;
   readonly clearSequence: readonly string[];
   readonly occupiedCells: number;
   readonly clearedLines: number;
@@ -184,6 +186,7 @@ export interface OpenerScenarioReachableQuality {
   readonly tSpinClears: number;
   readonly tSpinAttack: number;
   readonly backToBackChain: number;
+  readonly combo: number;
   readonly tSpinPotential: number;
   readonly holes: number;
 }
@@ -206,6 +209,19 @@ export type OpenerSearch = (input: SearchOpenerBeamInput) => SearchOpenerBeamNod
 interface SearchNodeWithReportPotential {
   readonly node: SearchOpenerBeamNode;
   readonly tSpinPotential: number;
+}
+
+interface TemplateStateKeyInput {
+  readonly rows: readonly number[];
+  readonly hold: string | null;
+  readonly queueIndex: number;
+  readonly backToBackChain: number;
+  readonly combo: number;
+}
+
+interface PhaseStateKeys {
+  readonly phaseKey: string;
+  readonly phaseProfileKey: string;
 }
 
 export interface RunOpenerExperimentInput {
@@ -643,7 +659,7 @@ export function rankOpenerTemplates(report: OpenerExperimentReport, topCount: nu
         best: candidate,
         sources: new Set([candidate.sourceScenario]),
         phaseKeys: new Set(phaseKeysByTemplate.get(key) ?? [candidate.phaseTemplateKey]),
-        phaseProfileKeys: new Set(phaseProfileKeysByTemplate.get(key) ?? [phaseProfileKeyFromRowsKey(candidate.phaseTemplateKey)])
+        phaseProfileKeys: new Set(phaseProfileKeysByTemplate.get(key) ?? [candidate.phaseProfileKey])
       });
       continue;
     }
@@ -651,7 +667,7 @@ export function rankOpenerTemplates(report: OpenerExperimentReport, topCount: nu
     for (const phaseKey of phaseKeysByTemplate.get(key) ?? [candidate.phaseTemplateKey]) {
       current.phaseKeys.add(phaseKey);
     }
-    for (const profileKey of phaseProfileKeysByTemplate.get(key) ?? [phaseProfileKeyFromRowsKey(candidate.phaseTemplateKey)]) {
+    for (const profileKey of phaseProfileKeysByTemplate.get(key) ?? [candidate.phaseProfileKey]) {
       current.phaseProfileKeys.add(profileKey);
     }
     if (compareRankedOpenerCandidates(candidate, current.best) < 0) {
@@ -780,21 +796,10 @@ export function replayOpenerTemplateSurvivability(
       );
     }
     for (const [index, node] of nodes.entries()) {
+      const { phaseKey, phaseProfileKey } = searchNodePhaseKeys(node, scenario);
       addQualityReplayHits(qualityHitsByTemplate, templates, searchNodeQuality(node, index), scenario.name, scenarioQualityHits);
-      addPhaseReplayHits(
-        phaseHitsByTemplate,
-        templateKeysByPhase,
-        searchNodePhaseTemplateKey(node, scenario),
-        scenario.name,
-        scenarioPhaseHits
-      );
-      addPhaseReplayHits(
-        phaseProfileHitsByTemplate,
-        templateKeysByPhaseProfile,
-        searchNodePhaseProfileKey(node, scenario),
-        scenario.name,
-        scenarioPhaseProfileHits
-      );
+      addPhaseReplayHits(phaseHitsByTemplate, templateKeysByPhase, phaseKey, scenario.name, scenarioPhaseHits);
+      addPhaseReplayHits(phaseProfileHitsByTemplate, templateKeysByPhaseProfile, phaseProfileKey, scenario.name, scenarioPhaseProfileHits);
       const key = searchNodeTemplateKey(node);
       if (!templateKeys.has(key) || scenarioHits.has(key)) {
         continue;
@@ -980,8 +985,7 @@ function createReachableTemplatePhases(
   const ranksByTemplatePhase = new Map<string, OpenerScenarioReachablePhase>();
   for (const [index, node] of nodes.entries()) {
     const key = searchNodeTemplateKey(node);
-    const phaseKey = searchNodePhaseTemplateKey(node, scenario);
-    const phaseProfileKey = searchNodePhaseProfileKey(node, scenario);
+    const { phaseKey, phaseProfileKey } = searchNodePhaseKeys(node, scenario);
     const uniqueKey = `${key}\n${phaseKey}`;
     if (!ranksByTemplatePhase.has(uniqueKey)) {
       ranksByTemplatePhase.set(uniqueKey, { key, phaseKey, phaseProfileKey, rank: index + 1 });
@@ -996,8 +1000,7 @@ function createReachablePhaseFrontiers(
 ): OpenerScenarioReachablePhaseFrontier[] {
   const ranksByPhase = new Map<string, OpenerScenarioReachablePhaseFrontier>();
   for (const [index, node] of nodes.entries()) {
-    const phaseKey = searchNodePhaseTemplateKey(node, scenario);
-    const phaseProfileKey = searchNodePhaseProfileKey(node, scenario);
+    const { phaseKey, phaseProfileKey } = searchNodePhaseKeys(node, scenario);
     const uniqueKey = `${phaseKey}\n${phaseProfileKey}`;
     if (!ranksByPhase.has(uniqueKey)) {
       ranksByPhase.set(uniqueKey, { phaseKey, phaseProfileKey, rank: index + 1 });
@@ -1067,6 +1070,7 @@ function createTopCandidates(
     .sort(compareSearchNodesForOpener)
     .slice(0, topCount)
     .map(({ node, tSpinPotential }, index) => {
+      const { phaseKey, phaseProfileKey } = searchNodePhaseKeys(node, scenario);
       const data = fumenCodec.encodePages(createOpenerFumenPages(node, { title: `${scenario.name} #${index + 1}` }));
       const urls = fumenCodec.createUrls(data);
       const qualityAttack = node.difficultAttack;
@@ -1083,6 +1087,7 @@ function createTopCandidates(
         difficultAttack: qualityAttack,
         nonDifficultAttack: node.attack - qualityAttack,
         points: node.points,
+        combo: node.combo,
         maxCombo: node.maxCombo,
         backToBackChain: node.backToBackChain,
         allClears: node.allClears,
@@ -1090,7 +1095,8 @@ function createTopCandidates(
         tSpinClears: node.tSpinClears,
         tSpinAttack: node.tSpinAttack,
         tSpinPotential,
-        phaseTemplateKey: searchNodePhaseTemplateKey(node, scenario),
+        phaseTemplateKey: phaseKey,
+        phaseProfileKey,
         clearSequence: clearSequence(node),
         occupiedCells: node.occupiedCells,
         clearedLines: node.clearedLines,
@@ -1272,20 +1278,48 @@ function collectReachablePhaseProfileKeysByTemplate(report: OpenerExperimentRepo
   return profileKeysByTemplate;
 }
 
-function templateKey(candidate: Pick<OpenerExperimentCandidate, "finalRows" | "hold" | "queueIndex" | "backToBackChain">): string {
-  return statefulTemplateKey(candidate.finalRows, candidate.hold, candidate.queueIndex, candidate.backToBackChain);
+function templateKey(
+  candidate: Pick<OpenerExperimentCandidate, "finalRows" | "hold" | "queueIndex" | "backToBackChain" | "combo">
+): string {
+  return statefulTemplateKey({
+    rows: candidate.finalRows,
+    hold: candidate.hold,
+    queueIndex: candidate.queueIndex,
+    backToBackChain: candidate.backToBackChain,
+    combo: candidate.combo
+  });
 }
 
-function searchNodeTemplateKey(node: Pick<SearchOpenerBeamNode, "rows" | "hold" | "queueIndex" | "backToBackChain">): string {
-  return statefulTemplateKey(node.rows, node.hold ?? null, node.queueIndex, node.backToBackChain);
+function searchNodeTemplateKey(node: Pick<SearchOpenerBeamNode, "rows" | "hold" | "queueIndex" | "backToBackChain" | "combo">): string {
+  return statefulTemplateKey({
+    rows: node.rows,
+    hold: node.hold ?? null,
+    queueIndex: node.queueIndex,
+    backToBackChain: node.backToBackChain,
+    combo: node.combo
+  });
 }
 
-function searchNodePhaseTemplateKey(node: SearchOpenerBeamNode, scenario: OpenerExperimentScenario): string {
-  return rowsTemplateKey(rowsAfterPlacementPrefix(node, templatePhaseDepth(scenario.maxDepth)));
+function searchNodePhaseKeys(node: SearchOpenerBeamNode, scenario: OpenerExperimentScenario): PhaseStateKeys {
+  const state = searchNodePhaseState(node, scenario);
+  return {
+    phaseKey: statefulTemplateKey(state),
+    phaseProfileKey: statefulPhaseProfileKey(state)
+  };
 }
 
-function searchNodePhaseProfileKey(node: SearchOpenerBeamNode, scenario: OpenerExperimentScenario): string {
-  return phaseProfileKey(rowsAfterPlacementPrefix(node, templatePhaseDepth(scenario.maxDepth)));
+function searchNodePhaseState(node: SearchOpenerBeamNode, scenario: OpenerExperimentScenario): TemplateStateKeyInput {
+  const prefixDepth = templatePhaseDepth(scenario.maxDepth);
+  if (node.placements.length === 0 || prefixDepth >= node.placements.length) {
+    return {
+      rows: node.rows,
+      hold: node.hold ?? null,
+      queueIndex: node.queueIndex,
+      backToBackChain: node.backToBackChain,
+      combo: node.combo
+    };
+  }
+  return stateAfterPlacementPrefix(node, prefixDepth, scenario.queue);
 }
 
 function searchNodeQuality(node: SearchOpenerBeamNode, index: number): OpenerScenarioReachableQuality {
@@ -1296,6 +1330,7 @@ function searchNodeQuality(node: SearchOpenerBeamNode, index: number): OpenerSce
     tSpinClears: node.tSpinClears,
     tSpinAttack: node.tSpinAttack,
     backToBackChain: node.backToBackChain,
+    combo: node.combo,
     tSpinPotential: node.tSpinPotential,
     holes: node.holes
   };
@@ -1310,6 +1345,7 @@ function meetsReplayQuality(quality: OpenerScenarioReachableQuality, target: Ran
     quality.tSpinClears >= target.tSpinClears &&
     quality.tSpinAttack >= target.tSpinAttack &&
     quality.backToBackChain >= target.backToBackChain &&
+    quality.combo >= target.combo &&
     quality.tSpinPotential >= target.tSpinPotential &&
     quality.holes <= target.holes
   );
@@ -1322,13 +1358,17 @@ function templatePhaseDepth(maxDepth: number): number {
   return Math.floor((maxDepth - 1) / 7) * 7;
 }
 
-function rowsAfterPlacementPrefix(node: SearchOpenerBeamNode, prefixDepth: number): readonly number[] {
-  if (node.placements.length === 0 || prefixDepth >= node.placements.length) {
-    return node.rows;
-  }
-
+function stateAfterPlacementPrefix(node: SearchOpenerBeamNode, prefixDepth: number, queue: string): TemplateStateKeyInput {
   let rows = new Array<number>(BOARD_HEIGHT).fill(0);
-  for (const placement of node.placements.slice(0, prefixDepth)) {
+  let hold: string | null = null;
+  let queueIndex = 0;
+  let backToBackChain = 0;
+  let combo = 0;
+  for (let index = 0; index < prefixDepth; index += 1) {
+    const placement = node.placements[index];
+    if (placement === undefined) {
+      throw new Error(`Cannot reconstruct ${prefixDepth}-placement phase state from ${node.placements.length} placements.`);
+    }
     for (const cell of placement.cells) {
       if (cell.x < 0 || cell.x >= BOARD_WIDTH || cell.y < 0 || cell.y >= BOARD_HEIGHT) {
         throw new Error(`Placement ${placement.path} has an out-of-board phase cell (${cell.x}, ${cell.y}).`);
@@ -1336,8 +1376,33 @@ function rowsAfterPlacementPrefix(node: SearchOpenerBeamNode, prefixDepth: numbe
       rows[cell.y] = (rows[cell.y] ?? 0) | (1 << cell.x);
     }
     rows = clearFullLineRows(rows);
+    ({ hold, queueIndex } = advanceHoldStateFromPlacement(placement.usedHold, hold, queueIndex, queue));
+    backToBackChain = placement.backToBackChain;
+    combo = placement.combo;
   }
-  return rows;
+  return { rows, hold, queueIndex, backToBackChain, combo };
+}
+
+function advanceHoldStateFromPlacement(
+  usedHold: boolean,
+  hold: string | null,
+  queueIndex: number,
+  queue: string
+): Pick<TemplateStateKeyInput, "hold" | "queueIndex"> {
+  const current = queue[queueIndex];
+  if (current === undefined) {
+    throw new Error(`Cannot reconstruct hold state after queue index ${queueIndex}: queue is exhausted.`);
+  }
+  if (!usedHold) {
+    return { hold, queueIndex: queueIndex + 1 };
+  }
+  if (hold === null) {
+    if (queue[queueIndex + 1] === undefined) {
+      throw new Error(`Cannot reconstruct empty-hold placement after queue index ${queueIndex}: next queue piece is missing.`);
+    }
+    return { hold: current, queueIndex: queueIndex + 2 };
+  }
+  return { hold: current, queueIndex: queueIndex + 1 };
 }
 
 function clearFullLineRows(rows: readonly number[]): number[] {
@@ -1348,8 +1413,8 @@ function clearFullLineRows(rows: readonly number[]): number[] {
   return keptRows;
 }
 
-function statefulTemplateKey(rows: readonly number[], hold: string | null, queueIndex: number, backToBackChain: number): string {
-  return `${rowsTemplateKey(rows)}|hold=${hold ?? "-"}|queue=${queueIndex}|b2b=${backToBackChain}`;
+function statefulTemplateKey(state: TemplateStateKeyInput): string {
+  return `${rowsTemplateKey(state.rows)}|hold=${state.hold ?? "-"}|queue=${state.queueIndex}|b2b=${state.backToBackChain}|combo=${state.combo}`;
 }
 
 function rowsTemplateKey(rows: readonly number[]): string {
@@ -1358,8 +1423,8 @@ function rowsTemplateKey(rows: readonly number[]): string {
   return direct <= mirrored ? direct : mirrored;
 }
 
-function phaseProfileKeyFromRowsKey(rowsKey: string): string {
-  return phaseProfileKey(rowsKey.split(",").map((row) => Number(row)));
+function statefulPhaseProfileKey(state: TemplateStateKeyInput): string {
+  return `${phaseProfileKey(state.rows)}|hold=${state.hold ?? "-"}|queue=${state.queueIndex}|b2b=${state.backToBackChain}|combo=${state.combo}`;
 }
 
 function phaseProfileKey(rows: readonly number[]): string {

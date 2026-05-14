@@ -27,6 +27,7 @@ describe("native opener beam search", () => {
     expect(nodes[0]?.firepowerScore).toBeGreaterThanOrEqual(0);
     expect(nodes[0]?.attack).toBeGreaterThanOrEqual(0);
     expect(nodes[0]?.points).toBeGreaterThanOrEqual(0);
+    expect(nodes[0]?.combo).toBeGreaterThanOrEqual(0);
     expect(nodes[0]?.occupiedCells ?? 0).toBeGreaterThan(0);
     expect(nodes[0]?.occupiedCells ?? 0).toBeLessThanOrEqual(16);
     for (let index = 1; index < nodes.length; index += 1) {
@@ -44,6 +45,7 @@ describe("native opener beam search", () => {
       firepowerScore: full?.firepowerScore,
       rows: full?.rows,
       attack: full?.attack,
+      combo: full?.combo,
       tSpinAttack: full?.tSpinAttack,
       backToBackChain: full?.backToBackChain
     });
@@ -61,6 +63,7 @@ describe("native opener beam search", () => {
     expect(nodes[0]?.placements[0]?.spinKind).toBeDefined();
     expect(nodes[0]?.placements[0]?.clearName).toBeDefined();
     expect(nodes[0]?.placements[0]?.attack).toBeGreaterThanOrEqual(0);
+    expect(nodes[0]?.placements[0]?.backToBackChain).toBeGreaterThanOrEqual(0);
     expect(nodes[0]?.placements[0]?.clearedLines).toBeGreaterThanOrEqual(0);
   });
 

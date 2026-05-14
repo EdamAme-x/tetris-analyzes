@@ -139,6 +139,7 @@ describe("opener experiment runner", () => {
             placements: [],
             attack: 0,
             points: 0,
+            combo: 0,
             maxCombo: 0,
             backToBackChain: 0,
             allClears: 0,
@@ -192,6 +193,7 @@ describe("opener experiment runner", () => {
           placements: [],
           attack: 0,
           points: 0,
+          combo: 0,
           maxCombo: 0,
           backToBackChain: 0,
           allClears: 0,
@@ -764,7 +766,7 @@ describe("opener experiment runner", () => {
 
     expect(calls).toBe(1);
     expect(report.scenarios[0]?.reachableTemplates).toEqual([
-      { key: `${[384, 640, 128, ...new Array(17).fill(0)].join(",")}|hold=-|queue=1|b2b=0`, rank: 1 }
+      { key: `${[384, 640, 128, ...new Array(17).fill(0)].join(",")}|hold=-|queue=1|b2b=0|combo=0`, rank: 1 }
     ]);
     expect(report.templateReplay?.templates[0]?.hits[0]).toMatchObject({
       scenario: "cached-replay",
@@ -845,6 +847,44 @@ describe("opener experiment runner", () => {
     });
   });
 
+  test("does not replay template hits across different active combo state", () => {
+    const rows = [1, 2, 3, ...new Array(17).fill(0)];
+    const report = runOpenerExperiment({
+      scenarios: [
+        {
+          name: "source",
+          queue: "IO",
+          hold: true,
+          beamWidth: 4,
+          maxDepth: 1,
+          warmups: 0,
+          iterations: 1,
+          top: 1,
+          rules: { spinMode: "T-SPINS", comboTable: "MULTIPLIER", kickTable: "SRS+" }
+        }
+      ],
+      templateReplay: {
+        scenarios: [replayScenario("same-board-broken-combo", "JO")],
+        topTemplates: 1
+      },
+      clock: createClock("2026-05-14T00:00:00.000Z", [0, 2]),
+      fumenCodec: fakeCodec,
+      search: (input) => {
+        if (input.queue === "IO") {
+          return [{ ...candidateNode("source"), rows, hold: "T", queueIndex: 2, backToBackChain: 2, combo: 2 }];
+        }
+        return [{ ...candidateNode("same-board"), rows, hold: "T", queueIndex: 2, backToBackChain: 2, combo: 0 }];
+      }
+    });
+
+    expect(report.templateReplay?.templates[0]).toMatchObject({
+      replayScenarioCount: 1,
+      replayHitCount: 0,
+      replayHitRate: 0,
+      hits: []
+    });
+  });
+
   test("counts phase replay hits at bag boundaries without exact final board matches", () => {
     const phasePlacements = Array.from({ length: 7 }, () => placementEvent("SINGLE", 0, 0, "I", 0));
     const report = runOpenerExperiment({
@@ -907,6 +947,72 @@ describe("opener experiment runner", () => {
     });
   });
 
+  test("does not count phase replay across mismatched phase hold, queue, B2B, or combo state", () => {
+    const phasePlacements = Array.from({ length: 7 }, () => placementEvent("SINGLE", 0, 0, "I", 0));
+    const phaseRows = [0b1111, ...new Array(19).fill(0)];
+    const missRows = [0b11110000, ...new Array(19).fill(0)];
+    const report = runOpenerExperiment({
+      scenarios: [
+        {
+          name: "source",
+          queue: "TIJLOSZTIJLOSZ",
+          hold: true,
+          beamWidth: 4,
+          maxDepth: 14,
+          warmups: 0,
+          iterations: 1,
+          top: 1
+        }
+      ],
+      templateReplay: {
+        scenarios: [
+          {
+            name: "phase-state-miss",
+            queue: "OJLZISTOJLZIST",
+            hold: true,
+            beamWidth: 4,
+            maxDepth: 14,
+            warmups: 0,
+            iterations: 1
+          }
+        ],
+        topTemplates: 1
+      },
+      clock: createClock("2026-05-14T00:00:00.000Z", [0, 2]),
+      fumenCodec: fakeCodec,
+      search: (input) => {
+        if (input.queue === "TIJLOSZTIJLOSZ") {
+          return [
+            {
+              ...candidateNode("source"),
+              depth: 8,
+              queueIndex: 14,
+              rows: missRows,
+              placements: [...phasePlacements, placementEvent("SINGLE", 0, 0, "I", 4)]
+            }
+          ];
+        }
+        return [
+          {
+            ...candidateNode("phase-state-miss"),
+            depth: 7,
+            queueIndex: 8,
+            hold: "T",
+            rows: phaseRows,
+            backToBackChain: 1,
+            combo: 1
+          }
+        ];
+      }
+    });
+
+    expect(report.templateReplay?.templates[0]).toMatchObject({
+      replayHitCount: 0,
+      phaseReplayHitCount: 0,
+      phaseProfileReplayHitCount: 0
+    });
+  });
+
   test("counts continuation phase replay from the fourteen-piece frontier", () => {
     const targetRows = [7, 11, 13, ...new Array(17).fill(0)];
     const missRows = [2, 4, 8, ...new Array(17).fill(0)];
@@ -957,7 +1063,7 @@ describe("opener experiment runner", () => {
           ];
         }
         if (input.maxDepth === 14) {
-          return [{ ...candidateNode("frontier-hit"), rows: targetRows }];
+          return [{ ...candidateNode("frontier-hit"), rows: targetRows, backToBackChain: 3 }];
         }
         return [{ ...candidateNode("final-miss"), rows: missRows }];
       }
@@ -1032,6 +1138,55 @@ describe("opener experiment runner", () => {
       phaseReplayHitCount: 0,
       qualityReplayHitCount: 1,
       qualityReplayHitRate: 0.5
+    });
+  });
+
+  test("requires replay quality hits to preserve active combo state", () => {
+    const targetRows = [7, 11, 13, ...new Array(17).fill(0)];
+    const hitRows = [3, 5, 9, ...new Array(17).fill(0)];
+    const report = runOpenerExperiment({
+      scenarios: [rankingScenario("source", "TI")],
+      templateReplay: {
+        scenarios: [replayScenario("combo-miss", "JO")],
+        topTemplates: 1
+      },
+      clock: createClock("2026-05-14T00:00:00.000Z", [0, 1]),
+      fumenCodec: fakeCodec,
+      search: (input) => {
+        if (input.queue === "TI") {
+          return [
+            {
+              ...candidateNode("source"),
+              rows: targetRows,
+              attack: 12,
+              difficultAttack: 12,
+              difficultClears: 3,
+              tSpinClears: 3,
+              tSpinAttack: 12,
+              backToBackChain: 3,
+              combo: 2
+            }
+          ];
+        }
+        return [
+          {
+            ...candidateNode("combo-miss"),
+            rows: hitRows,
+            attack: 12,
+            difficultAttack: 12,
+            difficultClears: 3,
+            tSpinClears: 3,
+            tSpinAttack: 12,
+            backToBackChain: 3,
+            combo: 1
+          }
+        ];
+      }
+    });
+
+    expect(report.templateReplay?.templates[0]).toMatchObject({
+      replayHitCount: 0,
+      qualityReplayHitCount: 0
     });
   });
 
@@ -1383,6 +1538,7 @@ describe("opener experiment runner", () => {
           placements: [],
           attack: 0,
           points: 0,
+          combo: 0,
           maxCombo: 0,
           backToBackChain: 0,
           allClears: 0,
@@ -1407,6 +1563,7 @@ describe("opener experiment runner", () => {
           placements: [],
           attack: 4,
           points: 400,
+          combo: 0,
           maxCombo: 0,
           backToBackChain: 0,
           allClears: 0,
@@ -1501,6 +1658,7 @@ describe("opener experiment runner", () => {
           placements: [],
           attack: 10,
           points: 2_000,
+          combo: 4,
           maxCombo: 4,
           backToBackChain: 0,
           allClears: 0,
@@ -1525,6 +1683,7 @@ describe("opener experiment runner", () => {
           placements: [],
           attack: 4,
           points: 1_200,
+          combo: 1,
           maxCombo: 1,
           backToBackChain: 1,
           allClears: 0,
@@ -1648,6 +1807,7 @@ function candidateNode(path: string) {
     placements: [],
     attack: 0,
     points: 0,
+    combo: 0,
     maxCombo: 0,
     backToBackChain: 0,
     allClears: 0,
@@ -1704,6 +1864,7 @@ function placementEvent(
     baseAttack: attack,
     points: 0,
     combo: 0,
+    backToBackChain: 0,
     backToBack: false,
     backToBackBonus: 0,
     allClear: false,
