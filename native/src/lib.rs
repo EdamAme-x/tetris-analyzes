@@ -19,7 +19,10 @@ use firepower::{
     estimate_t_spin_potential, firepower_score, parse_clear_kind, parse_combo_table,
     quad_well_continuation_score, score_state, FirepowerEvent, FirepowerState,
 };
-use movement::{can_place, is_reachable_placement, lock_shape, parse_kick_table};
+use movement::{
+    can_place, is_reachable_placement, is_reachable_placement_with_cache, lock_shape,
+    parse_kick_table, ReachablePlacementSet,
+};
 use pieces::{
     format_placement, parse_piece_string, parse_queue, piece_name, piece_shapes,
     placement_shape_indices, Cell, Piece, Shape,
@@ -553,6 +556,7 @@ pub(crate) fn search_opener_states(
                 .flatten()
             {
                 let shapes = piece_shapes(choice.piece);
+                let mut reachable_cache = None;
                 for shape_index in placement_shape_indices(choice.piece).iter().copied() {
                     let shape = shapes[shape_index];
                     for x in 0..=(BOARD_WIDTH as i8 - shape.width) {
@@ -569,6 +573,7 @@ pub(crate) fn search_opener_states(
                                     y,
                                     include_placements,
                                     kick_table,
+                                    &mut reachable_cache,
                                     spin_mode,
                                 ) else {
                                     can_place_below = can_place_here;
@@ -794,9 +799,18 @@ fn place_grounded_at_y(
     y: i8,
     include_placement: bool,
     kick_table: KickTable,
+    reachable_cache: &mut Option<ReachablePlacementSet>,
     spin_mode: SpinMode,
 ) -> Option<PlacedBoard> {
-    if !is_reachable_placement(rows, choice.piece, shape_index, x, y, kick_table) {
+    if !is_reachable_placement_with_cache(
+        rows,
+        choice.piece,
+        shape_index,
+        x,
+        y,
+        kick_table,
+        reachable_cache,
+    ) {
         return None;
     }
 
