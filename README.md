@@ -68,3 +68,4 @@ Executable examples live in `tests/`.
 - [x] Scan occupied row bits directly during native board evaluation
 - [x] Combine native line-clear counting and clearing during placement evaluation
 - [x] Show native candidate queue index and hold state in opener Markdown reports
+- [x] Pack native search-key board rows before hashing opener beam states

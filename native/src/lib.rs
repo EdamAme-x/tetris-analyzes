@@ -1,7 +1,7 @@
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
 use std::collections::HashMap;
-use std::hash::{BuildHasherDefault, Hasher};
+use std::hash::{BuildHasherDefault, Hash, Hasher};
 
 mod bag;
 mod board;
@@ -100,13 +100,41 @@ pub(crate) struct SearchState {
     pub(crate) t_spin_potential: u32,
 }
 
-#[derive(Eq, Hash, PartialEq)]
+#[derive(Eq, PartialEq)]
 struct SearchKey {
     rows: BoardRows,
     hold: Option<Piece>,
     queue_index: usize,
     combo: u32,
     back_to_back_chain: u32,
+}
+
+impl Hash for SearchKey {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        for chunk in self.rows.chunks_exact(4) {
+            let packed = u64::from(chunk[0])
+                | (u64::from(chunk[1]) << 16)
+                | (u64::from(chunk[2]) << 32)
+                | (u64::from(chunk[3]) << 48);
+            state.write_u64(packed);
+        }
+        state.write_u8(self.hold.map(piece_hash_code).unwrap_or(7));
+        state.write_usize(self.queue_index);
+        state.write_u32(self.combo);
+        state.write_u32(self.back_to_back_chain);
+    }
+}
+
+fn piece_hash_code(piece: Piece) -> u8 {
+    match piece {
+        Piece::I => 0,
+        Piece::O => 1,
+        Piece::T => 2,
+        Piece::S => 3,
+        Piece::Z => 4,
+        Piece::J => 5,
+        Piece::L => 6,
+    }
 }
 
 #[derive(Clone, Copy, Default)]
@@ -1178,6 +1206,59 @@ mod tests {
             firepower,
             t_spin_potential: 0,
         }
+    }
+
+    fn hash_search_key(key: &SearchKey) -> u64 {
+        let mut hasher = FastHasher::default();
+        key.hash(&mut hasher);
+        hasher.finish()
+    }
+
+    #[test]
+    fn search_key_hash_includes_packed_rows_and_state_fields() {
+        let base = SearchKey {
+            rows: [0_u16; BOARD_HEIGHT],
+            hold: None,
+            queue_index: 0,
+            combo: 0,
+            back_to_back_chain: 0,
+        };
+        let base_hash = hash_search_key(&base);
+
+        let mut high_row = base.rows;
+        high_row[BOARD_HEIGHT - 1] = 1;
+        assert_ne!(
+            hash_search_key(&SearchKey {
+                rows: high_row,
+                ..base
+            }),
+            base_hash
+        );
+        assert_ne!(
+            hash_search_key(&SearchKey {
+                hold: Some(Piece::T),
+                ..base
+            }),
+            base_hash
+        );
+        assert_ne!(
+            hash_search_key(&SearchKey {
+                queue_index: 1,
+                ..base
+            }),
+            base_hash
+        );
+        assert_ne!(
+            hash_search_key(&SearchKey { combo: 1, ..base }),
+            base_hash
+        );
+        assert_ne!(
+            hash_search_key(&SearchKey {
+                back_to_back_chain: 1,
+                ..base
+            }),
+            base_hash
+        );
     }
 
     #[test]
