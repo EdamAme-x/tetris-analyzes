@@ -15,9 +15,10 @@ use bag::{evaluate_opener_bag_internal, OpenerBagEvaluation};
 use board::{BoardEvaluation, BoardRows, BOARD_HEIGHT, BOARD_WIDTH};
 use firepower::{
     advance_firepower_for_clear_with_combo_table, advance_firepower_with_combo_table,
-    clear_kind_cleared_lines, clear_kind_name, estimate_t_spin_potential,
-    estimate_t_spin_surface_potential, firepower_score, parse_clear_kind, parse_combo_table,
-    score_state, FirepowerEvent, FirepowerState,
+    clear_kind_cleared_lines, clear_kind_name, estimate_quad_well_potential,
+    estimate_t_spin_potential, estimate_t_spin_surface_potential, firepower_score,
+    parse_clear_kind, parse_combo_table, quad_well_continuation_score, score_state,
+    FirepowerEvent, FirepowerState,
 };
 use movement::{can_place, is_reachable_placement, lock_shape, parse_kick_table};
 use pieces::{
@@ -645,7 +646,18 @@ fn score_t_spin_setup_potential(
             } else {
                 0
             };
-        state.score = score_state(state.metrics, state.firepower, state.t_spin_potential);
+        let quad_well_potential = if state.firepower.back_to_back_chain > 0
+            && has_future_i_piece(state, pieces)
+        {
+            estimate_quad_well_potential(&state.rows)
+        } else {
+            0
+        };
+        state.score = score_state(state.metrics, state.firepower, state.t_spin_potential)
+            + quad_well_continuation_score(
+                quad_well_potential,
+                state.firepower.back_to_back_chain,
+            );
     }
 }
 
@@ -654,6 +666,13 @@ fn has_future_t_piece(state: &SearchState, pieces: &[Piece]) -> bool {
         || pieces
             .get(state.queue_index..)
             .is_some_and(|remaining| remaining.contains(&Piece::T))
+}
+
+fn has_future_i_piece(state: &SearchState, pieces: &[Piece]) -> bool {
+    state.hold == Some(Piece::I)
+        || pieces
+            .get(state.queue_index..)
+            .is_some_and(|remaining| remaining.contains(&Piece::I))
 }
 
 fn spin_mode_allows_t_spin_potential(spin_mode: SpinMode) -> bool {

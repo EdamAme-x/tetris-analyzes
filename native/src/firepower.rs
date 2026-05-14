@@ -89,6 +89,14 @@ pub(crate) fn firepower_score(firepower: FirepowerState) -> f64 {
         + firepower.all_clears as f64 * 500.0
 }
 
+pub(crate) fn quad_well_continuation_score(quad_well_potential: u32, back_to_back_chain: u32) -> f64 {
+    if quad_well_potential == 0 || back_to_back_chain == 0 {
+        return 0.0;
+    }
+
+    f64::from(quad_well_potential) * (650.0 + f64::from(back_to_back_chain.min(5)) * 220.0)
+}
+
 pub(crate) fn board_shape_score(metrics: BoardEvaluation) -> f64 {
     let cleared_lines = metrics[1] as f64;
     let aggregate_height = metrics[2] as f64;
@@ -144,6 +152,21 @@ pub(crate) fn estimate_t_spin_potential(rows: &BoardRows, kick_table: KickTable)
                 can_place_below = can_place_here;
             }
         }
+    }
+    best
+}
+
+pub(crate) fn estimate_quad_well_potential(rows: &BoardRows) -> u32 {
+    let mut best = 0_u32;
+    for well_x in 0..BOARD_WIDTH {
+        let well_mask = 1_u16 << well_x;
+        let mut clean_rows = 0_u32;
+        for row in rows.iter().take(4).copied() {
+            if row & well_mask == 0 && (row & !well_mask).count_ones() >= 6 {
+                clean_rows += 1;
+            }
+        }
+        best = best.max(clean_rows);
     }
     best
 }
@@ -433,5 +456,17 @@ mod tests {
             score_state(flat_metrics(), b2b_ready, 2) - score_state(flat_metrics(), b2b_ready, 0);
 
         assert!(b2b_setup_delta > quiet_setup_delta * 1.8);
+    }
+
+    #[test]
+    fn scores_quad_wells_only_as_b2b_continuation() {
+        let mut rows = [0_u16; BOARD_HEIGHT];
+        for row in rows.iter_mut().take(4) {
+            *row = 0b1111111111 ^ (1 << 9);
+        }
+
+        assert_eq!(estimate_quad_well_potential(&rows), 4);
+        assert_eq!(quad_well_continuation_score(4, 0), 0.0);
+        assert!(quad_well_continuation_score(4, 2) > quad_well_continuation_score(2, 2));
     }
 }
