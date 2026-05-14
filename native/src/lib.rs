@@ -932,10 +932,10 @@ fn place_grounded_at_y(
             cells.push(absolute);
         }
     }
-    let cleared_lines = board::count_full_lines_array(&placed);
+    let (cleared_rows, cleared_lines) = board::clear_full_lines_array_with_count(placed);
     let spin = detect_spin_for_mode(&placed, choice.piece, shape, x, y, cleared_lines, spin_mode);
     Some(PlacedBoard {
-        rows: board::clear_full_lines_array(placed),
+        rows: cleared_rows,
         y,
         spin,
         placement: cells.map(|cells| Placement {

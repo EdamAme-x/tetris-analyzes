@@ -66,3 +66,4 @@ Executable examples live in `tests/`.
 - [x] Skip native T immobility checks for spin modes that cannot use immobile T minis
 - [x] Add fumen parity coverage for real native hold and line-clear placement histories
 - [x] Scan occupied row bits directly during native board evaluation
+- [x] Combine native line-clear counting and clearing during placement evaluation

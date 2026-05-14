@@ -254,16 +254,19 @@ pub(crate) fn count_full_lines_array(rows: &BoardRows) -> u32 {
     rows.iter().filter(|row| **row == ROW_MASK).count() as u32
 }
 
-pub(crate) fn clear_full_lines_array(rows: BoardRows) -> BoardRows {
+pub(crate) fn clear_full_lines_array_with_count(rows: BoardRows) -> (BoardRows, u32) {
     let mut output = [0_u16; BOARD_HEIGHT];
     let mut write_y = 0;
+    let mut cleared_lines = 0_u32;
     for row in rows {
         if row != ROW_MASK {
             output[write_y] = row;
             write_y += 1;
+        } else {
+            cleared_lines += 1;
         }
     }
-    output
+    (output, cleared_lines)
 }
 
 fn evaluate_column_metrics(
@@ -338,6 +341,22 @@ mod tests {
         assert_eq!(evaluation[2], 8);
         assert_eq!(evaluation[3], 2);
         assert_eq!(evaluation[4], 8);
+    }
+
+    #[test]
+    fn clear_full_lines_array_with_count_matches_clear_and_count_helpers() {
+        let mut rows = [0_u16; BOARD_HEIGHT];
+        rows[0] = 0b0000001111;
+        rows[1] = ROW_MASK;
+        rows[2] = 0b1111000000;
+        rows[4] = ROW_MASK;
+
+        let (cleared, count) = clear_full_lines_array_with_count(rows);
+
+        assert_eq!(count, count_full_lines_array(&rows));
+        assert_eq!(cleared[0], 0b0000001111);
+        assert_eq!(cleared[1], 0b1111000000);
+        assert_eq!(cleared[2], 0);
     }
 
     fn slow_evaluate_board(rows: &BoardRows) -> BoardEvaluation {
