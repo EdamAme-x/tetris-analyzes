@@ -162,7 +162,9 @@ impl Ord for PlacementStep {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         self.used_hold
             .cmp(&other.used_hold)
-            .then_with(|| piece_name(self.piece).cmp(piece_name(other.piece)))
+            .then_with(|| {
+                placement_piece_order(self.piece).cmp(&placement_piece_order(other.piece))
+            })
             .then_with(|| self.rotation.cmp(&other.rotation))
             .then_with(|| self.x.cmp(&other.x))
             .then_with(|| self.y.cmp(&other.y))
@@ -172,6 +174,18 @@ impl Ord for PlacementStep {
 impl PartialOrd for PlacementStep {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(self.cmp(other))
+    }
+}
+
+fn placement_piece_order(piece: Piece) -> u8 {
+    match piece {
+        Piece::I => 0,
+        Piece::J => 1,
+        Piece::L => 2,
+        Piece::O => 3,
+        Piece::S => 4,
+        Piece::T => 5,
+        Piece::Z => 6,
     }
 }
 

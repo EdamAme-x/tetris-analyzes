@@ -78,3 +78,4 @@ Executable examples live in `tests/`.
 - [x] Sample capped native bag queues across deterministic permutation positions instead of DFS prefixes
 - [x] Add medium-depth TL B2B T-spin pruning regression coverage
 - [x] Stream native bag permutation evaluation without prebuilding queue vectors
+- [x] Compare native placement-step tie breakers with numeric piece ranks
