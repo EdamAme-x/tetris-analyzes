@@ -7,6 +7,7 @@ bun run generate:tetrio-tables
 bun run check
 bun test
 bun run bench:release
+bun run bench:openers
 bun run experiment:opener
 ```
 
@@ -19,7 +20,6 @@ Executable examples live in `tests/`.
 - [x] Native opener beam search with hold and reachability filtering
 - [x] Native spin/firepower scoring with generated TETR.IO clear and combo tables
 - [x] Native 7-bag buildability sampling with Pareto queue ranking
-- [x] Native kick table selection for SRS+, SRS, and NONE
-- [ ] Full TETR.IO kick table parity for SRS-X, TETRA-X, NRS, ARS, and ASC
-- [ ] Spin mode variants beyond current T-spin/immobile primitives
-- [ ] Known opener benchmark set and regression report
+- [x] Native generated TETR.IO kick tables for SRS+, SRS, SRS-X, TETRA-X, NRS, ARS, ASC, and NONE
+- [x] Native spin mode selection for T-SPINS, all-spin, mini-only, handheld, stupid, and none variants
+- [x] Known opener benchmark set and regression report

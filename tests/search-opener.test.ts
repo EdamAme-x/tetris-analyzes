@@ -7,7 +7,6 @@ import {
   searchOpenerBeam,
   searchOpenerBeamWithPlacements
 } from "../src/application/search-opener";
-import { ROW_MASK } from "../src/domain/board";
 import { TETRIO_COMBO_ATTACK_TABLES, TETRIO_GARBAGE_ATTACK_TABLE, TETRIO_SCORING_TABLE } from "../src/domain/tetrio-tables";
 import { bitBoardFromRows } from "../src/infrastructure/bitboard/native-bitboard";
 import type { NativeClearName } from "../src/infrastructure/native/binding-types";
@@ -55,10 +54,17 @@ describe("native opener beam search", () => {
   test("filters placements that are geometrically possible but unreachable from spawn", () => {
     const empty = bitBoardFromRows(new Array(20).fill(0));
     const sealedCave = new Array(20).fill(0);
-    sealedCave[1] = ROW_MASK;
+    sealedCave[0] = 660;
+    sealedCave[1] = 553;
+    sealedCave[2] = 832;
+    sealedCave[3] = 964;
+    sealedCave[4] = 68;
+    sealedCave[5] = 588;
+    sealedCave[6] = 32;
+    sealedCave[7] = 496;
 
     expect(canReachOpenerPlacement({ rows: empty, piece: "I", rotation: 0, x: 3, y: 0 })).toBe(true);
-    expect(canReachOpenerPlacement({ rows: bitBoardFromRows(sealedCave), piece: "I", rotation: 0, x: 3, y: 0 })).toBe(false);
+    expect(canReachOpenerPlacement({ rows: bitBoardFromRows(sealedCave), piece: "T", rotation: 0, x: 6, y: 1 })).toBe(false);
   });
 
   test("applies native kick table options during reachability and search", () => {
@@ -73,9 +79,13 @@ describe("native opener beam search", () => {
 
     expect(canReachOpenerPlacement({ rows: board, piece: "T", rotation: 0, x: 4, y: 2, kickTable: "SRS+" })).toBe(true);
     expect(canReachOpenerPlacement({ rows: board, piece: "T", rotation: 0, x: 4, y: 2, kickTable: "NONE" })).toBe(false);
-    expect(() => searchOpenerBeam({ queue: "TIL", kickTable: "SRS" })).not.toThrow();
+    expect(() => searchOpenerBeam({ queue: "TIL", kickTable: "SRS-X" })).not.toThrow();
+    expect(() => searchOpenerBeam({ queue: "TIL", kickTable: "TETRA-X" })).not.toThrow();
+    expect(() => searchOpenerBeam({ queue: "TIL", kickTable: "NRS" })).not.toThrow();
+    expect(() => searchOpenerBeam({ queue: "TIL", kickTable: "ARS" })).not.toThrow();
+    expect(() => searchOpenerBeam({ queue: "TIL", kickTable: "ASC" })).not.toThrow();
     expect(() => evaluateOpenerBag({ bag: "TIO", kickTable: "NONE", maxQueues: 2 })).not.toThrow();
-    expect(() => searchOpenerBeam({ queue: "TIL", kickTable: "ARS" as "SRS" })).toThrow("Unsupported native opener kick table");
+    expect(() => searchOpenerBeam({ queue: "TIL", kickTable: "BAD KICKS" as "SRS" })).toThrow("Unsupported native opener kick table");
   });
 
   test("detects T-spin, T-spin mini, and immobile spin primitives in native code", () => {
@@ -103,6 +113,36 @@ describe("native opener beam search", () => {
       spin: true,
       immobile: true
     });
+  });
+
+  test("applies native spin mode options before firepower scoring", () => {
+    const fullTSpinRows = new Array(20).fill(0);
+    fullTSpinRows[1] = (1 << 3) | (1 << 5);
+    const immobileIRows = new Array(20).fill(0);
+    immobileIRows[0] = (1 << 2) | (1 << 7);
+
+    expect(
+      detectOpenerSpin({ rows: bitBoardFromRows(fullTSpinRows), piece: "T", rotation: 0, x: 3, y: 0, spinMode: "NONE" })
+    ).toMatchObject({
+      kind: "NONE",
+      spin: false
+    });
+    expect(
+      detectOpenerSpin({ rows: bitBoardFromRows(immobileIRows), piece: "I", rotation: 0, x: 3, y: 0, spinMode: "ALL-SPINS" })
+    ).toMatchObject({
+      kind: "T_SPIN",
+      spin: true,
+      mini: false
+    });
+    expect(
+      detectOpenerSpin({ rows: bitBoardFromRows(immobileIRows), piece: "I", rotation: 0, x: 3, y: 0, spinMode: "ALL-MINI" })
+    ).toMatchObject({
+      kind: "T_SPIN_MINI",
+      spin: true,
+      mini: true
+    });
+    expect(() => searchOpenerBeam({ queue: "TIL", spinMode: "HANDHELD" })).not.toThrow();
+    expect(() => searchOpenerBeam({ queue: "TIL", spinMode: "BAD SPINS" as "T-SPINS" })).toThrow("Unsupported native opener spin mode");
   });
 
   test("evaluates TETR.IO-style opener firepower in native code", () => {

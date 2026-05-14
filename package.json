@@ -6,7 +6,8 @@
   "scripts": {
     "build:native": "napi build --manifest-path native/Cargo.toml --package-json-path package.json --output-dir native --platform --js index.js --dts index.d.ts --release",
     "build:native:debug": "napi build --manifest-path native/Cargo.toml --package-json-path package.json --output-dir native --platform --js index.js --dts index.d.ts",
-    "bench": "bun run bench/bitboard.bench.ts && bun run bench/search-opener.bench.ts",
+    "bench": "bun run bench/bitboard.bench.ts && bun run bench/search-opener.bench.ts && bun run bench/opener-regression.bench.ts",
+    "bench:openers": "bun run bench/opener-regression.bench.ts",
     "bench:release": "bun run build:native && bun run bench",
     "check": "tsc --noEmit",
     "experiment:opener": "bun run build:native && bun run scripts/run-opener-experiment.ts",

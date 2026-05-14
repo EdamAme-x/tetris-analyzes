@@ -31,6 +31,31 @@ pub(crate) enum ComboTable {
     ModernGuideline,
 }
 
+#[derive(Clone, Copy, Eq, PartialEq)]
+pub(crate) enum KickTable {
+    Srs,
+    SrsPlus,
+    SrsX,
+    TetraX,
+    Nrs,
+    Ars,
+    Asc,
+    None,
+}
+
+#[derive(Clone, Copy, Eq, PartialEq)]
+pub(crate) enum KickGroup {
+    Default,
+    I,
+    O,
+}
+
+#[derive(Clone, Copy)]
+pub(crate) struct Kick {
+    pub(crate) x: i8,
+    pub(crate) y: i8,
+}
+
 pub const SOURCE_ASSET: &str =
     "https://tetr.io/js/tetrio.js?hv=7eebfc9cd.987f91854aad.20260504T210001";
 pub const SOURCE_FETCHED_AT: &str = "2026-05-14T07:32:32+09:00";
@@ -91,6 +116,933 @@ pub(crate) const COMBO_TABLE_MODERN_GUIDELINE: [u32; 13] = [
     0_u32, 1_u32, 1_u32, 2_u32, 2_u32, 2_u32, 3_u32, 3_u32, 3_u32, 3_u32, 3_u32, 3_u32, 4_u32,
 ];
 
+pub(crate) const NO_KICKS: [Kick; 1] = [Kick { x: 0, y: 0 }];
+
+pub(crate) const KICK_TABLE_SRS_DEFAULT_01: [Kick; 5] = [
+    Kick { x: 0, y: 0 }, Kick { x: -1, y: 0 }, Kick { x: -1, y: -1 }, Kick { x: 0, y: 2 },
+    Kick { x: -1, y: 2 },
+];
+pub(crate) const KICK_TABLE_SRS_DEFAULT_10: [Kick; 5] = [
+    Kick { x: 0, y: 0 }, Kick { x: 1, y: 0 }, Kick { x: 1, y: 1 }, Kick { x: 0, y: -2 },
+    Kick { x: 1, y: -2 },
+];
+pub(crate) const KICK_TABLE_SRS_DEFAULT_12: [Kick; 5] = [
+    Kick { x: 0, y: 0 }, Kick { x: 1, y: 0 }, Kick { x: 1, y: 1 }, Kick { x: 0, y: -2 },
+    Kick { x: 1, y: -2 },
+];
+pub(crate) const KICK_TABLE_SRS_DEFAULT_21: [Kick; 5] = [
+    Kick { x: 0, y: 0 }, Kick { x: -1, y: 0 }, Kick { x: -1, y: -1 }, Kick { x: 0, y: 2 },
+    Kick { x: -1, y: 2 },
+];
+pub(crate) const KICK_TABLE_SRS_DEFAULT_23: [Kick; 5] = [
+    Kick { x: 0, y: 0 }, Kick { x: 1, y: 0 }, Kick { x: 1, y: -1 }, Kick { x: 0, y: 2 },
+    Kick { x: 1, y: 2 },
+];
+pub(crate) const KICK_TABLE_SRS_DEFAULT_32: [Kick; 5] = [
+    Kick { x: 0, y: 0 }, Kick { x: -1, y: 0 }, Kick { x: -1, y: 1 }, Kick { x: 0, y: -2 },
+    Kick { x: -1, y: -2 },
+];
+pub(crate) const KICK_TABLE_SRS_DEFAULT_30: [Kick; 5] = [
+    Kick { x: 0, y: 0 }, Kick { x: -1, y: 0 }, Kick { x: -1, y: 1 }, Kick { x: 0, y: -2 },
+    Kick { x: -1, y: -2 },
+];
+pub(crate) const KICK_TABLE_SRS_DEFAULT_03: [Kick; 5] = [
+    Kick { x: 0, y: 0 }, Kick { x: 1, y: 0 }, Kick { x: 1, y: -1 }, Kick { x: 0, y: 2 },
+    Kick { x: 1, y: 2 },
+];
+pub(crate) const KICK_TABLE_SRS_DEFAULT_02: [Kick; 6] = [
+    Kick { x: 0, y: 0 }, Kick { x: 0, y: -1 }, Kick { x: 1, y: -1 }, Kick { x: -1, y: -1 },
+    Kick { x: 1, y: 0 }, Kick { x: -1, y: 0 },
+];
+pub(crate) const KICK_TABLE_SRS_DEFAULT_20: [Kick; 6] = [
+    Kick { x: 0, y: 0 }, Kick { x: 0, y: 1 }, Kick { x: -1, y: 1 }, Kick { x: 1, y: 1 },
+    Kick { x: -1, y: 0 }, Kick { x: 1, y: 0 },
+];
+pub(crate) const KICK_TABLE_SRS_DEFAULT_13: [Kick; 6] = [
+    Kick { x: 0, y: 0 }, Kick { x: 1, y: 0 }, Kick { x: 1, y: -2 }, Kick { x: 1, y: -1 },
+    Kick { x: 0, y: -2 }, Kick { x: 0, y: -1 },
+];
+pub(crate) const KICK_TABLE_SRS_DEFAULT_31: [Kick; 6] = [
+    Kick { x: 0, y: 0 }, Kick { x: -1, y: 0 }, Kick { x: -1, y: -2 }, Kick { x: -1, y: -1 },
+    Kick { x: 0, y: -2 }, Kick { x: 0, y: -1 },
+];
+pub(crate) const KICK_TABLE_SRS_I_01: [Kick; 5] = [
+    Kick { x: 0, y: 0 }, Kick { x: -2, y: 0 }, Kick { x: 1, y: 0 }, Kick { x: -2, y: 1 },
+    Kick { x: 1, y: -2 },
+];
+pub(crate) const KICK_TABLE_SRS_I_10: [Kick; 5] = [
+    Kick { x: 0, y: 0 }, Kick { x: 2, y: 0 }, Kick { x: -1, y: 0 }, Kick { x: 2, y: -1 },
+    Kick { x: -1, y: 2 },
+];
+pub(crate) const KICK_TABLE_SRS_I_12: [Kick; 5] = [
+    Kick { x: 0, y: 0 }, Kick { x: -1, y: 0 }, Kick { x: 2, y: 0 }, Kick { x: -1, y: -2 },
+    Kick { x: 2, y: 1 },
+];
+pub(crate) const KICK_TABLE_SRS_I_21: [Kick; 5] = [
+    Kick { x: 0, y: 0 }, Kick { x: 1, y: 0 }, Kick { x: -2, y: 0 }, Kick { x: 1, y: 2 },
+    Kick { x: -2, y: -1 },
+];
+pub(crate) const KICK_TABLE_SRS_I_23: [Kick; 5] = [
+    Kick { x: 0, y: 0 }, Kick { x: 2, y: 0 }, Kick { x: -1, y: 0 }, Kick { x: 2, y: -1 },
+    Kick { x: -1, y: 2 },
+];
+pub(crate) const KICK_TABLE_SRS_I_32: [Kick; 5] = [
+    Kick { x: 0, y: 0 }, Kick { x: -2, y: 0 }, Kick { x: 1, y: 0 }, Kick { x: -2, y: 1 },
+    Kick { x: 1, y: -2 },
+];
+pub(crate) const KICK_TABLE_SRS_I_30: [Kick; 5] = [
+    Kick { x: 0, y: 0 }, Kick { x: 1, y: 0 }, Kick { x: -2, y: 0 }, Kick { x: 1, y: 2 },
+    Kick { x: -2, y: -1 },
+];
+pub(crate) const KICK_TABLE_SRS_I_03: [Kick; 5] = [
+    Kick { x: 0, y: 0 }, Kick { x: -1, y: 0 }, Kick { x: 2, y: 0 }, Kick { x: -1, y: -2 },
+    Kick { x: 2, y: 1 },
+];
+pub(crate) const KICK_TABLE_SRS_I_02: [Kick; 1] = [Kick { x: 0, y: 0 }];
+pub(crate) const KICK_TABLE_SRS_I_20: [Kick; 1] = [Kick { x: 0, y: 0 }];
+pub(crate) const KICK_TABLE_SRS_I_13: [Kick; 1] = [Kick { x: 0, y: 0 }];
+pub(crate) const KICK_TABLE_SRS_I_31: [Kick; 1] = [Kick { x: 0, y: 0 }];
+pub(crate) const KICK_TABLE_SRS_O_01: [Kick; 8] = [
+    Kick { x: 0, y: 0 }, Kick { x: 0, y: -1 }, Kick { x: -1, y: -1 }, Kick { x: 0, y: 1 },
+    Kick { x: -1, y: 1 }, Kick { x: 1, y: 0 }, Kick { x: 1, y: -1 }, Kick { x: 1, y: 1 },
+];
+pub(crate) const KICK_TABLE_SRS_O_10: [Kick; 8] = [
+    Kick { x: 0, y: 0 }, Kick { x: 1, y: 0 }, Kick { x: 0, y: -1 }, Kick { x: 1, y: 1 },
+    Kick { x: 1, y: -1 }, Kick { x: -1, y: 0 }, Kick { x: -1, y: -1 }, Kick { x: -1, y: 1 },
+];
+pub(crate) const KICK_TABLE_SRS_O_12: [Kick; 8] = [
+    Kick { x: 0, y: 0 }, Kick { x: -1, y: 0 }, Kick { x: 0, y: -1 }, Kick { x: -1, y: 1 },
+    Kick { x: -1, y: -1 }, Kick { x: 1, y: 0 }, Kick { x: 1, y: -1 }, Kick { x: 1, y: 1 },
+];
+pub(crate) const KICK_TABLE_SRS_O_21: [Kick; 8] = [
+    Kick { x: 0, y: 0 }, Kick { x: 0, y: -1 }, Kick { x: 1, y: -1 }, Kick { x: 0, y: 1 },
+    Kick { x: 1, y: 1 }, Kick { x: -1, y: 0 }, Kick { x: -1, y: -1 }, Kick { x: -1, y: 1 },
+];
+pub(crate) const KICK_TABLE_SRS_O_23: [Kick; 8] = [
+    Kick { x: 0, y: 0 }, Kick { x: 0, y: -1 }, Kick { x: -1, y: -1 }, Kick { x: 0, y: 1 },
+    Kick { x: -1, y: 1 }, Kick { x: 1, y: 0 }, Kick { x: 1, y: -1 }, Kick { x: 1, y: 1 },
+];
+pub(crate) const KICK_TABLE_SRS_O_32: [Kick; 8] = [
+    Kick { x: 0, y: 0 }, Kick { x: 1, y: 0 }, Kick { x: 0, y: -1 }, Kick { x: 1, y: 1 },
+    Kick { x: 1, y: -1 }, Kick { x: -1, y: 0 }, Kick { x: -1, y: -1 }, Kick { x: -1, y: 1 },
+];
+pub(crate) const KICK_TABLE_SRS_O_30: [Kick; 8] = [
+    Kick { x: 0, y: 0 }, Kick { x: -1, y: 0 }, Kick { x: 0, y: -1 }, Kick { x: -1, y: 1 },
+    Kick { x: -1, y: -1 }, Kick { x: 1, y: 0 }, Kick { x: 1, y: -1 }, Kick { x: 1, y: 1 },
+];
+pub(crate) const KICK_TABLE_SRS_O_03: [Kick; 8] = [
+    Kick { x: 0, y: 0 }, Kick { x: 0, y: -1 }, Kick { x: 1, y: -1 }, Kick { x: 0, y: 1 },
+    Kick { x: 1, y: 1 }, Kick { x: -1, y: 0 }, Kick { x: -1, y: -1 }, Kick { x: -1, y: 1 },
+];
+pub(crate) const KICK_TABLE_SRS_O_02: [Kick; 2] = [
+    Kick { x: 0, y: 0 }, Kick { x: 0, y: -1 },
+];
+pub(crate) const KICK_TABLE_SRS_O_20: [Kick; 2] = [
+    Kick { x: 0, y: 0 }, Kick { x: 0, y: 1 },
+];
+pub(crate) const KICK_TABLE_SRS_O_13: [Kick; 2] = [
+    Kick { x: 0, y: 0 }, Kick { x: 1, y: 0 },
+];
+pub(crate) const KICK_TABLE_SRS_O_31: [Kick; 2] = [
+    Kick { x: 0, y: 0 }, Kick { x: -1, y: 0 },
+];
+pub(crate) const KICK_TABLE_SRS_PLUS_DEFAULT_01: [Kick; 5] = [
+    Kick { x: 0, y: 0 }, Kick { x: -1, y: 0 }, Kick { x: -1, y: -1 }, Kick { x: 0, y: 2 },
+    Kick { x: -1, y: 2 },
+];
+pub(crate) const KICK_TABLE_SRS_PLUS_DEFAULT_10: [Kick; 5] = [
+    Kick { x: 0, y: 0 }, Kick { x: 1, y: 0 }, Kick { x: 1, y: 1 }, Kick { x: 0, y: -2 },
+    Kick { x: 1, y: -2 },
+];
+pub(crate) const KICK_TABLE_SRS_PLUS_DEFAULT_12: [Kick; 5] = [
+    Kick { x: 0, y: 0 }, Kick { x: 1, y: 0 }, Kick { x: 1, y: 1 }, Kick { x: 0, y: -2 },
+    Kick { x: 1, y: -2 },
+];
+pub(crate) const KICK_TABLE_SRS_PLUS_DEFAULT_21: [Kick; 5] = [
+    Kick { x: 0, y: 0 }, Kick { x: -1, y: 0 }, Kick { x: -1, y: -1 }, Kick { x: 0, y: 2 },
+    Kick { x: -1, y: 2 },
+];
+pub(crate) const KICK_TABLE_SRS_PLUS_DEFAULT_23: [Kick; 5] = [
+    Kick { x: 0, y: 0 }, Kick { x: 1, y: 0 }, Kick { x: 1, y: -1 }, Kick { x: 0, y: 2 },
+    Kick { x: 1, y: 2 },
+];
+pub(crate) const KICK_TABLE_SRS_PLUS_DEFAULT_32: [Kick; 5] = [
+    Kick { x: 0, y: 0 }, Kick { x: -1, y: 0 }, Kick { x: -1, y: 1 }, Kick { x: 0, y: -2 },
+    Kick { x: -1, y: -2 },
+];
+pub(crate) const KICK_TABLE_SRS_PLUS_DEFAULT_30: [Kick; 5] = [
+    Kick { x: 0, y: 0 }, Kick { x: -1, y: 0 }, Kick { x: -1, y: 1 }, Kick { x: 0, y: -2 },
+    Kick { x: -1, y: -2 },
+];
+pub(crate) const KICK_TABLE_SRS_PLUS_DEFAULT_03: [Kick; 5] = [
+    Kick { x: 0, y: 0 }, Kick { x: 1, y: 0 }, Kick { x: 1, y: -1 }, Kick { x: 0, y: 2 },
+    Kick { x: 1, y: 2 },
+];
+pub(crate) const KICK_TABLE_SRS_PLUS_DEFAULT_02: [Kick; 6] = [
+    Kick { x: 0, y: 0 }, Kick { x: 0, y: -1 }, Kick { x: 1, y: -1 }, Kick { x: -1, y: -1 },
+    Kick { x: 1, y: 0 }, Kick { x: -1, y: 0 },
+];
+pub(crate) const KICK_TABLE_SRS_PLUS_DEFAULT_20: [Kick; 6] = [
+    Kick { x: 0, y: 0 }, Kick { x: 0, y: 1 }, Kick { x: -1, y: 1 }, Kick { x: 1, y: 1 },
+    Kick { x: -1, y: 0 }, Kick { x: 1, y: 0 },
+];
+pub(crate) const KICK_TABLE_SRS_PLUS_DEFAULT_13: [Kick; 6] = [
+    Kick { x: 0, y: 0 }, Kick { x: 1, y: 0 }, Kick { x: 1, y: -2 }, Kick { x: 1, y: -1 },
+    Kick { x: 0, y: -2 }, Kick { x: 0, y: -1 },
+];
+pub(crate) const KICK_TABLE_SRS_PLUS_DEFAULT_31: [Kick; 6] = [
+    Kick { x: 0, y: 0 }, Kick { x: -1, y: 0 }, Kick { x: -1, y: -2 }, Kick { x: -1, y: -1 },
+    Kick { x: 0, y: -2 }, Kick { x: 0, y: -1 },
+];
+pub(crate) const KICK_TABLE_SRS_PLUS_I_01: [Kick; 5] = [
+    Kick { x: 0, y: 0 }, Kick { x: 1, y: 0 }, Kick { x: -2, y: 0 }, Kick { x: -2, y: 1 },
+    Kick { x: 1, y: -2 },
+];
+pub(crate) const KICK_TABLE_SRS_PLUS_I_10: [Kick; 5] = [
+    Kick { x: 0, y: 0 }, Kick { x: -1, y: 0 }, Kick { x: 2, y: 0 }, Kick { x: -1, y: 2 },
+    Kick { x: 2, y: -1 },
+];
+pub(crate) const KICK_TABLE_SRS_PLUS_I_12: [Kick; 5] = [
+    Kick { x: 0, y: 0 }, Kick { x: -1, y: 0 }, Kick { x: 2, y: 0 }, Kick { x: -1, y: -2 },
+    Kick { x: 2, y: 1 },
+];
+pub(crate) const KICK_TABLE_SRS_PLUS_I_21: [Kick; 5] = [
+    Kick { x: 0, y: 0 }, Kick { x: -2, y: 0 }, Kick { x: 1, y: 0 }, Kick { x: -2, y: -1 },
+    Kick { x: 1, y: 2 },
+];
+pub(crate) const KICK_TABLE_SRS_PLUS_I_23: [Kick; 5] = [
+    Kick { x: 0, y: 0 }, Kick { x: 2, y: 0 }, Kick { x: -1, y: 0 }, Kick { x: 2, y: -1 },
+    Kick { x: -1, y: 2 },
+];
+pub(crate) const KICK_TABLE_SRS_PLUS_I_32: [Kick; 5] = [
+    Kick { x: 0, y: 0 }, Kick { x: 1, y: 0 }, Kick { x: -2, y: 0 }, Kick { x: 1, y: -2 },
+    Kick { x: -2, y: 1 },
+];
+pub(crate) const KICK_TABLE_SRS_PLUS_I_30: [Kick; 5] = [
+    Kick { x: 0, y: 0 }, Kick { x: 1, y: 0 }, Kick { x: -2, y: 0 }, Kick { x: 1, y: 2 },
+    Kick { x: -2, y: -1 },
+];
+pub(crate) const KICK_TABLE_SRS_PLUS_I_03: [Kick; 5] = [
+    Kick { x: 0, y: 0 }, Kick { x: -1, y: 0 }, Kick { x: 2, y: 0 }, Kick { x: 2, y: 1 },
+    Kick { x: -1, y: -2 },
+];
+pub(crate) const KICK_TABLE_SRS_PLUS_I_02: [Kick; 2] = [
+    Kick { x: 0, y: 0 }, Kick { x: 0, y: -1 },
+];
+pub(crate) const KICK_TABLE_SRS_PLUS_I_20: [Kick; 2] = [
+    Kick { x: 0, y: 0 }, Kick { x: 0, y: 1 },
+];
+pub(crate) const KICK_TABLE_SRS_PLUS_I_13: [Kick; 2] = [
+    Kick { x: 0, y: 0 }, Kick { x: 1, y: 0 },
+];
+pub(crate) const KICK_TABLE_SRS_PLUS_I_31: [Kick; 2] = [
+    Kick { x: 0, y: 0 }, Kick { x: -1, y: 0 },
+];
+pub(crate) const KICK_TABLE_SRS_PLUS_O_01: [Kick; 8] = [
+    Kick { x: 0, y: 0 }, Kick { x: 0, y: -1 }, Kick { x: -1, y: -1 }, Kick { x: 0, y: 1 },
+    Kick { x: -1, y: 1 }, Kick { x: 1, y: 0 }, Kick { x: 1, y: -1 }, Kick { x: 1, y: 1 },
+];
+pub(crate) const KICK_TABLE_SRS_PLUS_O_10: [Kick; 8] = [
+    Kick { x: 0, y: 0 }, Kick { x: 1, y: 0 }, Kick { x: 0, y: -1 }, Kick { x: 1, y: 1 },
+    Kick { x: 1, y: -1 }, Kick { x: -1, y: 0 }, Kick { x: -1, y: -1 }, Kick { x: -1, y: 1 },
+];
+pub(crate) const KICK_TABLE_SRS_PLUS_O_12: [Kick; 8] = [
+    Kick { x: 0, y: 0 }, Kick { x: -1, y: 0 }, Kick { x: 0, y: -1 }, Kick { x: -1, y: 1 },
+    Kick { x: -1, y: -1 }, Kick { x: 1, y: 0 }, Kick { x: 1, y: -1 }, Kick { x: 1, y: 1 },
+];
+pub(crate) const KICK_TABLE_SRS_PLUS_O_21: [Kick; 8] = [
+    Kick { x: 0, y: 0 }, Kick { x: 0, y: -1 }, Kick { x: 1, y: -1 }, Kick { x: 0, y: 1 },
+    Kick { x: 1, y: 1 }, Kick { x: -1, y: 0 }, Kick { x: -1, y: -1 }, Kick { x: -1, y: 1 },
+];
+pub(crate) const KICK_TABLE_SRS_PLUS_O_23: [Kick; 8] = [
+    Kick { x: 0, y: 0 }, Kick { x: 0, y: -1 }, Kick { x: -1, y: -1 }, Kick { x: 0, y: 1 },
+    Kick { x: -1, y: 1 }, Kick { x: 1, y: 0 }, Kick { x: 1, y: -1 }, Kick { x: 1, y: 1 },
+];
+pub(crate) const KICK_TABLE_SRS_PLUS_O_32: [Kick; 8] = [
+    Kick { x: 0, y: 0 }, Kick { x: 1, y: 0 }, Kick { x: 0, y: -1 }, Kick { x: 1, y: 1 },
+    Kick { x: 1, y: -1 }, Kick { x: -1, y: 0 }, Kick { x: -1, y: -1 }, Kick { x: -1, y: 1 },
+];
+pub(crate) const KICK_TABLE_SRS_PLUS_O_30: [Kick; 8] = [
+    Kick { x: 0, y: 0 }, Kick { x: -1, y: 0 }, Kick { x: 0, y: -1 }, Kick { x: -1, y: 1 },
+    Kick { x: -1, y: -1 }, Kick { x: 1, y: 0 }, Kick { x: 1, y: -1 }, Kick { x: 1, y: 1 },
+];
+pub(crate) const KICK_TABLE_SRS_PLUS_O_03: [Kick; 8] = [
+    Kick { x: 0, y: 0 }, Kick { x: 0, y: -1 }, Kick { x: 1, y: -1 }, Kick { x: 0, y: 1 },
+    Kick { x: 1, y: 1 }, Kick { x: -1, y: 0 }, Kick { x: -1, y: -1 }, Kick { x: -1, y: 1 },
+];
+pub(crate) const KICK_TABLE_SRS_PLUS_O_02: [Kick; 2] = [
+    Kick { x: 0, y: 0 }, Kick { x: 0, y: -1 },
+];
+pub(crate) const KICK_TABLE_SRS_PLUS_O_20: [Kick; 2] = [
+    Kick { x: 0, y: 0 }, Kick { x: 0, y: 1 },
+];
+pub(crate) const KICK_TABLE_SRS_PLUS_O_13: [Kick; 2] = [
+    Kick { x: 0, y: 0 }, Kick { x: 1, y: 0 },
+];
+pub(crate) const KICK_TABLE_SRS_PLUS_O_31: [Kick; 2] = [
+    Kick { x: 0, y: 0 }, Kick { x: -1, y: 0 },
+];
+pub(crate) const KICK_TABLE_SRS_X_DEFAULT_01: [Kick; 5] = [
+    Kick { x: 0, y: 0 }, Kick { x: -1, y: 0 }, Kick { x: -1, y: -1 }, Kick { x: 0, y: 2 },
+    Kick { x: -1, y: 2 },
+];
+pub(crate) const KICK_TABLE_SRS_X_DEFAULT_10: [Kick; 5] = [
+    Kick { x: 0, y: 0 }, Kick { x: 1, y: 0 }, Kick { x: 1, y: 1 }, Kick { x: 0, y: -2 },
+    Kick { x: 1, y: -2 },
+];
+pub(crate) const KICK_TABLE_SRS_X_DEFAULT_12: [Kick; 5] = [
+    Kick { x: 0, y: 0 }, Kick { x: 1, y: 0 }, Kick { x: 1, y: 1 }, Kick { x: 0, y: -2 },
+    Kick { x: 1, y: -2 },
+];
+pub(crate) const KICK_TABLE_SRS_X_DEFAULT_21: [Kick; 5] = [
+    Kick { x: 0, y: 0 }, Kick { x: -1, y: 0 }, Kick { x: -1, y: -1 }, Kick { x: 0, y: 2 },
+    Kick { x: -1, y: 2 },
+];
+pub(crate) const KICK_TABLE_SRS_X_DEFAULT_23: [Kick; 5] = [
+    Kick { x: 0, y: 0 }, Kick { x: 1, y: 0 }, Kick { x: 1, y: -1 }, Kick { x: 0, y: 2 },
+    Kick { x: 1, y: 2 },
+];
+pub(crate) const KICK_TABLE_SRS_X_DEFAULT_32: [Kick; 5] = [
+    Kick { x: 0, y: 0 }, Kick { x: -1, y: 0 }, Kick { x: -1, y: 1 }, Kick { x: 0, y: -2 },
+    Kick { x: -1, y: -2 },
+];
+pub(crate) const KICK_TABLE_SRS_X_DEFAULT_30: [Kick; 5] = [
+    Kick { x: 0, y: 0 }, Kick { x: -1, y: 0 }, Kick { x: -1, y: 1 }, Kick { x: 0, y: -2 },
+    Kick { x: -1, y: -2 },
+];
+pub(crate) const KICK_TABLE_SRS_X_DEFAULT_03: [Kick; 5] = [
+    Kick { x: 0, y: 0 }, Kick { x: 1, y: 0 }, Kick { x: 1, y: -1 }, Kick { x: 0, y: 2 },
+    Kick { x: 1, y: 2 },
+];
+pub(crate) const KICK_TABLE_SRS_X_DEFAULT_02: [Kick; 12] = [
+    Kick { x: 0, y: 0 }, Kick { x: 1, y: 0 }, Kick { x: 2, y: 0 }, Kick { x: 1, y: 1 },
+    Kick { x: 2, y: 1 }, Kick { x: -1, y: 0 }, Kick { x: -2, y: 0 }, Kick { x: -1, y: 1 },
+    Kick { x: -2, y: 1 }, Kick { x: 0, y: -1 }, Kick { x: 3, y: 0 }, Kick { x: -3, y: 0 },
+];
+pub(crate) const KICK_TABLE_SRS_X_DEFAULT_20: [Kick; 12] = [
+    Kick { x: 0, y: 0 }, Kick { x: -1, y: 0 }, Kick { x: -2, y: 0 }, Kick { x: -1, y: -1 },
+    Kick { x: -2, y: -1 }, Kick { x: 1, y: 0 }, Kick { x: 2, y: 0 }, Kick { x: 1, y: -1 },
+    Kick { x: 2, y: -1 }, Kick { x: 0, y: 1 }, Kick { x: -3, y: 0 }, Kick { x: 3, y: 0 },
+];
+pub(crate) const KICK_TABLE_SRS_X_DEFAULT_13: [Kick; 12] = [
+    Kick { x: 0, y: 0 }, Kick { x: 0, y: 1 }, Kick { x: 0, y: 2 }, Kick { x: -1, y: 1 },
+    Kick { x: -1, y: 2 }, Kick { x: 0, y: -1 }, Kick { x: 0, y: -2 }, Kick { x: -1, y: -1 },
+    Kick { x: -1, y: -2 }, Kick { x: 1, y: 0 }, Kick { x: 0, y: 3 }, Kick { x: 0, y: -3 },
+];
+pub(crate) const KICK_TABLE_SRS_X_DEFAULT_31: [Kick; 12] = [
+    Kick { x: 0, y: 0 }, Kick { x: 0, y: 1 }, Kick { x: 0, y: 2 }, Kick { x: 1, y: 1 },
+    Kick { x: 1, y: 2 }, Kick { x: 0, y: -1 }, Kick { x: 0, y: -2 }, Kick { x: 1, y: -1 },
+    Kick { x: 1, y: -2 }, Kick { x: -1, y: 0 }, Kick { x: 0, y: 3 }, Kick { x: 0, y: -3 },
+];
+pub(crate) const KICK_TABLE_SRS_X_I_01: [Kick; 5] = [
+    Kick { x: 0, y: 0 }, Kick { x: -2, y: 0 }, Kick { x: 1, y: 0 }, Kick { x: -2, y: 1 },
+    Kick { x: 1, y: -2 },
+];
+pub(crate) const KICK_TABLE_SRS_X_I_10: [Kick; 5] = [
+    Kick { x: 0, y: 0 }, Kick { x: 2, y: 0 }, Kick { x: -1, y: 0 }, Kick { x: 2, y: -1 },
+    Kick { x: -1, y: 2 },
+];
+pub(crate) const KICK_TABLE_SRS_X_I_12: [Kick; 5] = [
+    Kick { x: 0, y: 0 }, Kick { x: -1, y: 0 }, Kick { x: 2, y: 0 }, Kick { x: -1, y: -2 },
+    Kick { x: 2, y: 1 },
+];
+pub(crate) const KICK_TABLE_SRS_X_I_21: [Kick; 5] = [
+    Kick { x: 0, y: 0 }, Kick { x: 1, y: 0 }, Kick { x: -2, y: 0 }, Kick { x: 1, y: 2 },
+    Kick { x: -2, y: -1 },
+];
+pub(crate) const KICK_TABLE_SRS_X_I_23: [Kick; 5] = [
+    Kick { x: 0, y: 0 }, Kick { x: 2, y: 0 }, Kick { x: -1, y: 0 }, Kick { x: 2, y: -1 },
+    Kick { x: -1, y: 2 },
+];
+pub(crate) const KICK_TABLE_SRS_X_I_32: [Kick; 5] = [
+    Kick { x: 0, y: 0 }, Kick { x: -2, y: 0 }, Kick { x: 1, y: 0 }, Kick { x: -2, y: 1 },
+    Kick { x: 1, y: -2 },
+];
+pub(crate) const KICK_TABLE_SRS_X_I_30: [Kick; 5] = [
+    Kick { x: 0, y: 0 }, Kick { x: 1, y: 0 }, Kick { x: -2, y: 0 }, Kick { x: 1, y: 2 },
+    Kick { x: -2, y: -1 },
+];
+pub(crate) const KICK_TABLE_SRS_X_I_03: [Kick; 5] = [
+    Kick { x: 0, y: 0 }, Kick { x: -1, y: 0 }, Kick { x: 2, y: 0 }, Kick { x: -1, y: -2 },
+    Kick { x: 2, y: 1 },
+];
+pub(crate) const KICK_TABLE_SRS_X_I_02: [Kick; 6] = [
+    Kick { x: 0, y: 0 }, Kick { x: -1, y: 0 }, Kick { x: -2, y: 0 }, Kick { x: 1, y: 0 },
+    Kick { x: 2, y: 0 }, Kick { x: 0, y: 1 },
+];
+pub(crate) const KICK_TABLE_SRS_X_I_20: [Kick; 6] = [
+    Kick { x: 0, y: 0 }, Kick { x: 1, y: 0 }, Kick { x: 2, y: 0 }, Kick { x: -1, y: 0 },
+    Kick { x: -2, y: 0 }, Kick { x: 0, y: -1 },
+];
+pub(crate) const KICK_TABLE_SRS_X_I_13: [Kick; 6] = [
+    Kick { x: 0, y: 0 }, Kick { x: 0, y: 1 }, Kick { x: 0, y: 2 }, Kick { x: 0, y: -1 },
+    Kick { x: 0, y: -2 }, Kick { x: -1, y: 0 },
+];
+pub(crate) const KICK_TABLE_SRS_X_I_31: [Kick; 6] = [
+    Kick { x: 0, y: 0 }, Kick { x: 0, y: 1 }, Kick { x: 0, y: 2 }, Kick { x: 0, y: -1 },
+    Kick { x: 0, y: -2 }, Kick { x: 1, y: 0 },
+];
+pub(crate) const KICK_TABLE_SRS_X_O_01: [Kick; 8] = [
+    Kick { x: 0, y: 0 }, Kick { x: 0, y: -1 }, Kick { x: -1, y: -1 }, Kick { x: 0, y: 1 },
+    Kick { x: -1, y: 1 }, Kick { x: 1, y: 0 }, Kick { x: 1, y: -1 }, Kick { x: 1, y: 1 },
+];
+pub(crate) const KICK_TABLE_SRS_X_O_10: [Kick; 8] = [
+    Kick { x: 0, y: 0 }, Kick { x: 1, y: 0 }, Kick { x: 0, y: -1 }, Kick { x: 1, y: 1 },
+    Kick { x: 1, y: -1 }, Kick { x: -1, y: 0 }, Kick { x: -1, y: -1 }, Kick { x: -1, y: 1 },
+];
+pub(crate) const KICK_TABLE_SRS_X_O_12: [Kick; 8] = [
+    Kick { x: 0, y: 0 }, Kick { x: -1, y: 0 }, Kick { x: 0, y: -1 }, Kick { x: -1, y: 1 },
+    Kick { x: -1, y: -1 }, Kick { x: 1, y: 0 }, Kick { x: 1, y: -1 }, Kick { x: 1, y: 1 },
+];
+pub(crate) const KICK_TABLE_SRS_X_O_21: [Kick; 8] = [
+    Kick { x: 0, y: 0 }, Kick { x: 0, y: -1 }, Kick { x: 1, y: -1 }, Kick { x: 0, y: 1 },
+    Kick { x: 1, y: 1 }, Kick { x: -1, y: 0 }, Kick { x: -1, y: -1 }, Kick { x: -1, y: 1 },
+];
+pub(crate) const KICK_TABLE_SRS_X_O_23: [Kick; 8] = [
+    Kick { x: 0, y: 0 }, Kick { x: 0, y: -1 }, Kick { x: -1, y: -1 }, Kick { x: 0, y: 1 },
+    Kick { x: -1, y: 1 }, Kick { x: 1, y: 0 }, Kick { x: 1, y: -1 }, Kick { x: 1, y: 1 },
+];
+pub(crate) const KICK_TABLE_SRS_X_O_32: [Kick; 8] = [
+    Kick { x: 0, y: 0 }, Kick { x: 1, y: 0 }, Kick { x: 0, y: -1 }, Kick { x: 1, y: 1 },
+    Kick { x: 1, y: -1 }, Kick { x: -1, y: 0 }, Kick { x: -1, y: -1 }, Kick { x: -1, y: 1 },
+];
+pub(crate) const KICK_TABLE_SRS_X_O_30: [Kick; 8] = [
+    Kick { x: 0, y: 0 }, Kick { x: -1, y: 0 }, Kick { x: 0, y: -1 }, Kick { x: -1, y: 1 },
+    Kick { x: -1, y: -1 }, Kick { x: 1, y: 0 }, Kick { x: 1, y: -1 }, Kick { x: 1, y: 1 },
+];
+pub(crate) const KICK_TABLE_SRS_X_O_03: [Kick; 8] = [
+    Kick { x: 0, y: 0 }, Kick { x: 0, y: -1 }, Kick { x: 1, y: -1 }, Kick { x: 0, y: 1 },
+    Kick { x: 1, y: 1 }, Kick { x: -1, y: 0 }, Kick { x: -1, y: -1 }, Kick { x: -1, y: 1 },
+];
+pub(crate) const KICK_TABLE_SRS_X_O_02: [Kick; 2] = [
+    Kick { x: 0, y: 0 }, Kick { x: 0, y: -1 },
+];
+pub(crate) const KICK_TABLE_SRS_X_O_20: [Kick; 2] = [
+    Kick { x: 0, y: 0 }, Kick { x: 0, y: 1 },
+];
+pub(crate) const KICK_TABLE_SRS_X_O_13: [Kick; 2] = [
+    Kick { x: 0, y: 0 }, Kick { x: 1, y: 0 },
+];
+pub(crate) const KICK_TABLE_SRS_X_O_31: [Kick; 2] = [
+    Kick { x: 0, y: 0 }, Kick { x: -1, y: 0 },
+];
+pub(crate) const KICK_TABLE_TETRA_X_DEFAULT_01: [Kick; 9] = [
+    Kick { x: 0, y: 0 }, Kick { x: 0, y: 1 }, Kick { x: -1, y: 0 }, Kick { x: 1, y: 0 },
+    Kick { x: -1, y: 1 }, Kick { x: 1, y: 1 }, Kick { x: 0, y: -1 }, Kick { x: -1, y: -1 },
+    Kick { x: 1, y: -1 },
+];
+pub(crate) const KICK_TABLE_TETRA_X_DEFAULT_10: [Kick; 9] = [
+    Kick { x: 0, y: 0 }, Kick { x: 0, y: 1 }, Kick { x: 1, y: 0 }, Kick { x: -1, y: 0 },
+    Kick { x: 1, y: 1 }, Kick { x: -1, y: 1 }, Kick { x: 0, y: -1 }, Kick { x: 1, y: -1 },
+    Kick { x: -1, y: -1 },
+];
+pub(crate) const KICK_TABLE_TETRA_X_DEFAULT_12: [Kick; 9] = [
+    Kick { x: 0, y: 0 }, Kick { x: 0, y: 1 }, Kick { x: -1, y: 0 }, Kick { x: 1, y: 0 },
+    Kick { x: -1, y: 1 }, Kick { x: 1, y: 1 }, Kick { x: 0, y: -1 }, Kick { x: -1, y: -1 },
+    Kick { x: 1, y: -1 },
+];
+pub(crate) const KICK_TABLE_TETRA_X_DEFAULT_21: [Kick; 9] = [
+    Kick { x: 0, y: 0 }, Kick { x: 0, y: 1 }, Kick { x: 1, y: 0 }, Kick { x: -1, y: 0 },
+    Kick { x: 1, y: 1 }, Kick { x: -1, y: 1 }, Kick { x: 0, y: -1 }, Kick { x: 1, y: -1 },
+    Kick { x: -1, y: -1 },
+];
+pub(crate) const KICK_TABLE_TETRA_X_DEFAULT_23: [Kick; 9] = [
+    Kick { x: 0, y: 0 }, Kick { x: 0, y: 1 }, Kick { x: -1, y: 0 }, Kick { x: 1, y: 0 },
+    Kick { x: -1, y: 1 }, Kick { x: 1, y: 1 }, Kick { x: 0, y: -1 }, Kick { x: -1, y: -1 },
+    Kick { x: 1, y: -1 },
+];
+pub(crate) const KICK_TABLE_TETRA_X_DEFAULT_32: [Kick; 9] = [
+    Kick { x: 0, y: 0 }, Kick { x: 0, y: 1 }, Kick { x: 1, y: 0 }, Kick { x: -1, y: 0 },
+    Kick { x: 1, y: 1 }, Kick { x: -1, y: 1 }, Kick { x: 0, y: -1 }, Kick { x: 1, y: -1 },
+    Kick { x: -1, y: -1 },
+];
+pub(crate) const KICK_TABLE_TETRA_X_DEFAULT_30: [Kick; 9] = [
+    Kick { x: 0, y: 0 }, Kick { x: 0, y: 1 }, Kick { x: -1, y: 0 }, Kick { x: 1, y: 0 },
+    Kick { x: -1, y: 1 }, Kick { x: 1, y: 1 }, Kick { x: 0, y: -1 }, Kick { x: -1, y: -1 },
+    Kick { x: 1, y: -1 },
+];
+pub(crate) const KICK_TABLE_TETRA_X_DEFAULT_03: [Kick; 9] = [
+    Kick { x: 0, y: 0 }, Kick { x: 0, y: 1 }, Kick { x: 1, y: 0 }, Kick { x: -1, y: 0 },
+    Kick { x: 1, y: 1 }, Kick { x: -1, y: 1 }, Kick { x: 0, y: -1 }, Kick { x: 1, y: -1 },
+    Kick { x: -1, y: -1 },
+];
+pub(crate) const KICK_TABLE_TETRA_X_DEFAULT_02: [Kick; 5] = [
+    Kick { x: 0, y: 0 }, Kick { x: 0, y: 1 }, Kick { x: 0, y: -1 }, Kick { x: -1, y: 0 },
+    Kick { x: 1, y: 0 },
+];
+pub(crate) const KICK_TABLE_TETRA_X_DEFAULT_20: [Kick; 5] = [
+    Kick { x: 0, y: 0 }, Kick { x: 0, y: 1 }, Kick { x: 0, y: -1 }, Kick { x: -1, y: 0 },
+    Kick { x: 1, y: 0 },
+];
+pub(crate) const KICK_TABLE_TETRA_X_DEFAULT_13: [Kick; 5] = [
+    Kick { x: 0, y: 0 }, Kick { x: 0, y: 1 }, Kick { x: 0, y: -1 }, Kick { x: -1, y: 0 },
+    Kick { x: 1, y: 0 },
+];
+pub(crate) const KICK_TABLE_TETRA_X_DEFAULT_31: [Kick; 5] = [
+    Kick { x: 0, y: 0 }, Kick { x: 0, y: 1 }, Kick { x: 0, y: -1 }, Kick { x: -1, y: 0 },
+    Kick { x: 1, y: 0 },
+];
+pub(crate) const KICK_TABLE_TETRA_X_I_01: [Kick; 8] = [
+    Kick { x: 0, y: 0 }, Kick { x: 0, y: -1 }, Kick { x: 0, y: -2 }, Kick { x: 0, y: 1 },
+    Kick { x: 1, y: -1 }, Kick { x: -1, y: -1 }, Kick { x: 1, y: -2 }, Kick { x: -1, y: -2 },
+];
+pub(crate) const KICK_TABLE_TETRA_X_I_10: [Kick; 7] = [
+    Kick { x: 0, y: 0 }, Kick { x: 0, y: -1 }, Kick { x: 0, y: -2 }, Kick { x: 0, y: 1 },
+    Kick { x: -1, y: 0 }, Kick { x: 1, y: 0 }, Kick { x: 2, y: 0 },
+];
+pub(crate) const KICK_TABLE_TETRA_X_I_12: [Kick; 7] = [
+    Kick { x: 0, y: 0 }, Kick { x: 0, y: -1 }, Kick { x: 0, y: -2 }, Kick { x: 0, y: 1 },
+    Kick { x: -1, y: 0 }, Kick { x: 1, y: 0 }, Kick { x: 2, y: 0 },
+];
+pub(crate) const KICK_TABLE_TETRA_X_I_21: [Kick; 8] = [
+    Kick { x: 0, y: 0 }, Kick { x: 0, y: 1 }, Kick { x: 0, y: 2 }, Kick { x: 0, y: -1 },
+    Kick { x: -1, y: 1 }, Kick { x: 1, y: 1 }, Kick { x: -1, y: 2 }, Kick { x: 1, y: 2 },
+];
+pub(crate) const KICK_TABLE_TETRA_X_I_23: [Kick; 8] = [
+    Kick { x: 0, y: 0 }, Kick { x: 0, y: 1 }, Kick { x: 0, y: 2 }, Kick { x: 0, y: -1 },
+    Kick { x: 1, y: 1 }, Kick { x: -1, y: 1 }, Kick { x: 1, y: 2 }, Kick { x: -1, y: 2 },
+];
+pub(crate) const KICK_TABLE_TETRA_X_I_32: [Kick; 7] = [
+    Kick { x: 0, y: 0 }, Kick { x: 0, y: -1 }, Kick { x: 0, y: -2 }, Kick { x: 0, y: 1 },
+    Kick { x: 1, y: 0 }, Kick { x: -1, y: 0 }, Kick { x: -2, y: 0 },
+];
+pub(crate) const KICK_TABLE_TETRA_X_I_30: [Kick; 7] = [
+    Kick { x: 0, y: 0 }, Kick { x: 0, y: -1 }, Kick { x: 0, y: -2 }, Kick { x: 0, y: 1 },
+    Kick { x: 1, y: 0 }, Kick { x: -1, y: 0 }, Kick { x: -2, y: 0 },
+];
+pub(crate) const KICK_TABLE_TETRA_X_I_03: [Kick; 8] = [
+    Kick { x: 0, y: 0 }, Kick { x: 0, y: -1 }, Kick { x: 0, y: -2 }, Kick { x: 0, y: 1 },
+    Kick { x: -1, y: -1 }, Kick { x: 1, y: -1 }, Kick { x: -1, y: -2 }, Kick { x: 1, y: -2 },
+];
+pub(crate) const KICK_TABLE_TETRA_X_I_02: [Kick; 3] = [
+    Kick { x: 0, y: 0 }, Kick { x: 0, y: -1 }, Kick { x: 0, y: 1 },
+];
+pub(crate) const KICK_TABLE_TETRA_X_I_20: [Kick; 3] = [
+    Kick { x: 0, y: 0 }, Kick { x: 0, y: -1 }, Kick { x: 0, y: 1 },
+];
+pub(crate) const KICK_TABLE_TETRA_X_I_13: [Kick; 3] = [
+    Kick { x: 0, y: 0 }, Kick { x: 0, y: -1 }, Kick { x: 0, y: 1 },
+];
+pub(crate) const KICK_TABLE_TETRA_X_I_31: [Kick; 3] = [
+    Kick { x: 0, y: 0 }, Kick { x: 0, y: -1 }, Kick { x: 0, y: 1 },
+];
+pub(crate) const KICK_TABLE_TETRA_X_O_01: [Kick; 9] = [
+    Kick { x: 0, y: 0 }, Kick { x: 0, y: 1 }, Kick { x: -1, y: 0 }, Kick { x: 1, y: 0 },
+    Kick { x: -1, y: 1 }, Kick { x: 1, y: 1 }, Kick { x: 0, y: -1 }, Kick { x: -1, y: -1 },
+    Kick { x: 1, y: -1 },
+];
+pub(crate) const KICK_TABLE_TETRA_X_O_10: [Kick; 9] = [
+    Kick { x: 0, y: 0 }, Kick { x: 0, y: 1 }, Kick { x: 1, y: 0 }, Kick { x: -1, y: 0 },
+    Kick { x: 1, y: 1 }, Kick { x: -1, y: 1 }, Kick { x: 0, y: -1 }, Kick { x: 1, y: -1 },
+    Kick { x: -1, y: -1 },
+];
+pub(crate) const KICK_TABLE_TETRA_X_O_12: [Kick; 9] = [
+    Kick { x: 0, y: 0 }, Kick { x: 0, y: 1 }, Kick { x: -1, y: 0 }, Kick { x: 1, y: 0 },
+    Kick { x: -1, y: 1 }, Kick { x: 1, y: 1 }, Kick { x: 0, y: -1 }, Kick { x: -1, y: -1 },
+    Kick { x: 1, y: -1 },
+];
+pub(crate) const KICK_TABLE_TETRA_X_O_21: [Kick; 9] = [
+    Kick { x: 0, y: 0 }, Kick { x: 0, y: 1 }, Kick { x: 1, y: 0 }, Kick { x: -1, y: 0 },
+    Kick { x: 1, y: 1 }, Kick { x: -1, y: 1 }, Kick { x: 0, y: -1 }, Kick { x: 1, y: -1 },
+    Kick { x: -1, y: -1 },
+];
+pub(crate) const KICK_TABLE_TETRA_X_O_23: [Kick; 9] = [
+    Kick { x: 0, y: 0 }, Kick { x: 0, y: 1 }, Kick { x: -1, y: 0 }, Kick { x: 1, y: 0 },
+    Kick { x: -1, y: 1 }, Kick { x: 1, y: 1 }, Kick { x: 0, y: -1 }, Kick { x: -1, y: -1 },
+    Kick { x: 1, y: -1 },
+];
+pub(crate) const KICK_TABLE_TETRA_X_O_32: [Kick; 9] = [
+    Kick { x: 0, y: 0 }, Kick { x: 0, y: 1 }, Kick { x: 1, y: 0 }, Kick { x: -1, y: 0 },
+    Kick { x: 1, y: 1 }, Kick { x: -1, y: 1 }, Kick { x: 0, y: -1 }, Kick { x: 1, y: -1 },
+    Kick { x: -1, y: -1 },
+];
+pub(crate) const KICK_TABLE_TETRA_X_O_30: [Kick; 9] = [
+    Kick { x: 0, y: 0 }, Kick { x: 0, y: 1 }, Kick { x: -1, y: 0 }, Kick { x: 1, y: 0 },
+    Kick { x: -1, y: 1 }, Kick { x: 1, y: 1 }, Kick { x: 0, y: -1 }, Kick { x: -1, y: -1 },
+    Kick { x: 1, y: -1 },
+];
+pub(crate) const KICK_TABLE_TETRA_X_O_03: [Kick; 9] = [
+    Kick { x: 0, y: 0 }, Kick { x: 0, y: 1 }, Kick { x: 1, y: 0 }, Kick { x: -1, y: 0 },
+    Kick { x: 1, y: 1 }, Kick { x: -1, y: 1 }, Kick { x: 0, y: -1 }, Kick { x: 1, y: -1 },
+    Kick { x: -1, y: -1 },
+];
+pub(crate) const KICK_TABLE_TETRA_X_O_02: [Kick; 5] = [
+    Kick { x: 0, y: 0 }, Kick { x: 0, y: 1 }, Kick { x: 0, y: -1 }, Kick { x: -1, y: 0 },
+    Kick { x: 1, y: 0 },
+];
+pub(crate) const KICK_TABLE_TETRA_X_O_20: [Kick; 5] = [
+    Kick { x: 0, y: 0 }, Kick { x: 0, y: 1 }, Kick { x: 0, y: -1 }, Kick { x: -1, y: 0 },
+    Kick { x: 1, y: 0 },
+];
+pub(crate) const KICK_TABLE_TETRA_X_O_13: [Kick; 5] = [
+    Kick { x: 0, y: 0 }, Kick { x: 0, y: 1 }, Kick { x: 0, y: -1 }, Kick { x: -1, y: 0 },
+    Kick { x: 1, y: 0 },
+];
+pub(crate) const KICK_TABLE_TETRA_X_O_31: [Kick; 5] = [
+    Kick { x: 0, y: 0 }, Kick { x: 0, y: 1 }, Kick { x: 0, y: -1 }, Kick { x: -1, y: 0 },
+    Kick { x: 1, y: 0 },
+];
+pub(crate) const KICK_TABLE_NRS_DEFAULT_01: [Kick; 1] = [Kick { x: 0, y: 0 }];
+pub(crate) const KICK_TABLE_NRS_DEFAULT_10: [Kick; 1] = [Kick { x: 0, y: 0 }];
+pub(crate) const KICK_TABLE_NRS_DEFAULT_12: [Kick; 1] = [Kick { x: 0, y: 0 }];
+pub(crate) const KICK_TABLE_NRS_DEFAULT_21: [Kick; 1] = [Kick { x: 0, y: 0 }];
+pub(crate) const KICK_TABLE_NRS_DEFAULT_23: [Kick; 1] = [Kick { x: 0, y: 0 }];
+pub(crate) const KICK_TABLE_NRS_DEFAULT_32: [Kick; 1] = [Kick { x: 0, y: 0 }];
+pub(crate) const KICK_TABLE_NRS_DEFAULT_30: [Kick; 1] = [Kick { x: 0, y: 0 }];
+pub(crate) const KICK_TABLE_NRS_DEFAULT_03: [Kick; 1] = [Kick { x: 0, y: 0 }];
+pub(crate) const KICK_TABLE_NRS_DEFAULT_02: [Kick; 1] = [Kick { x: 0, y: 0 }];
+pub(crate) const KICK_TABLE_NRS_DEFAULT_20: [Kick; 1] = [Kick { x: 0, y: 0 }];
+pub(crate) const KICK_TABLE_NRS_DEFAULT_13: [Kick; 1] = [Kick { x: 0, y: 0 }];
+pub(crate) const KICK_TABLE_NRS_DEFAULT_31: [Kick; 1] = [Kick { x: 0, y: 0 }];
+pub(crate) const KICK_TABLE_NRS_I_01: [Kick; 1] = [Kick { x: 0, y: 0 }];
+pub(crate) const KICK_TABLE_NRS_I_10: [Kick; 1] = [Kick { x: 0, y: 0 }];
+pub(crate) const KICK_TABLE_NRS_I_12: [Kick; 1] = [Kick { x: 0, y: 0 }];
+pub(crate) const KICK_TABLE_NRS_I_21: [Kick; 1] = [Kick { x: 0, y: 0 }];
+pub(crate) const KICK_TABLE_NRS_I_23: [Kick; 1] = [Kick { x: 0, y: 0 }];
+pub(crate) const KICK_TABLE_NRS_I_32: [Kick; 1] = [Kick { x: 0, y: 0 }];
+pub(crate) const KICK_TABLE_NRS_I_30: [Kick; 1] = [Kick { x: 0, y: 0 }];
+pub(crate) const KICK_TABLE_NRS_I_03: [Kick; 1] = [Kick { x: 0, y: 0 }];
+pub(crate) const KICK_TABLE_NRS_I_02: [Kick; 1] = [Kick { x: 0, y: 0 }];
+pub(crate) const KICK_TABLE_NRS_I_20: [Kick; 1] = [Kick { x: 0, y: 0 }];
+pub(crate) const KICK_TABLE_NRS_I_13: [Kick; 1] = [Kick { x: 0, y: 0 }];
+pub(crate) const KICK_TABLE_NRS_I_31: [Kick; 1] = [Kick { x: 0, y: 0 }];
+pub(crate) const KICK_TABLE_NRS_O_01: [Kick; 1] = [Kick { x: 0, y: 0 }];
+pub(crate) const KICK_TABLE_NRS_O_10: [Kick; 1] = [Kick { x: 0, y: 0 }];
+pub(crate) const KICK_TABLE_NRS_O_12: [Kick; 1] = [Kick { x: 0, y: 0 }];
+pub(crate) const KICK_TABLE_NRS_O_21: [Kick; 1] = [Kick { x: 0, y: 0 }];
+pub(crate) const KICK_TABLE_NRS_O_23: [Kick; 1] = [Kick { x: 0, y: 0 }];
+pub(crate) const KICK_TABLE_NRS_O_32: [Kick; 1] = [Kick { x: 0, y: 0 }];
+pub(crate) const KICK_TABLE_NRS_O_30: [Kick; 1] = [Kick { x: 0, y: 0 }];
+pub(crate) const KICK_TABLE_NRS_O_03: [Kick; 1] = [Kick { x: 0, y: 0 }];
+pub(crate) const KICK_TABLE_NRS_O_02: [Kick; 1] = [Kick { x: 0, y: 0 }];
+pub(crate) const KICK_TABLE_NRS_O_20: [Kick; 1] = [Kick { x: 0, y: 0 }];
+pub(crate) const KICK_TABLE_NRS_O_13: [Kick; 1] = [Kick { x: 0, y: 0 }];
+pub(crate) const KICK_TABLE_NRS_O_31: [Kick; 1] = [Kick { x: 0, y: 0 }];
+pub(crate) const KICK_TABLE_ARS_DEFAULT_01: [Kick; 3] = [
+    Kick { x: 0, y: 0 }, Kick { x: 1, y: 0 }, Kick { x: -1, y: 0 },
+];
+pub(crate) const KICK_TABLE_ARS_DEFAULT_10: [Kick; 3] = [
+    Kick { x: 0, y: 0 }, Kick { x: 1, y: 0 }, Kick { x: -1, y: 0 },
+];
+pub(crate) const KICK_TABLE_ARS_DEFAULT_12: [Kick; 3] = [
+    Kick { x: 0, y: 0 }, Kick { x: 1, y: 0 }, Kick { x: -1, y: 0 },
+];
+pub(crate) const KICK_TABLE_ARS_DEFAULT_21: [Kick; 3] = [
+    Kick { x: 0, y: 0 }, Kick { x: 1, y: 0 }, Kick { x: -1, y: 0 },
+];
+pub(crate) const KICK_TABLE_ARS_DEFAULT_23: [Kick; 3] = [
+    Kick { x: 0, y: 0 }, Kick { x: 1, y: 0 }, Kick { x: -1, y: 0 },
+];
+pub(crate) const KICK_TABLE_ARS_DEFAULT_32: [Kick; 3] = [
+    Kick { x: 0, y: 0 }, Kick { x: 1, y: 0 }, Kick { x: -1, y: 0 },
+];
+pub(crate) const KICK_TABLE_ARS_DEFAULT_30: [Kick; 3] = [
+    Kick { x: 0, y: 0 }, Kick { x: 1, y: 0 }, Kick { x: -1, y: 0 },
+];
+pub(crate) const KICK_TABLE_ARS_DEFAULT_03: [Kick; 3] = [
+    Kick { x: 0, y: 0 }, Kick { x: 1, y: 0 }, Kick { x: -1, y: 0 },
+];
+pub(crate) const KICK_TABLE_ARS_DEFAULT_02: [Kick; 3] = [
+    Kick { x: 0, y: 0 }, Kick { x: 1, y: 0 }, Kick { x: -1, y: 0 },
+];
+pub(crate) const KICK_TABLE_ARS_DEFAULT_20: [Kick; 3] = [
+    Kick { x: 0, y: 0 }, Kick { x: 1, y: 0 }, Kick { x: -1, y: 0 },
+];
+pub(crate) const KICK_TABLE_ARS_DEFAULT_13: [Kick; 3] = [
+    Kick { x: 0, y: 0 }, Kick { x: 1, y: 0 }, Kick { x: -1, y: 0 },
+];
+pub(crate) const KICK_TABLE_ARS_DEFAULT_31: [Kick; 3] = [
+    Kick { x: 0, y: 0 }, Kick { x: 1, y: 0 }, Kick { x: -1, y: 0 },
+];
+pub(crate) const KICK_TABLE_ARS_I_01: [Kick; 1] = [Kick { x: 0, y: 0 }];
+pub(crate) const KICK_TABLE_ARS_I_10: [Kick; 1] = [Kick { x: 0, y: 0 }];
+pub(crate) const KICK_TABLE_ARS_I_12: [Kick; 1] = [Kick { x: 0, y: 0 }];
+pub(crate) const KICK_TABLE_ARS_I_21: [Kick; 1] = [Kick { x: 0, y: 0 }];
+pub(crate) const KICK_TABLE_ARS_I_23: [Kick; 1] = [Kick { x: 0, y: 0 }];
+pub(crate) const KICK_TABLE_ARS_I_32: [Kick; 1] = [Kick { x: 0, y: 0 }];
+pub(crate) const KICK_TABLE_ARS_I_30: [Kick; 1] = [Kick { x: 0, y: 0 }];
+pub(crate) const KICK_TABLE_ARS_I_03: [Kick; 1] = [Kick { x: 0, y: 0 }];
+pub(crate) const KICK_TABLE_ARS_I_02: [Kick; 1] = [Kick { x: 0, y: 0 }];
+pub(crate) const KICK_TABLE_ARS_I_20: [Kick; 1] = [Kick { x: 0, y: 0 }];
+pub(crate) const KICK_TABLE_ARS_I_13: [Kick; 1] = [Kick { x: 0, y: 0 }];
+pub(crate) const KICK_TABLE_ARS_I_31: [Kick; 1] = [Kick { x: 0, y: 0 }];
+pub(crate) const KICK_TABLE_ARS_O_01: [Kick; 3] = [
+    Kick { x: 0, y: 0 }, Kick { x: 1, y: 0 }, Kick { x: -1, y: 0 },
+];
+pub(crate) const KICK_TABLE_ARS_O_10: [Kick; 3] = [
+    Kick { x: 0, y: 0 }, Kick { x: 1, y: 0 }, Kick { x: -1, y: 0 },
+];
+pub(crate) const KICK_TABLE_ARS_O_12: [Kick; 3] = [
+    Kick { x: 0, y: 0 }, Kick { x: 1, y: 0 }, Kick { x: -1, y: 0 },
+];
+pub(crate) const KICK_TABLE_ARS_O_21: [Kick; 3] = [
+    Kick { x: 0, y: 0 }, Kick { x: 1, y: 0 }, Kick { x: -1, y: 0 },
+];
+pub(crate) const KICK_TABLE_ARS_O_23: [Kick; 3] = [
+    Kick { x: 0, y: 0 }, Kick { x: 1, y: 0 }, Kick { x: -1, y: 0 },
+];
+pub(crate) const KICK_TABLE_ARS_O_32: [Kick; 3] = [
+    Kick { x: 0, y: 0 }, Kick { x: 1, y: 0 }, Kick { x: -1, y: 0 },
+];
+pub(crate) const KICK_TABLE_ARS_O_30: [Kick; 3] = [
+    Kick { x: 0, y: 0 }, Kick { x: 1, y: 0 }, Kick { x: -1, y: 0 },
+];
+pub(crate) const KICK_TABLE_ARS_O_03: [Kick; 3] = [
+    Kick { x: 0, y: 0 }, Kick { x: 1, y: 0 }, Kick { x: -1, y: 0 },
+];
+pub(crate) const KICK_TABLE_ARS_O_02: [Kick; 3] = [
+    Kick { x: 0, y: 0 }, Kick { x: 1, y: 0 }, Kick { x: -1, y: 0 },
+];
+pub(crate) const KICK_TABLE_ARS_O_20: [Kick; 3] = [
+    Kick { x: 0, y: 0 }, Kick { x: 1, y: 0 }, Kick { x: -1, y: 0 },
+];
+pub(crate) const KICK_TABLE_ARS_O_13: [Kick; 3] = [
+    Kick { x: 0, y: 0 }, Kick { x: 1, y: 0 }, Kick { x: -1, y: 0 },
+];
+pub(crate) const KICK_TABLE_ARS_O_31: [Kick; 3] = [
+    Kick { x: 0, y: 0 }, Kick { x: 1, y: 0 }, Kick { x: -1, y: 0 },
+];
+pub(crate) const KICK_TABLE_ASC_DEFAULT_01: [Kick; 22] = [
+    Kick { x: 0, y: 0 }, Kick { x: -1, y: 0 }, Kick { x: 0, y: 1 }, Kick { x: -1, y: 1 },
+    Kick { x: 0, y: 2 }, Kick { x: -1, y: 2 }, Kick { x: -2, y: 0 }, Kick { x: -2, y: 1 },
+    Kick { x: -2, y: 2 }, Kick { x: 1, y: 0 }, Kick { x: 1, y: 1 }, Kick { x: 0, y: -1 },
+    Kick { x: -1, y: -1 }, Kick { x: -2, y: -1 }, Kick { x: 1, y: 2 }, Kick { x: 2, y: 0 },
+    Kick { x: 0, y: -2 }, Kick { x: -1, y: -2 }, Kick { x: -2, y: -2 }, Kick { x: 2, y: 1 },
+    Kick { x: 2, y: 2 }, Kick { x: 1, y: -1 },
+];
+pub(crate) const KICK_TABLE_ASC_DEFAULT_10: [Kick; 22] = [
+    Kick { x: 0, y: 0 }, Kick { x: 1, y: 0 }, Kick { x: 0, y: 1 }, Kick { x: 1, y: 1 },
+    Kick { x: 0, y: 2 }, Kick { x: 1, y: 2 }, Kick { x: 2, y: 0 }, Kick { x: 2, y: 1 },
+    Kick { x: 2, y: 2 }, Kick { x: -1, y: 0 }, Kick { x: -1, y: 1 }, Kick { x: 0, y: -1 },
+    Kick { x: 1, y: -1 }, Kick { x: 2, y: -1 }, Kick { x: -1, y: 2 }, Kick { x: -2, y: 0 },
+    Kick { x: 0, y: -2 }, Kick { x: 1, y: -2 }, Kick { x: 2, y: -2 }, Kick { x: -2, y: 1 },
+    Kick { x: -2, y: 2 }, Kick { x: -1, y: -1 },
+];
+pub(crate) const KICK_TABLE_ASC_DEFAULT_12: [Kick; 22] = [
+    Kick { x: 0, y: 0 }, Kick { x: -1, y: 0 }, Kick { x: 0, y: 1 }, Kick { x: -1, y: 1 },
+    Kick { x: 0, y: 2 }, Kick { x: -1, y: 2 }, Kick { x: -2, y: 0 }, Kick { x: -2, y: 1 },
+    Kick { x: -2, y: 2 }, Kick { x: 1, y: 0 }, Kick { x: 1, y: 1 }, Kick { x: 0, y: -1 },
+    Kick { x: -1, y: -1 }, Kick { x: -2, y: -1 }, Kick { x: 1, y: 2 }, Kick { x: 2, y: 0 },
+    Kick { x: 0, y: -2 }, Kick { x: -1, y: -2 }, Kick { x: -2, y: -2 }, Kick { x: 2, y: 1 },
+    Kick { x: 2, y: 2 }, Kick { x: 1, y: -1 },
+];
+pub(crate) const KICK_TABLE_ASC_DEFAULT_21: [Kick; 22] = [
+    Kick { x: 0, y: 0 }, Kick { x: 1, y: 0 }, Kick { x: 0, y: 1 }, Kick { x: 1, y: 1 },
+    Kick { x: 0, y: 2 }, Kick { x: 1, y: 2 }, Kick { x: 2, y: 0 }, Kick { x: 2, y: 1 },
+    Kick { x: 2, y: 2 }, Kick { x: -1, y: 0 }, Kick { x: -1, y: 1 }, Kick { x: 0, y: -1 },
+    Kick { x: 1, y: -1 }, Kick { x: 2, y: -1 }, Kick { x: -1, y: 2 }, Kick { x: -2, y: 0 },
+    Kick { x: 0, y: -2 }, Kick { x: 1, y: -2 }, Kick { x: 2, y: -2 }, Kick { x: -2, y: 1 },
+    Kick { x: -2, y: 2 }, Kick { x: -1, y: -1 },
+];
+pub(crate) const KICK_TABLE_ASC_DEFAULT_23: [Kick; 22] = [
+    Kick { x: 0, y: 0 }, Kick { x: -1, y: 0 }, Kick { x: 0, y: 1 }, Kick { x: -1, y: 1 },
+    Kick { x: 0, y: 2 }, Kick { x: -1, y: 2 }, Kick { x: -2, y: 0 }, Kick { x: -2, y: 1 },
+    Kick { x: -2, y: 2 }, Kick { x: 1, y: 0 }, Kick { x: 1, y: 1 }, Kick { x: 0, y: -1 },
+    Kick { x: -1, y: -1 }, Kick { x: -2, y: -1 }, Kick { x: 1, y: 2 }, Kick { x: 2, y: 0 },
+    Kick { x: 0, y: -2 }, Kick { x: -1, y: -2 }, Kick { x: -2, y: -2 }, Kick { x: 2, y: 1 },
+    Kick { x: 2, y: 2 }, Kick { x: 1, y: -1 },
+];
+pub(crate) const KICK_TABLE_ASC_DEFAULT_32: [Kick; 22] = [
+    Kick { x: 0, y: 0 }, Kick { x: 1, y: 0 }, Kick { x: 0, y: 1 }, Kick { x: 1, y: 1 },
+    Kick { x: 0, y: 2 }, Kick { x: 1, y: 2 }, Kick { x: 2, y: 0 }, Kick { x: 2, y: 1 },
+    Kick { x: 2, y: 2 }, Kick { x: -1, y: 0 }, Kick { x: -1, y: 1 }, Kick { x: 0, y: -1 },
+    Kick { x: 1, y: -1 }, Kick { x: 2, y: -1 }, Kick { x: -1, y: 2 }, Kick { x: -2, y: 0 },
+    Kick { x: 0, y: -2 }, Kick { x: 1, y: -2 }, Kick { x: 2, y: -2 }, Kick { x: -2, y: 1 },
+    Kick { x: -2, y: 2 }, Kick { x: -1, y: -1 },
+];
+pub(crate) const KICK_TABLE_ASC_DEFAULT_30: [Kick; 22] = [
+    Kick { x: 0, y: 0 }, Kick { x: -1, y: 0 }, Kick { x: 0, y: 1 }, Kick { x: -1, y: 1 },
+    Kick { x: 0, y: 2 }, Kick { x: -1, y: 2 }, Kick { x: -2, y: 0 }, Kick { x: -2, y: 1 },
+    Kick { x: -2, y: 2 }, Kick { x: 1, y: 0 }, Kick { x: 1, y: 1 }, Kick { x: 0, y: -1 },
+    Kick { x: -1, y: -1 }, Kick { x: -2, y: -1 }, Kick { x: 1, y: 2 }, Kick { x: 2, y: 0 },
+    Kick { x: 0, y: -2 }, Kick { x: -1, y: -2 }, Kick { x: -2, y: -2 }, Kick { x: 2, y: 1 },
+    Kick { x: 2, y: 2 }, Kick { x: 1, y: -1 },
+];
+pub(crate) const KICK_TABLE_ASC_DEFAULT_03: [Kick; 22] = [
+    Kick { x: 0, y: 0 }, Kick { x: 1, y: 0 }, Kick { x: 0, y: 1 }, Kick { x: 1, y: 1 },
+    Kick { x: 0, y: 2 }, Kick { x: 1, y: 2 }, Kick { x: 2, y: 0 }, Kick { x: 2, y: 1 },
+    Kick { x: 2, y: 2 }, Kick { x: -1, y: 0 }, Kick { x: -1, y: 1 }, Kick { x: 0, y: -1 },
+    Kick { x: 1, y: -1 }, Kick { x: 2, y: -1 }, Kick { x: -1, y: 2 }, Kick { x: -2, y: 0 },
+    Kick { x: 0, y: -2 }, Kick { x: 1, y: -2 }, Kick { x: 2, y: -2 }, Kick { x: -2, y: 1 },
+    Kick { x: -2, y: 2 }, Kick { x: -1, y: -1 },
+];
+pub(crate) const KICK_TABLE_ASC_DEFAULT_02: [Kick; 1] = [Kick { x: 0, y: 0 }];
+pub(crate) const KICK_TABLE_ASC_DEFAULT_20: [Kick; 1] = [Kick { x: 0, y: 0 }];
+pub(crate) const KICK_TABLE_ASC_DEFAULT_13: [Kick; 1] = [Kick { x: 0, y: 0 }];
+pub(crate) const KICK_TABLE_ASC_DEFAULT_31: [Kick; 1] = [Kick { x: 0, y: 0 }];
+pub(crate) const KICK_TABLE_ASC_I_01: [Kick; 22] = [
+    Kick { x: 0, y: 0 }, Kick { x: -1, y: 0 }, Kick { x: 0, y: 1 }, Kick { x: -1, y: 1 },
+    Kick { x: 0, y: 2 }, Kick { x: -1, y: 2 }, Kick { x: -2, y: 0 }, Kick { x: -2, y: 1 },
+    Kick { x: -2, y: 2 }, Kick { x: 1, y: 0 }, Kick { x: 1, y: 1 }, Kick { x: 0, y: -1 },
+    Kick { x: -1, y: -1 }, Kick { x: -2, y: -1 }, Kick { x: 1, y: 2 }, Kick { x: 2, y: 0 },
+    Kick { x: 0, y: -2 }, Kick { x: -1, y: -2 }, Kick { x: -2, y: -2 }, Kick { x: 2, y: 1 },
+    Kick { x: 2, y: 2 }, Kick { x: 1, y: -1 },
+];
+pub(crate) const KICK_TABLE_ASC_I_10: [Kick; 22] = [
+    Kick { x: 0, y: 0 }, Kick { x: 1, y: 0 }, Kick { x: 0, y: 1 }, Kick { x: 1, y: 1 },
+    Kick { x: 0, y: 2 }, Kick { x: 1, y: 2 }, Kick { x: 2, y: 0 }, Kick { x: 2, y: 1 },
+    Kick { x: 2, y: 2 }, Kick { x: -1, y: 0 }, Kick { x: -1, y: 1 }, Kick { x: 0, y: -1 },
+    Kick { x: 1, y: -1 }, Kick { x: 2, y: -1 }, Kick { x: -1, y: 2 }, Kick { x: -2, y: 0 },
+    Kick { x: 0, y: -2 }, Kick { x: 1, y: -2 }, Kick { x: 2, y: -2 }, Kick { x: -2, y: 1 },
+    Kick { x: -2, y: 2 }, Kick { x: -1, y: -1 },
+];
+pub(crate) const KICK_TABLE_ASC_I_12: [Kick; 22] = [
+    Kick { x: 0, y: 0 }, Kick { x: -1, y: 0 }, Kick { x: 0, y: 1 }, Kick { x: -1, y: 1 },
+    Kick { x: 0, y: 2 }, Kick { x: -1, y: 2 }, Kick { x: -2, y: 0 }, Kick { x: -2, y: 1 },
+    Kick { x: -2, y: 2 }, Kick { x: 1, y: 0 }, Kick { x: 1, y: 1 }, Kick { x: 0, y: -1 },
+    Kick { x: -1, y: -1 }, Kick { x: -2, y: -1 }, Kick { x: 1, y: 2 }, Kick { x: 2, y: 0 },
+    Kick { x: 0, y: -2 }, Kick { x: -1, y: -2 }, Kick { x: -2, y: -2 }, Kick { x: 2, y: 1 },
+    Kick { x: 2, y: 2 }, Kick { x: 1, y: -1 },
+];
+pub(crate) const KICK_TABLE_ASC_I_21: [Kick; 22] = [
+    Kick { x: 0, y: 0 }, Kick { x: 1, y: 0 }, Kick { x: 0, y: 1 }, Kick { x: 1, y: 1 },
+    Kick { x: 0, y: 2 }, Kick { x: 1, y: 2 }, Kick { x: 2, y: 0 }, Kick { x: 2, y: 1 },
+    Kick { x: 2, y: 2 }, Kick { x: -1, y: 0 }, Kick { x: -1, y: 1 }, Kick { x: 0, y: -1 },
+    Kick { x: 1, y: -1 }, Kick { x: 2, y: -1 }, Kick { x: -1, y: 2 }, Kick { x: -2, y: 0 },
+    Kick { x: 0, y: -2 }, Kick { x: 1, y: -2 }, Kick { x: 2, y: -2 }, Kick { x: -2, y: 1 },
+    Kick { x: -2, y: 2 }, Kick { x: -1, y: -1 },
+];
+pub(crate) const KICK_TABLE_ASC_I_23: [Kick; 22] = [
+    Kick { x: 0, y: 0 }, Kick { x: -1, y: 0 }, Kick { x: 0, y: 1 }, Kick { x: -1, y: 1 },
+    Kick { x: 0, y: 2 }, Kick { x: -1, y: 2 }, Kick { x: -2, y: 0 }, Kick { x: -2, y: 1 },
+    Kick { x: -2, y: 2 }, Kick { x: 1, y: 0 }, Kick { x: 1, y: 1 }, Kick { x: 0, y: -1 },
+    Kick { x: -1, y: -1 }, Kick { x: -2, y: -1 }, Kick { x: 1, y: 2 }, Kick { x: 2, y: 0 },
+    Kick { x: 0, y: -2 }, Kick { x: -1, y: -2 }, Kick { x: -2, y: -2 }, Kick { x: 2, y: 1 },
+    Kick { x: 2, y: 2 }, Kick { x: 1, y: -1 },
+];
+pub(crate) const KICK_TABLE_ASC_I_32: [Kick; 22] = [
+    Kick { x: 0, y: 0 }, Kick { x: 1, y: 0 }, Kick { x: 0, y: 1 }, Kick { x: 1, y: 1 },
+    Kick { x: 0, y: 2 }, Kick { x: 1, y: 2 }, Kick { x: 2, y: 0 }, Kick { x: 2, y: 1 },
+    Kick { x: 2, y: 2 }, Kick { x: -1, y: 0 }, Kick { x: -1, y: 1 }, Kick { x: 0, y: -1 },
+    Kick { x: 1, y: -1 }, Kick { x: 2, y: -1 }, Kick { x: -1, y: 2 }, Kick { x: -2, y: 0 },
+    Kick { x: 0, y: -2 }, Kick { x: 1, y: -2 }, Kick { x: 2, y: -2 }, Kick { x: -2, y: 1 },
+    Kick { x: -2, y: 2 }, Kick { x: -1, y: -1 },
+];
+pub(crate) const KICK_TABLE_ASC_I_30: [Kick; 22] = [
+    Kick { x: 0, y: 0 }, Kick { x: -1, y: 0 }, Kick { x: 0, y: 1 }, Kick { x: -1, y: 1 },
+    Kick { x: 0, y: 2 }, Kick { x: -1, y: 2 }, Kick { x: -2, y: 0 }, Kick { x: -2, y: 1 },
+    Kick { x: -2, y: 2 }, Kick { x: 1, y: 0 }, Kick { x: 1, y: 1 }, Kick { x: 0, y: -1 },
+    Kick { x: -1, y: -1 }, Kick { x: -2, y: -1 }, Kick { x: 1, y: 2 }, Kick { x: 2, y: 0 },
+    Kick { x: 0, y: -2 }, Kick { x: -1, y: -2 }, Kick { x: -2, y: -2 }, Kick { x: 2, y: 1 },
+    Kick { x: 2, y: 2 }, Kick { x: 1, y: -1 },
+];
+pub(crate) const KICK_TABLE_ASC_I_03: [Kick; 22] = [
+    Kick { x: 0, y: 0 }, Kick { x: 1, y: 0 }, Kick { x: 0, y: 1 }, Kick { x: 1, y: 1 },
+    Kick { x: 0, y: 2 }, Kick { x: 1, y: 2 }, Kick { x: 2, y: 0 }, Kick { x: 2, y: 1 },
+    Kick { x: 2, y: 2 }, Kick { x: -1, y: 0 }, Kick { x: -1, y: 1 }, Kick { x: 0, y: -1 },
+    Kick { x: 1, y: -1 }, Kick { x: 2, y: -1 }, Kick { x: -1, y: 2 }, Kick { x: -2, y: 0 },
+    Kick { x: 0, y: -2 }, Kick { x: 1, y: -2 }, Kick { x: 2, y: -2 }, Kick { x: -2, y: 1 },
+    Kick { x: -2, y: 2 }, Kick { x: -1, y: -1 },
+];
+pub(crate) const KICK_TABLE_ASC_I_02: [Kick; 1] = [Kick { x: 0, y: 0 }];
+pub(crate) const KICK_TABLE_ASC_I_20: [Kick; 1] = [Kick { x: 0, y: 0 }];
+pub(crate) const KICK_TABLE_ASC_I_13: [Kick; 1] = [Kick { x: 0, y: 0 }];
+pub(crate) const KICK_TABLE_ASC_I_31: [Kick; 1] = [Kick { x: 0, y: 0 }];
+pub(crate) const KICK_TABLE_ASC_O_01: [Kick; 22] = [
+    Kick { x: 0, y: 0 }, Kick { x: -1, y: 0 }, Kick { x: 0, y: 1 }, Kick { x: -1, y: 1 },
+    Kick { x: 0, y: 2 }, Kick { x: -1, y: 2 }, Kick { x: -2, y: 0 }, Kick { x: -2, y: 1 },
+    Kick { x: -2, y: 2 }, Kick { x: 1, y: 0 }, Kick { x: 1, y: 1 }, Kick { x: 0, y: -1 },
+    Kick { x: -1, y: -1 }, Kick { x: -2, y: -1 }, Kick { x: 1, y: 2 }, Kick { x: 2, y: 0 },
+    Kick { x: 0, y: -2 }, Kick { x: -1, y: -2 }, Kick { x: -2, y: -2 }, Kick { x: 2, y: 1 },
+    Kick { x: 2, y: 2 }, Kick { x: 1, y: -1 },
+];
+pub(crate) const KICK_TABLE_ASC_O_10: [Kick; 22] = [
+    Kick { x: 0, y: 0 }, Kick { x: 1, y: 0 }, Kick { x: 0, y: 1 }, Kick { x: 1, y: 1 },
+    Kick { x: 0, y: 2 }, Kick { x: 1, y: 2 }, Kick { x: 2, y: 0 }, Kick { x: 2, y: 1 },
+    Kick { x: 2, y: 2 }, Kick { x: -1, y: 0 }, Kick { x: -1, y: 1 }, Kick { x: 0, y: -1 },
+    Kick { x: 1, y: -1 }, Kick { x: 2, y: -1 }, Kick { x: -1, y: 2 }, Kick { x: -2, y: 0 },
+    Kick { x: 0, y: -2 }, Kick { x: 1, y: -2 }, Kick { x: 2, y: -2 }, Kick { x: -2, y: 1 },
+    Kick { x: -2, y: 2 }, Kick { x: -1, y: -1 },
+];
+pub(crate) const KICK_TABLE_ASC_O_12: [Kick; 22] = [
+    Kick { x: 0, y: 0 }, Kick { x: -1, y: 0 }, Kick { x: 0, y: 1 }, Kick { x: -1, y: 1 },
+    Kick { x: 0, y: 2 }, Kick { x: -1, y: 2 }, Kick { x: -2, y: 0 }, Kick { x: -2, y: 1 },
+    Kick { x: -2, y: 2 }, Kick { x: 1, y: 0 }, Kick { x: 1, y: 1 }, Kick { x: 0, y: -1 },
+    Kick { x: -1, y: -1 }, Kick { x: -2, y: -1 }, Kick { x: 1, y: 2 }, Kick { x: 2, y: 0 },
+    Kick { x: 0, y: -2 }, Kick { x: -1, y: -2 }, Kick { x: -2, y: -2 }, Kick { x: 2, y: 1 },
+    Kick { x: 2, y: 2 }, Kick { x: 1, y: -1 },
+];
+pub(crate) const KICK_TABLE_ASC_O_21: [Kick; 22] = [
+    Kick { x: 0, y: 0 }, Kick { x: 1, y: 0 }, Kick { x: 0, y: 1 }, Kick { x: 1, y: 1 },
+    Kick { x: 0, y: 2 }, Kick { x: 1, y: 2 }, Kick { x: 2, y: 0 }, Kick { x: 2, y: 1 },
+    Kick { x: 2, y: 2 }, Kick { x: -1, y: 0 }, Kick { x: -1, y: 1 }, Kick { x: 0, y: -1 },
+    Kick { x: 1, y: -1 }, Kick { x: 2, y: -1 }, Kick { x: -1, y: 2 }, Kick { x: -2, y: 0 },
+    Kick { x: 0, y: -2 }, Kick { x: 1, y: -2 }, Kick { x: 2, y: -2 }, Kick { x: -2, y: 1 },
+    Kick { x: -2, y: 2 }, Kick { x: -1, y: -1 },
+];
+pub(crate) const KICK_TABLE_ASC_O_23: [Kick; 22] = [
+    Kick { x: 0, y: 0 }, Kick { x: -1, y: 0 }, Kick { x: 0, y: 1 }, Kick { x: -1, y: 1 },
+    Kick { x: 0, y: 2 }, Kick { x: -1, y: 2 }, Kick { x: -2, y: 0 }, Kick { x: -2, y: 1 },
+    Kick { x: -2, y: 2 }, Kick { x: 1, y: 0 }, Kick { x: 1, y: 1 }, Kick { x: 0, y: -1 },
+    Kick { x: -1, y: -1 }, Kick { x: -2, y: -1 }, Kick { x: 1, y: 2 }, Kick { x: 2, y: 0 },
+    Kick { x: 0, y: -2 }, Kick { x: -1, y: -2 }, Kick { x: -2, y: -2 }, Kick { x: 2, y: 1 },
+    Kick { x: 2, y: 2 }, Kick { x: 1, y: -1 },
+];
+pub(crate) const KICK_TABLE_ASC_O_32: [Kick; 22] = [
+    Kick { x: 0, y: 0 }, Kick { x: 1, y: 0 }, Kick { x: 0, y: 1 }, Kick { x: 1, y: 1 },
+    Kick { x: 0, y: 2 }, Kick { x: 1, y: 2 }, Kick { x: 2, y: 0 }, Kick { x: 2, y: 1 },
+    Kick { x: 2, y: 2 }, Kick { x: -1, y: 0 }, Kick { x: -1, y: 1 }, Kick { x: 0, y: -1 },
+    Kick { x: 1, y: -1 }, Kick { x: 2, y: -1 }, Kick { x: -1, y: 2 }, Kick { x: -2, y: 0 },
+    Kick { x: 0, y: -2 }, Kick { x: 1, y: -2 }, Kick { x: 2, y: -2 }, Kick { x: -2, y: 1 },
+    Kick { x: -2, y: 2 }, Kick { x: -1, y: -1 },
+];
+pub(crate) const KICK_TABLE_ASC_O_30: [Kick; 22] = [
+    Kick { x: 0, y: 0 }, Kick { x: -1, y: 0 }, Kick { x: 0, y: 1 }, Kick { x: -1, y: 1 },
+    Kick { x: 0, y: 2 }, Kick { x: -1, y: 2 }, Kick { x: -2, y: 0 }, Kick { x: -2, y: 1 },
+    Kick { x: -2, y: 2 }, Kick { x: 1, y: 0 }, Kick { x: 1, y: 1 }, Kick { x: 0, y: -1 },
+    Kick { x: -1, y: -1 }, Kick { x: -2, y: -1 }, Kick { x: 1, y: 2 }, Kick { x: 2, y: 0 },
+    Kick { x: 0, y: -2 }, Kick { x: -1, y: -2 }, Kick { x: -2, y: -2 }, Kick { x: 2, y: 1 },
+    Kick { x: 2, y: 2 }, Kick { x: 1, y: -1 },
+];
+pub(crate) const KICK_TABLE_ASC_O_03: [Kick; 22] = [
+    Kick { x: 0, y: 0 }, Kick { x: 1, y: 0 }, Kick { x: 0, y: 1 }, Kick { x: 1, y: 1 },
+    Kick { x: 0, y: 2 }, Kick { x: 1, y: 2 }, Kick { x: 2, y: 0 }, Kick { x: 2, y: 1 },
+    Kick { x: 2, y: 2 }, Kick { x: -1, y: 0 }, Kick { x: -1, y: 1 }, Kick { x: 0, y: -1 },
+    Kick { x: 1, y: -1 }, Kick { x: 2, y: -1 }, Kick { x: -1, y: 2 }, Kick { x: -2, y: 0 },
+    Kick { x: 0, y: -2 }, Kick { x: 1, y: -2 }, Kick { x: 2, y: -2 }, Kick { x: -2, y: 1 },
+    Kick { x: -2, y: 2 }, Kick { x: -1, y: -1 },
+];
+pub(crate) const KICK_TABLE_ASC_O_02: [Kick; 1] = [Kick { x: 0, y: 0 }];
+pub(crate) const KICK_TABLE_ASC_O_20: [Kick; 1] = [Kick { x: 0, y: 0 }];
+pub(crate) const KICK_TABLE_ASC_O_13: [Kick; 1] = [Kick { x: 0, y: 0 }];
+pub(crate) const KICK_TABLE_ASC_O_31: [Kick; 1] = [Kick { x: 0, y: 0 }];
+pub(crate) const KICK_TABLE_NONE_DEFAULT_01: [Kick; 1] = [Kick { x: 0, y: 0 }];
+pub(crate) const KICK_TABLE_NONE_DEFAULT_10: [Kick; 1] = [Kick { x: 0, y: 0 }];
+pub(crate) const KICK_TABLE_NONE_DEFAULT_12: [Kick; 1] = [Kick { x: 0, y: 0 }];
+pub(crate) const KICK_TABLE_NONE_DEFAULT_21: [Kick; 1] = [Kick { x: 0, y: 0 }];
+pub(crate) const KICK_TABLE_NONE_DEFAULT_23: [Kick; 1] = [Kick { x: 0, y: 0 }];
+pub(crate) const KICK_TABLE_NONE_DEFAULT_32: [Kick; 1] = [Kick { x: 0, y: 0 }];
+pub(crate) const KICK_TABLE_NONE_DEFAULT_30: [Kick; 1] = [Kick { x: 0, y: 0 }];
+pub(crate) const KICK_TABLE_NONE_DEFAULT_03: [Kick; 1] = [Kick { x: 0, y: 0 }];
+pub(crate) const KICK_TABLE_NONE_DEFAULT_02: [Kick; 1] = [Kick { x: 0, y: 0 }];
+pub(crate) const KICK_TABLE_NONE_DEFAULT_20: [Kick; 1] = [Kick { x: 0, y: 0 }];
+pub(crate) const KICK_TABLE_NONE_DEFAULT_13: [Kick; 1] = [Kick { x: 0, y: 0 }];
+pub(crate) const KICK_TABLE_NONE_DEFAULT_31: [Kick; 1] = [Kick { x: 0, y: 0 }];
+pub(crate) const KICK_TABLE_NONE_I_01: [Kick; 1] = [Kick { x: 0, y: 0 }];
+pub(crate) const KICK_TABLE_NONE_I_10: [Kick; 1] = [Kick { x: 0, y: 0 }];
+pub(crate) const KICK_TABLE_NONE_I_12: [Kick; 1] = [Kick { x: 0, y: 0 }];
+pub(crate) const KICK_TABLE_NONE_I_21: [Kick; 1] = [Kick { x: 0, y: 0 }];
+pub(crate) const KICK_TABLE_NONE_I_23: [Kick; 1] = [Kick { x: 0, y: 0 }];
+pub(crate) const KICK_TABLE_NONE_I_32: [Kick; 1] = [Kick { x: 0, y: 0 }];
+pub(crate) const KICK_TABLE_NONE_I_30: [Kick; 1] = [Kick { x: 0, y: 0 }];
+pub(crate) const KICK_TABLE_NONE_I_03: [Kick; 1] = [Kick { x: 0, y: 0 }];
+pub(crate) const KICK_TABLE_NONE_I_02: [Kick; 1] = [Kick { x: 0, y: 0 }];
+pub(crate) const KICK_TABLE_NONE_I_20: [Kick; 1] = [Kick { x: 0, y: 0 }];
+pub(crate) const KICK_TABLE_NONE_I_13: [Kick; 1] = [Kick { x: 0, y: 0 }];
+pub(crate) const KICK_TABLE_NONE_I_31: [Kick; 1] = [Kick { x: 0, y: 0 }];
+pub(crate) const KICK_TABLE_NONE_O_01: [Kick; 1] = [Kick { x: 0, y: 0 }];
+pub(crate) const KICK_TABLE_NONE_O_10: [Kick; 1] = [Kick { x: 0, y: 0 }];
+pub(crate) const KICK_TABLE_NONE_O_12: [Kick; 1] = [Kick { x: 0, y: 0 }];
+pub(crate) const KICK_TABLE_NONE_O_21: [Kick; 1] = [Kick { x: 0, y: 0 }];
+pub(crate) const KICK_TABLE_NONE_O_23: [Kick; 1] = [Kick { x: 0, y: 0 }];
+pub(crate) const KICK_TABLE_NONE_O_32: [Kick; 1] = [Kick { x: 0, y: 0 }];
+pub(crate) const KICK_TABLE_NONE_O_30: [Kick; 1] = [Kick { x: 0, y: 0 }];
+pub(crate) const KICK_TABLE_NONE_O_03: [Kick; 1] = [Kick { x: 0, y: 0 }];
+pub(crate) const KICK_TABLE_NONE_O_02: [Kick; 1] = [Kick { x: 0, y: 0 }];
+pub(crate) const KICK_TABLE_NONE_O_20: [Kick; 1] = [Kick { x: 0, y: 0 }];
+pub(crate) const KICK_TABLE_NONE_O_13: [Kick; 1] = [Kick { x: 0, y: 0 }];
+pub(crate) const KICK_TABLE_NONE_O_31: [Kick; 1] = [Kick { x: 0, y: 0 }];
+
 pub(crate) fn clear_kind_name(kind: ClearKind) -> &'static str {
     CLEAR_NAMES[clear_kind_index(kind)]
 }
@@ -127,6 +1079,419 @@ pub(crate) fn combo_table_from_key(key: &str) -> Option<ComboTable> {
         "classic guideline" => Some(ComboTable::ClassicGuideline),
         "modern guideline" => Some(ComboTable::ModernGuideline),
         _ => None,
+    }
+}
+
+pub(crate) fn kick_table_key(table: KickTable) -> &'static str {
+    match table {
+        KickTable::Srs => "SRS",
+        KickTable::SrsPlus => "SRS+",
+        KickTable::SrsX => "SRS-X",
+        KickTable::TetraX => "TETRA-X",
+        KickTable::Nrs => "NRS",
+        KickTable::Ars => "ARS",
+        KickTable::Asc => "ASC",
+        KickTable::None => "none",
+    }
+}
+
+pub(crate) fn kick_table_from_key(key: &str) -> Option<KickTable> {
+    match key {
+        "SRS" => Some(KickTable::Srs),
+        "SRS+" => Some(KickTable::SrsPlus),
+        "SRS-X" => Some(KickTable::SrsX),
+        "TETRA-X" => Some(KickTable::TetraX),
+        "NRS" => Some(KickTable::Nrs),
+        "ARS" => Some(KickTable::Ars),
+        "ASC" => Some(KickTable::Asc),
+        "none" => Some(KickTable::None),
+        _ => None,
+    }
+}
+
+pub(crate) fn kick_table_offsets(
+    table: KickTable,
+    group: KickGroup,
+    from_rotation: u8,
+    to_rotation: u8,
+) -> &'static [Kick] {
+    match table {
+        KickTable::Srs => match group {
+            KickGroup::Default => match (from_rotation, to_rotation) {
+                (0, 1) => &KICK_TABLE_SRS_DEFAULT_01,
+                (1, 0) => &KICK_TABLE_SRS_DEFAULT_10,
+                (1, 2) => &KICK_TABLE_SRS_DEFAULT_12,
+                (2, 1) => &KICK_TABLE_SRS_DEFAULT_21,
+                (2, 3) => &KICK_TABLE_SRS_DEFAULT_23,
+                (3, 2) => &KICK_TABLE_SRS_DEFAULT_32,
+                (3, 0) => &KICK_TABLE_SRS_DEFAULT_30,
+                (0, 3) => &KICK_TABLE_SRS_DEFAULT_03,
+                (0, 2) => &KICK_TABLE_SRS_DEFAULT_02,
+                (2, 0) => &KICK_TABLE_SRS_DEFAULT_20,
+                (1, 3) => &KICK_TABLE_SRS_DEFAULT_13,
+                (3, 1) => &KICK_TABLE_SRS_DEFAULT_31,
+                _ => &NO_KICKS,
+            },
+            KickGroup::I => match (from_rotation, to_rotation) {
+                (0, 1) => &KICK_TABLE_SRS_I_01,
+                (1, 0) => &KICK_TABLE_SRS_I_10,
+                (1, 2) => &KICK_TABLE_SRS_I_12,
+                (2, 1) => &KICK_TABLE_SRS_I_21,
+                (2, 3) => &KICK_TABLE_SRS_I_23,
+                (3, 2) => &KICK_TABLE_SRS_I_32,
+                (3, 0) => &KICK_TABLE_SRS_I_30,
+                (0, 3) => &KICK_TABLE_SRS_I_03,
+                (0, 2) => &KICK_TABLE_SRS_I_02,
+                (2, 0) => &KICK_TABLE_SRS_I_20,
+                (1, 3) => &KICK_TABLE_SRS_I_13,
+                (3, 1) => &KICK_TABLE_SRS_I_31,
+                _ => &NO_KICKS,
+            },
+            KickGroup::O => match (from_rotation, to_rotation) {
+                (0, 1) => &KICK_TABLE_SRS_O_01,
+                (1, 0) => &KICK_TABLE_SRS_O_10,
+                (1, 2) => &KICK_TABLE_SRS_O_12,
+                (2, 1) => &KICK_TABLE_SRS_O_21,
+                (2, 3) => &KICK_TABLE_SRS_O_23,
+                (3, 2) => &KICK_TABLE_SRS_O_32,
+                (3, 0) => &KICK_TABLE_SRS_O_30,
+                (0, 3) => &KICK_TABLE_SRS_O_03,
+                (0, 2) => &KICK_TABLE_SRS_O_02,
+                (2, 0) => &KICK_TABLE_SRS_O_20,
+                (1, 3) => &KICK_TABLE_SRS_O_13,
+                (3, 1) => &KICK_TABLE_SRS_O_31,
+                _ => &NO_KICKS,
+            },
+        },
+        KickTable::SrsPlus => match group {
+            KickGroup::Default => match (from_rotation, to_rotation) {
+                (0, 1) => &KICK_TABLE_SRS_PLUS_DEFAULT_01,
+                (1, 0) => &KICK_TABLE_SRS_PLUS_DEFAULT_10,
+                (1, 2) => &KICK_TABLE_SRS_PLUS_DEFAULT_12,
+                (2, 1) => &KICK_TABLE_SRS_PLUS_DEFAULT_21,
+                (2, 3) => &KICK_TABLE_SRS_PLUS_DEFAULT_23,
+                (3, 2) => &KICK_TABLE_SRS_PLUS_DEFAULT_32,
+                (3, 0) => &KICK_TABLE_SRS_PLUS_DEFAULT_30,
+                (0, 3) => &KICK_TABLE_SRS_PLUS_DEFAULT_03,
+                (0, 2) => &KICK_TABLE_SRS_PLUS_DEFAULT_02,
+                (2, 0) => &KICK_TABLE_SRS_PLUS_DEFAULT_20,
+                (1, 3) => &KICK_TABLE_SRS_PLUS_DEFAULT_13,
+                (3, 1) => &KICK_TABLE_SRS_PLUS_DEFAULT_31,
+                _ => &NO_KICKS,
+            },
+            KickGroup::I => match (from_rotation, to_rotation) {
+                (0, 1) => &KICK_TABLE_SRS_PLUS_I_01,
+                (1, 0) => &KICK_TABLE_SRS_PLUS_I_10,
+                (1, 2) => &KICK_TABLE_SRS_PLUS_I_12,
+                (2, 1) => &KICK_TABLE_SRS_PLUS_I_21,
+                (2, 3) => &KICK_TABLE_SRS_PLUS_I_23,
+                (3, 2) => &KICK_TABLE_SRS_PLUS_I_32,
+                (3, 0) => &KICK_TABLE_SRS_PLUS_I_30,
+                (0, 3) => &KICK_TABLE_SRS_PLUS_I_03,
+                (0, 2) => &KICK_TABLE_SRS_PLUS_I_02,
+                (2, 0) => &KICK_TABLE_SRS_PLUS_I_20,
+                (1, 3) => &KICK_TABLE_SRS_PLUS_I_13,
+                (3, 1) => &KICK_TABLE_SRS_PLUS_I_31,
+                _ => &NO_KICKS,
+            },
+            KickGroup::O => match (from_rotation, to_rotation) {
+                (0, 1) => &KICK_TABLE_SRS_PLUS_O_01,
+                (1, 0) => &KICK_TABLE_SRS_PLUS_O_10,
+                (1, 2) => &KICK_TABLE_SRS_PLUS_O_12,
+                (2, 1) => &KICK_TABLE_SRS_PLUS_O_21,
+                (2, 3) => &KICK_TABLE_SRS_PLUS_O_23,
+                (3, 2) => &KICK_TABLE_SRS_PLUS_O_32,
+                (3, 0) => &KICK_TABLE_SRS_PLUS_O_30,
+                (0, 3) => &KICK_TABLE_SRS_PLUS_O_03,
+                (0, 2) => &KICK_TABLE_SRS_PLUS_O_02,
+                (2, 0) => &KICK_TABLE_SRS_PLUS_O_20,
+                (1, 3) => &KICK_TABLE_SRS_PLUS_O_13,
+                (3, 1) => &KICK_TABLE_SRS_PLUS_O_31,
+                _ => &NO_KICKS,
+            },
+        },
+        KickTable::SrsX => match group {
+            KickGroup::Default => match (from_rotation, to_rotation) {
+                (0, 1) => &KICK_TABLE_SRS_X_DEFAULT_01,
+                (1, 0) => &KICK_TABLE_SRS_X_DEFAULT_10,
+                (1, 2) => &KICK_TABLE_SRS_X_DEFAULT_12,
+                (2, 1) => &KICK_TABLE_SRS_X_DEFAULT_21,
+                (2, 3) => &KICK_TABLE_SRS_X_DEFAULT_23,
+                (3, 2) => &KICK_TABLE_SRS_X_DEFAULT_32,
+                (3, 0) => &KICK_TABLE_SRS_X_DEFAULT_30,
+                (0, 3) => &KICK_TABLE_SRS_X_DEFAULT_03,
+                (0, 2) => &KICK_TABLE_SRS_X_DEFAULT_02,
+                (2, 0) => &KICK_TABLE_SRS_X_DEFAULT_20,
+                (1, 3) => &KICK_TABLE_SRS_X_DEFAULT_13,
+                (3, 1) => &KICK_TABLE_SRS_X_DEFAULT_31,
+                _ => &NO_KICKS,
+            },
+            KickGroup::I => match (from_rotation, to_rotation) {
+                (0, 1) => &KICK_TABLE_SRS_X_I_01,
+                (1, 0) => &KICK_TABLE_SRS_X_I_10,
+                (1, 2) => &KICK_TABLE_SRS_X_I_12,
+                (2, 1) => &KICK_TABLE_SRS_X_I_21,
+                (2, 3) => &KICK_TABLE_SRS_X_I_23,
+                (3, 2) => &KICK_TABLE_SRS_X_I_32,
+                (3, 0) => &KICK_TABLE_SRS_X_I_30,
+                (0, 3) => &KICK_TABLE_SRS_X_I_03,
+                (0, 2) => &KICK_TABLE_SRS_X_I_02,
+                (2, 0) => &KICK_TABLE_SRS_X_I_20,
+                (1, 3) => &KICK_TABLE_SRS_X_I_13,
+                (3, 1) => &KICK_TABLE_SRS_X_I_31,
+                _ => &NO_KICKS,
+            },
+            KickGroup::O => match (from_rotation, to_rotation) {
+                (0, 1) => &KICK_TABLE_SRS_X_O_01,
+                (1, 0) => &KICK_TABLE_SRS_X_O_10,
+                (1, 2) => &KICK_TABLE_SRS_X_O_12,
+                (2, 1) => &KICK_TABLE_SRS_X_O_21,
+                (2, 3) => &KICK_TABLE_SRS_X_O_23,
+                (3, 2) => &KICK_TABLE_SRS_X_O_32,
+                (3, 0) => &KICK_TABLE_SRS_X_O_30,
+                (0, 3) => &KICK_TABLE_SRS_X_O_03,
+                (0, 2) => &KICK_TABLE_SRS_X_O_02,
+                (2, 0) => &KICK_TABLE_SRS_X_O_20,
+                (1, 3) => &KICK_TABLE_SRS_X_O_13,
+                (3, 1) => &KICK_TABLE_SRS_X_O_31,
+                _ => &NO_KICKS,
+            },
+        },
+        KickTable::TetraX => match group {
+            KickGroup::Default => match (from_rotation, to_rotation) {
+                (0, 1) => &KICK_TABLE_TETRA_X_DEFAULT_01,
+                (1, 0) => &KICK_TABLE_TETRA_X_DEFAULT_10,
+                (1, 2) => &KICK_TABLE_TETRA_X_DEFAULT_12,
+                (2, 1) => &KICK_TABLE_TETRA_X_DEFAULT_21,
+                (2, 3) => &KICK_TABLE_TETRA_X_DEFAULT_23,
+                (3, 2) => &KICK_TABLE_TETRA_X_DEFAULT_32,
+                (3, 0) => &KICK_TABLE_TETRA_X_DEFAULT_30,
+                (0, 3) => &KICK_TABLE_TETRA_X_DEFAULT_03,
+                (0, 2) => &KICK_TABLE_TETRA_X_DEFAULT_02,
+                (2, 0) => &KICK_TABLE_TETRA_X_DEFAULT_20,
+                (1, 3) => &KICK_TABLE_TETRA_X_DEFAULT_13,
+                (3, 1) => &KICK_TABLE_TETRA_X_DEFAULT_31,
+                _ => &NO_KICKS,
+            },
+            KickGroup::I => match (from_rotation, to_rotation) {
+                (0, 1) => &KICK_TABLE_TETRA_X_I_01,
+                (1, 0) => &KICK_TABLE_TETRA_X_I_10,
+                (1, 2) => &KICK_TABLE_TETRA_X_I_12,
+                (2, 1) => &KICK_TABLE_TETRA_X_I_21,
+                (2, 3) => &KICK_TABLE_TETRA_X_I_23,
+                (3, 2) => &KICK_TABLE_TETRA_X_I_32,
+                (3, 0) => &KICK_TABLE_TETRA_X_I_30,
+                (0, 3) => &KICK_TABLE_TETRA_X_I_03,
+                (0, 2) => &KICK_TABLE_TETRA_X_I_02,
+                (2, 0) => &KICK_TABLE_TETRA_X_I_20,
+                (1, 3) => &KICK_TABLE_TETRA_X_I_13,
+                (3, 1) => &KICK_TABLE_TETRA_X_I_31,
+                _ => &NO_KICKS,
+            },
+            KickGroup::O => match (from_rotation, to_rotation) {
+                (0, 1) => &KICK_TABLE_TETRA_X_O_01,
+                (1, 0) => &KICK_TABLE_TETRA_X_O_10,
+                (1, 2) => &KICK_TABLE_TETRA_X_O_12,
+                (2, 1) => &KICK_TABLE_TETRA_X_O_21,
+                (2, 3) => &KICK_TABLE_TETRA_X_O_23,
+                (3, 2) => &KICK_TABLE_TETRA_X_O_32,
+                (3, 0) => &KICK_TABLE_TETRA_X_O_30,
+                (0, 3) => &KICK_TABLE_TETRA_X_O_03,
+                (0, 2) => &KICK_TABLE_TETRA_X_O_02,
+                (2, 0) => &KICK_TABLE_TETRA_X_O_20,
+                (1, 3) => &KICK_TABLE_TETRA_X_O_13,
+                (3, 1) => &KICK_TABLE_TETRA_X_O_31,
+                _ => &NO_KICKS,
+            },
+        },
+        KickTable::Nrs => match group {
+            KickGroup::Default => match (from_rotation, to_rotation) {
+                (0, 1) => &KICK_TABLE_NRS_DEFAULT_01,
+                (1, 0) => &KICK_TABLE_NRS_DEFAULT_10,
+                (1, 2) => &KICK_TABLE_NRS_DEFAULT_12,
+                (2, 1) => &KICK_TABLE_NRS_DEFAULT_21,
+                (2, 3) => &KICK_TABLE_NRS_DEFAULT_23,
+                (3, 2) => &KICK_TABLE_NRS_DEFAULT_32,
+                (3, 0) => &KICK_TABLE_NRS_DEFAULT_30,
+                (0, 3) => &KICK_TABLE_NRS_DEFAULT_03,
+                (0, 2) => &KICK_TABLE_NRS_DEFAULT_02,
+                (2, 0) => &KICK_TABLE_NRS_DEFAULT_20,
+                (1, 3) => &KICK_TABLE_NRS_DEFAULT_13,
+                (3, 1) => &KICK_TABLE_NRS_DEFAULT_31,
+                _ => &NO_KICKS,
+            },
+            KickGroup::I => match (from_rotation, to_rotation) {
+                (0, 1) => &KICK_TABLE_NRS_I_01,
+                (1, 0) => &KICK_TABLE_NRS_I_10,
+                (1, 2) => &KICK_TABLE_NRS_I_12,
+                (2, 1) => &KICK_TABLE_NRS_I_21,
+                (2, 3) => &KICK_TABLE_NRS_I_23,
+                (3, 2) => &KICK_TABLE_NRS_I_32,
+                (3, 0) => &KICK_TABLE_NRS_I_30,
+                (0, 3) => &KICK_TABLE_NRS_I_03,
+                (0, 2) => &KICK_TABLE_NRS_I_02,
+                (2, 0) => &KICK_TABLE_NRS_I_20,
+                (1, 3) => &KICK_TABLE_NRS_I_13,
+                (3, 1) => &KICK_TABLE_NRS_I_31,
+                _ => &NO_KICKS,
+            },
+            KickGroup::O => match (from_rotation, to_rotation) {
+                (0, 1) => &KICK_TABLE_NRS_O_01,
+                (1, 0) => &KICK_TABLE_NRS_O_10,
+                (1, 2) => &KICK_TABLE_NRS_O_12,
+                (2, 1) => &KICK_TABLE_NRS_O_21,
+                (2, 3) => &KICK_TABLE_NRS_O_23,
+                (3, 2) => &KICK_TABLE_NRS_O_32,
+                (3, 0) => &KICK_TABLE_NRS_O_30,
+                (0, 3) => &KICK_TABLE_NRS_O_03,
+                (0, 2) => &KICK_TABLE_NRS_O_02,
+                (2, 0) => &KICK_TABLE_NRS_O_20,
+                (1, 3) => &KICK_TABLE_NRS_O_13,
+                (3, 1) => &KICK_TABLE_NRS_O_31,
+                _ => &NO_KICKS,
+            },
+        },
+        KickTable::Ars => match group {
+            KickGroup::Default => match (from_rotation, to_rotation) {
+                (0, 1) => &KICK_TABLE_ARS_DEFAULT_01,
+                (1, 0) => &KICK_TABLE_ARS_DEFAULT_10,
+                (1, 2) => &KICK_TABLE_ARS_DEFAULT_12,
+                (2, 1) => &KICK_TABLE_ARS_DEFAULT_21,
+                (2, 3) => &KICK_TABLE_ARS_DEFAULT_23,
+                (3, 2) => &KICK_TABLE_ARS_DEFAULT_32,
+                (3, 0) => &KICK_TABLE_ARS_DEFAULT_30,
+                (0, 3) => &KICK_TABLE_ARS_DEFAULT_03,
+                (0, 2) => &KICK_TABLE_ARS_DEFAULT_02,
+                (2, 0) => &KICK_TABLE_ARS_DEFAULT_20,
+                (1, 3) => &KICK_TABLE_ARS_DEFAULT_13,
+                (3, 1) => &KICK_TABLE_ARS_DEFAULT_31,
+                _ => &NO_KICKS,
+            },
+            KickGroup::I => match (from_rotation, to_rotation) {
+                (0, 1) => &KICK_TABLE_ARS_I_01,
+                (1, 0) => &KICK_TABLE_ARS_I_10,
+                (1, 2) => &KICK_TABLE_ARS_I_12,
+                (2, 1) => &KICK_TABLE_ARS_I_21,
+                (2, 3) => &KICK_TABLE_ARS_I_23,
+                (3, 2) => &KICK_TABLE_ARS_I_32,
+                (3, 0) => &KICK_TABLE_ARS_I_30,
+                (0, 3) => &KICK_TABLE_ARS_I_03,
+                (0, 2) => &KICK_TABLE_ARS_I_02,
+                (2, 0) => &KICK_TABLE_ARS_I_20,
+                (1, 3) => &KICK_TABLE_ARS_I_13,
+                (3, 1) => &KICK_TABLE_ARS_I_31,
+                _ => &NO_KICKS,
+            },
+            KickGroup::O => match (from_rotation, to_rotation) {
+                (0, 1) => &KICK_TABLE_ARS_O_01,
+                (1, 0) => &KICK_TABLE_ARS_O_10,
+                (1, 2) => &KICK_TABLE_ARS_O_12,
+                (2, 1) => &KICK_TABLE_ARS_O_21,
+                (2, 3) => &KICK_TABLE_ARS_O_23,
+                (3, 2) => &KICK_TABLE_ARS_O_32,
+                (3, 0) => &KICK_TABLE_ARS_O_30,
+                (0, 3) => &KICK_TABLE_ARS_O_03,
+                (0, 2) => &KICK_TABLE_ARS_O_02,
+                (2, 0) => &KICK_TABLE_ARS_O_20,
+                (1, 3) => &KICK_TABLE_ARS_O_13,
+                (3, 1) => &KICK_TABLE_ARS_O_31,
+                _ => &NO_KICKS,
+            },
+        },
+        KickTable::Asc => match group {
+            KickGroup::Default => match (from_rotation, to_rotation) {
+                (0, 1) => &KICK_TABLE_ASC_DEFAULT_01,
+                (1, 0) => &KICK_TABLE_ASC_DEFAULT_10,
+                (1, 2) => &KICK_TABLE_ASC_DEFAULT_12,
+                (2, 1) => &KICK_TABLE_ASC_DEFAULT_21,
+                (2, 3) => &KICK_TABLE_ASC_DEFAULT_23,
+                (3, 2) => &KICK_TABLE_ASC_DEFAULT_32,
+                (3, 0) => &KICK_TABLE_ASC_DEFAULT_30,
+                (0, 3) => &KICK_TABLE_ASC_DEFAULT_03,
+                (0, 2) => &KICK_TABLE_ASC_DEFAULT_02,
+                (2, 0) => &KICK_TABLE_ASC_DEFAULT_20,
+                (1, 3) => &KICK_TABLE_ASC_DEFAULT_13,
+                (3, 1) => &KICK_TABLE_ASC_DEFAULT_31,
+                _ => &NO_KICKS,
+            },
+            KickGroup::I => match (from_rotation, to_rotation) {
+                (0, 1) => &KICK_TABLE_ASC_I_01,
+                (1, 0) => &KICK_TABLE_ASC_I_10,
+                (1, 2) => &KICK_TABLE_ASC_I_12,
+                (2, 1) => &KICK_TABLE_ASC_I_21,
+                (2, 3) => &KICK_TABLE_ASC_I_23,
+                (3, 2) => &KICK_TABLE_ASC_I_32,
+                (3, 0) => &KICK_TABLE_ASC_I_30,
+                (0, 3) => &KICK_TABLE_ASC_I_03,
+                (0, 2) => &KICK_TABLE_ASC_I_02,
+                (2, 0) => &KICK_TABLE_ASC_I_20,
+                (1, 3) => &KICK_TABLE_ASC_I_13,
+                (3, 1) => &KICK_TABLE_ASC_I_31,
+                _ => &NO_KICKS,
+            },
+            KickGroup::O => match (from_rotation, to_rotation) {
+                (0, 1) => &KICK_TABLE_ASC_O_01,
+                (1, 0) => &KICK_TABLE_ASC_O_10,
+                (1, 2) => &KICK_TABLE_ASC_O_12,
+                (2, 1) => &KICK_TABLE_ASC_O_21,
+                (2, 3) => &KICK_TABLE_ASC_O_23,
+                (3, 2) => &KICK_TABLE_ASC_O_32,
+                (3, 0) => &KICK_TABLE_ASC_O_30,
+                (0, 3) => &KICK_TABLE_ASC_O_03,
+                (0, 2) => &KICK_TABLE_ASC_O_02,
+                (2, 0) => &KICK_TABLE_ASC_O_20,
+                (1, 3) => &KICK_TABLE_ASC_O_13,
+                (3, 1) => &KICK_TABLE_ASC_O_31,
+                _ => &NO_KICKS,
+            },
+        },
+        KickTable::None => match group {
+            KickGroup::Default => match (from_rotation, to_rotation) {
+                (0, 1) => &KICK_TABLE_NONE_DEFAULT_01,
+                (1, 0) => &KICK_TABLE_NONE_DEFAULT_10,
+                (1, 2) => &KICK_TABLE_NONE_DEFAULT_12,
+                (2, 1) => &KICK_TABLE_NONE_DEFAULT_21,
+                (2, 3) => &KICK_TABLE_NONE_DEFAULT_23,
+                (3, 2) => &KICK_TABLE_NONE_DEFAULT_32,
+                (3, 0) => &KICK_TABLE_NONE_DEFAULT_30,
+                (0, 3) => &KICK_TABLE_NONE_DEFAULT_03,
+                (0, 2) => &KICK_TABLE_NONE_DEFAULT_02,
+                (2, 0) => &KICK_TABLE_NONE_DEFAULT_20,
+                (1, 3) => &KICK_TABLE_NONE_DEFAULT_13,
+                (3, 1) => &KICK_TABLE_NONE_DEFAULT_31,
+                _ => &NO_KICKS,
+            },
+            KickGroup::I => match (from_rotation, to_rotation) {
+                (0, 1) => &KICK_TABLE_NONE_I_01,
+                (1, 0) => &KICK_TABLE_NONE_I_10,
+                (1, 2) => &KICK_TABLE_NONE_I_12,
+                (2, 1) => &KICK_TABLE_NONE_I_21,
+                (2, 3) => &KICK_TABLE_NONE_I_23,
+                (3, 2) => &KICK_TABLE_NONE_I_32,
+                (3, 0) => &KICK_TABLE_NONE_I_30,
+                (0, 3) => &KICK_TABLE_NONE_I_03,
+                (0, 2) => &KICK_TABLE_NONE_I_02,
+                (2, 0) => &KICK_TABLE_NONE_I_20,
+                (1, 3) => &KICK_TABLE_NONE_I_13,
+                (3, 1) => &KICK_TABLE_NONE_I_31,
+                _ => &NO_KICKS,
+            },
+            KickGroup::O => match (from_rotation, to_rotation) {
+                (0, 1) => &KICK_TABLE_NONE_O_01,
+                (1, 0) => &KICK_TABLE_NONE_O_10,
+                (1, 2) => &KICK_TABLE_NONE_O_12,
+                (2, 1) => &KICK_TABLE_NONE_O_21,
+                (2, 3) => &KICK_TABLE_NONE_O_23,
+                (3, 2) => &KICK_TABLE_NONE_O_32,
+                (3, 0) => &KICK_TABLE_NONE_O_30,
+                (0, 3) => &KICK_TABLE_NONE_O_03,
+                (0, 2) => &KICK_TABLE_NONE_O_02,
+                (2, 0) => &KICK_TABLE_NONE_O_20,
+                (1, 3) => &KICK_TABLE_NONE_O_13,
+                (3, 1) => &KICK_TABLE_NONE_O_31,
+                _ => &NO_KICKS,
+            },
+        },
     }
 }
 

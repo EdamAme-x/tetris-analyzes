@@ -18,12 +18,15 @@ use firepower::{
     clear_kind_cleared_lines, clear_kind_name, firepower_score, parse_clear_kind,
     parse_combo_table, score_state, FirepowerEvent, FirepowerState,
 };
-use movement::{can_place, is_reachable_placement, lock_shape, parse_kick_table, KickTable};
+use movement::{can_place, is_reachable_placement, lock_shape, parse_kick_table};
 use pieces::{
-    format_placement, parse_piece_string, parse_queue, piece_name, piece_shapes, Cell, Piece, Shape,
+    format_placement, parse_piece_string, parse_queue, piece_name, piece_shapes,
+    placement_shape_indices, Cell, Piece, Shape,
 };
-use spin::{detect_spin, spin_kind_name, SpinDetection};
-use tetrio_tables::ComboTable;
+use spin::{
+    apply_spin_mode, detect_spin, parse_spin_mode, spin_kind_name, SpinDetection, SpinMode,
+};
+use tetrio_tables::{ComboTable, KickTable};
 
 #[derive(Clone)]
 pub(crate) struct SearchState {
@@ -270,6 +273,7 @@ pub fn detect_opener_spin(
     rotation: u32,
     x: i32,
     y: i32,
+    spin_mode: Option<String>,
 ) -> Result<BeamSpinDetection> {
     let board = board::rows_to_array(rows.as_ref())?;
     let piece = parse_piece_string(&piece)?;
@@ -295,14 +299,19 @@ pub fn detect_opener_spin(
             piece_name(piece)
         )));
     };
-    Ok(BeamSpinDetection::from(detect_spin(
+    let detected = detect_spin(
         &locked,
         piece,
         shape,
         x,
         y,
         board::count_full_lines_array(&locked),
-    )))
+    );
+    let spin = match spin_mode {
+        Some(spin_mode) => apply_spin_mode(detected, piece, parse_spin_mode(&spin_mode)?),
+        None => detected,
+    };
+    Ok(BeamSpinDetection::from(spin))
 }
 
 #[napi(js_name = "evaluateOpenerFirepower")]
@@ -350,6 +359,7 @@ pub fn search_opener_beam(
     max_depth: u32,
     combo_table: Option<String>,
     kick_table: Option<String>,
+    spin_mode: Option<String>,
 ) -> Result<Vec<BeamSearchNode>> {
     search_opener_beam_internal(
         queue,
@@ -359,6 +369,7 @@ pub fn search_opener_beam(
         false,
         combo_table,
         kick_table,
+        spin_mode,
     )
 }
 
@@ -370,6 +381,7 @@ pub fn search_opener_beam_with_placements(
     max_depth: u32,
     combo_table: Option<String>,
     kick_table: Option<String>,
+    spin_mode: Option<String>,
 ) -> Result<Vec<BeamSearchNode>> {
     search_opener_beam_internal(
         queue,
@@ -379,6 +391,7 @@ pub fn search_opener_beam_with_placements(
         true,
         combo_table,
         kick_table,
+        spin_mode,
     )
 }
 
@@ -392,9 +405,11 @@ pub fn evaluate_opener_bag(
     top_queue_count: u32,
     combo_table: Option<String>,
     kick_table: Option<String>,
+    spin_mode: Option<String>,
 ) -> Result<OpenerBagEvaluation> {
     let combo_table = parse_optional_combo_table(combo_table.as_deref())?;
     let kick_table = parse_optional_kick_table(kick_table.as_deref())?;
+    let spin_mode = parse_optional_spin_mode(spin_mode.as_deref())?;
     evaluate_opener_bag_internal(
         &bag,
         beam_width,
@@ -404,6 +419,7 @@ pub fn evaluate_opener_bag(
         top_queue_count,
         combo_table,
         kick_table,
+        spin_mode,
     )
 }
 
@@ -415,12 +431,14 @@ fn search_opener_beam_internal(
     include_placements: bool,
     combo_table: Option<String>,
     kick_table: Option<String>,
+    spin_mode: Option<String>,
 ) -> Result<Vec<BeamSearchNode>> {
     let pieces = parse_queue(&queue)?;
     let max_depth = usize::min(max_depth as usize, pieces.len());
     let beam_width = validate_beam_width(beam_width)?;
     let combo_table = parse_optional_combo_table(combo_table.as_deref())?;
     let kick_table = parse_optional_kick_table(kick_table.as_deref())?;
+    let spin_mode = parse_optional_spin_mode(spin_mode.as_deref())?;
 
     Ok(search_opener_states(
         &pieces,
@@ -430,6 +448,7 @@ fn search_opener_beam_internal(
         include_placements,
         combo_table,
         kick_table,
+        spin_mode,
     )
     .into_iter()
     .map(BeamSearchNode::from)
@@ -444,6 +463,7 @@ pub(crate) fn search_opener_states(
     include_placements: bool,
     combo_table: ComboTable,
     kick_table: KickTable,
+    spin_mode: SpinMode,
 ) -> Vec<SearchState> {
     let empty_rows = [0_u16; BOARD_HEIGHT];
     let initial_metrics = board::evaluate_board_unchecked(&empty_rows);
@@ -464,7 +484,9 @@ pub(crate) fn search_opener_states(
 
         for state in &beam {
             for choice in piece_choices(&pieces, state, hold_enabled) {
-                for (shape_index, shape) in piece_shapes(choice.piece).iter().copied().enumerate() {
+                let shapes = piece_shapes(choice.piece);
+                for shape_index in placement_shape_indices(choice.piece).iter().copied() {
+                    let shape = shapes[shape_index];
                     for x in 0..=(BOARD_WIDTH as i8 - shape.width) {
                         if let Some(placed) = place_and_clear(
                             &state.rows,
@@ -474,6 +496,7 @@ pub(crate) fn search_opener_states(
                             x,
                             include_placements,
                             kick_table,
+                            spin_mode,
                         ) {
                             let rows = placed.rows;
                             let metrics = board::evaluate_board_unchecked(&rows);
@@ -588,6 +611,7 @@ fn place_and_clear(
     x: i8,
     include_placement: bool,
     kick_table: KickTable,
+    spin_mode: SpinMode,
 ) -> Option<PlacedBoard> {
     for y in 0..=(BOARD_HEIGHT as i8 - shape.height) {
         if can_place(rows, shape, x, y) && (y == 0 || !can_place(rows, shape, x, y - 1)) {
@@ -614,7 +638,11 @@ fn place_and_clear(
                 }
             }
             let cleared_lines = board::count_full_lines_array(&placed);
-            let spin = detect_spin(&placed, choice.piece, shape, x, y, cleared_lines);
+            let spin = apply_spin_mode(
+                detect_spin(&placed, choice.piece, shape, x, y, cleared_lines),
+                choice.piece,
+                spin_mode,
+            );
             return Some(PlacedBoard {
                 rows: board::clear_full_lines_array(placed),
                 y,
@@ -662,6 +690,13 @@ fn parse_optional_kick_table(input: Option<&str>) -> Result<KickTable> {
         .map(parse_kick_table)
         .transpose()
         .map(|kick_table| kick_table.unwrap_or(KickTable::SrsPlus))
+}
+
+fn parse_optional_spin_mode(input: Option<&str>) -> Result<SpinMode> {
+    input
+        .map(parse_spin_mode)
+        .transpose()
+        .map(|spin_mode| spin_mode.unwrap_or(SpinMode::TSpins))
 }
 
 impl From<SearchState> for BeamSearchNode {

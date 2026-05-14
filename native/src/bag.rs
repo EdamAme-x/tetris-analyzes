@@ -2,9 +2,9 @@ use napi::bindgen_prelude::{Error, Result};
 use napi_derive::napi;
 
 use crate::firepower::firepower_score;
-use crate::movement::KickTable;
 use crate::pieces::{parse_queue, piece_name, Piece};
-use crate::tetrio_tables::ComboTable;
+use crate::spin::SpinMode;
+use crate::tetrio_tables::{ComboTable, KickTable};
 use crate::{search_opener_states, validate_beam_width, SearchState};
 
 #[derive(Clone)]
@@ -53,6 +53,7 @@ pub(crate) fn evaluate_opener_bag_internal(
     top_queue_count: u32,
     combo_table: ComboTable,
     kick_table: KickTable,
+    spin_mode: SpinMode,
 ) -> Result<OpenerBagEvaluation> {
     let pieces = parse_unique_bag(bag)?;
     let total_queues = factorial(pieces.len());
@@ -80,6 +81,7 @@ pub(crate) fn evaluate_opener_bag_internal(
             false,
             combo_table,
             kick_table,
+            spin_mode,
         );
         evaluations.push(evaluate_queue(
             queue_to_string(&queue),

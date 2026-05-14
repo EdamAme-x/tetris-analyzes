@@ -1,3 +1,5 @@
+use napi::bindgen_prelude::{Error, Result};
+
 use crate::board::{BoardRows, BOARD_HEIGHT, BOARD_WIDTH};
 use crate::movement::can_place;
 use crate::pieces::{Cell, Piece, Shape};
@@ -18,6 +20,20 @@ pub(crate) enum SpinKind {
     TSpin,
     TSpinMini,
     ImmobileSpin,
+}
+
+#[derive(Clone, Copy, Eq, PartialEq)]
+pub(crate) enum SpinMode {
+    TSpins,
+    TSpinsPlus,
+    AllSpins,
+    AllSpinsPlus,
+    AllMini,
+    AllMiniPlus,
+    MiniOnly,
+    Handheld,
+    Stupid,
+    None,
 }
 
 pub(crate) fn detect_spin(
@@ -76,6 +92,90 @@ pub(crate) fn detect_spin(
         immobile,
         occupied_corners: 0,
         cleared_lines,
+    }
+}
+
+pub(crate) fn apply_spin_mode(
+    detection: SpinDetection,
+    piece: Piece,
+    mode: SpinMode,
+) -> SpinDetection {
+    if mode == SpinMode::None {
+        return without_spin(detection);
+    }
+
+    if mode == SpinMode::Stupid {
+        return with_spin_kind(detection, SpinKind::TSpin, false);
+    }
+
+    if piece == Piece::T {
+        if detection.kind != SpinKind::None {
+            return detection;
+        }
+        if detection.immobile && mode_allows_immobile_t_mini(mode) {
+            return with_spin_kind(detection, SpinKind::TSpinMini, true);
+        }
+        return without_spin(detection);
+    }
+
+    if !detection.immobile {
+        return without_spin(detection);
+    }
+
+    match mode {
+        SpinMode::AllSpins | SpinMode::AllSpinsPlus | SpinMode::Handheld => {
+            with_spin_kind(detection, SpinKind::TSpin, false)
+        }
+        SpinMode::AllMini | SpinMode::AllMiniPlus | SpinMode::MiniOnly => {
+            with_spin_kind(detection, SpinKind::TSpinMini, true)
+        }
+        SpinMode::TSpins | SpinMode::TSpinsPlus | SpinMode::None | SpinMode::Stupid => {
+            without_spin(detection)
+        }
+    }
+}
+
+pub(crate) fn parse_spin_mode(input: &str) -> Result<SpinMode> {
+    let normalized = input.trim().to_ascii_uppercase().replace('_', "-");
+    match normalized.as_str() {
+        "T-SPINS" | "TSPINS" | "T-SPIN" | "TSPIN" => Ok(SpinMode::TSpins),
+        "T-SPINS+" | "TSPINS+" | "T-SPIN+" | "TSPIN+" => Ok(SpinMode::TSpinsPlus),
+        "ALL-SPINS" => Ok(SpinMode::AllSpins),
+        "ALL-SPINS+" => Ok(SpinMode::AllSpinsPlus),
+        "ALL-MINI" => Ok(SpinMode::AllMini),
+        "ALL-MINI+" => Ok(SpinMode::AllMiniPlus),
+        "MINI-ONLY" => Ok(SpinMode::MiniOnly),
+        "HANDHELD" => Ok(SpinMode::Handheld),
+        "STUPID" => Ok(SpinMode::Stupid),
+        "NONE" => Ok(SpinMode::None),
+        _ => Err(Error::from_reason(format!(
+            "Unsupported native opener spin mode {input}."
+        ))),
+    }
+}
+
+fn mode_allows_immobile_t_mini(mode: SpinMode) -> bool {
+    matches!(
+        mode,
+        SpinMode::TSpinsPlus | SpinMode::AllSpinsPlus | SpinMode::AllMiniPlus
+    )
+}
+
+fn with_spin_kind(detection: SpinDetection, kind: SpinKind, mini: bool) -> SpinDetection {
+    SpinDetection {
+        kind,
+        spin: true,
+        mini,
+        ..detection
+    }
+}
+
+fn without_spin(detection: SpinDetection) -> SpinDetection {
+    SpinDetection {
+        kind: SpinKind::None,
+        spin: false,
+        mini: false,
+        ..detection
     }
 }
 

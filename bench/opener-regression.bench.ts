@@ -1,0 +1,168 @@
+import { searchOpenerBeamWithPlacements, type SearchOpenerBeamInput } from "../src/application/search-opener";
+
+interface OpenerRegressionCase {
+  readonly name: string;
+  readonly input: SearchOpenerBeamInput;
+  readonly iterations: number;
+  readonly minDepth: number;
+}
+
+interface OpenerRegressionResult {
+  readonly name: string;
+  readonly resultCount: number;
+  readonly topAttack: number;
+  readonly topScore: number;
+  readonly topHoles: number;
+  readonly topBumpiness: number;
+  readonly topPath: string;
+  readonly checksum: number;
+}
+
+interface TimingSummary {
+  readonly median: number;
+  readonly min: number;
+  readonly max: number;
+  readonly samples: number;
+}
+
+const samplesPerRound = 2;
+const rounds = 2;
+
+const cases: OpenerRegressionCase[] = [
+  {
+    name: "tki-3-seed",
+    input: { queue: "TILJSZO", beamWidth: 48, hold: true, maxDepth: 5 },
+    iterations: 4,
+    minDepth: 5
+  },
+  {
+    name: "dt-cannon-seed",
+    input: { queue: "TJLZISO", beamWidth: 48, hold: true, maxDepth: 5 },
+    iterations: 4,
+    minDepth: 5
+  },
+  {
+    name: "bt-cannon-seed",
+    input: { queue: "TSLJZIO", beamWidth: 48, hold: true, maxDepth: 5 },
+    iterations: 4,
+    minDepth: 5
+  },
+  {
+    name: "srsx-all-spin-stress",
+    input: { queue: "JLSTZIOT", beamWidth: 48, hold: true, maxDepth: 5, kickTable: "SRS-X", spinMode: "ALL-SPINS" },
+    iterations: 4,
+    minDepth: 5
+  },
+  {
+    name: "no-hold-control",
+    input: { queue: "TILJSZO", beamWidth: 48, hold: false, maxDepth: 5 },
+    iterations: 4,
+    minDepth: 5
+  }
+];
+
+for (const bench of cases) {
+  runCase(bench);
+}
+
+const samples = new Map(cases.map((bench) => [bench.name, [] as number[]]));
+const latest = new Map<string, OpenerRegressionResult>();
+
+for (const bench of rotateCases(cases, rounds)) {
+  for (let sample = 0; sample < samplesPerRound; sample += 1) {
+    const measured = measureCase(bench);
+    samples.get(bench.name)?.push(measured.ms);
+    latest.set(bench.name, measured.result);
+  }
+}
+
+console.log("");
+console.log("| opener seed | median ms | searches/s | nodes | attack | score | holes | bumpiness | checksum | top path |");
+console.log("| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |");
+for (const bench of cases) {
+  const timings = samples.get(bench.name) ?? [];
+  const summary = summarize(timings);
+  const latestResult = latest.get(bench.name);
+  if (latestResult === undefined) {
+    throw new Error(`Missing regression result for ${bench.name}.`);
+  }
+  const msPerSearch = summary.median / bench.iterations;
+  const searchesPerSecond = 1_000 / msPerSearch;
+  console.log(
+    [
+      bench.name,
+      summary.median.toFixed(3),
+      searchesPerSecond.toFixed(1),
+      String(latestResult.resultCount),
+      String(latestResult.topAttack),
+      latestResult.topScore.toFixed(1),
+      String(latestResult.topHoles),
+      String(latestResult.topBumpiness),
+      String(latestResult.checksum),
+      latestResult.topPath
+    ].join(" | ")
+  );
+}
+
+function measureCase(bench: OpenerRegressionCase): { readonly ms: number; readonly result: OpenerRegressionResult } {
+  const start = performance.now();
+  let result = runCase(bench);
+  for (let iteration = 1; iteration < bench.iterations; iteration += 1) {
+    result = runCase(bench);
+  }
+  return { ms: performance.now() - start, result };
+}
+
+function runCase(bench: OpenerRegressionCase): OpenerRegressionResult {
+  const nodes = searchOpenerBeamWithPlacements(bench.input);
+  const top = nodes[0];
+  if (top === undefined || top.depth < bench.minDepth) {
+    throw new Error(`Regression case ${bench.name} did not build to depth ${bench.minDepth}.`);
+  }
+  return {
+    name: bench.name,
+    resultCount: nodes.length,
+    topAttack: top.attack,
+    topScore: top.score,
+    topHoles: top.holes,
+    topBumpiness: top.bumpiness,
+    topPath: top.path.join(" "),
+    checksum: checksum(nodes)
+  };
+}
+
+function checksum(
+  nodes: readonly {
+    readonly score: number;
+    readonly attack: number;
+    readonly points: number;
+    readonly occupiedCells: number;
+    readonly path: readonly string[];
+  }[]
+): number {
+  let value = nodes.length;
+  for (const node of nodes) {
+    value ^= Math.trunc(node.score) + node.attack * 31 + node.points + node.occupiedCells + node.path.length;
+  }
+  return value;
+}
+
+function summarize(input: readonly number[]): TimingSummary {
+  const sorted = [...input].sort((left, right) => left - right);
+  return {
+    median: sorted[Math.floor(sorted.length / 2)] ?? 0,
+    min: sorted[0] ?? 0,
+    max: sorted.at(-1) ?? 0,
+    samples: sorted.length
+  };
+}
+
+function rotateCases(input: readonly OpenerRegressionCase[], rounds: number): OpenerRegressionCase[] {
+  const output: OpenerRegressionCase[] = [];
+  for (let round = 0; round < rounds; round += 1) {
+    for (let index = 0; index < input.length; index += 1) {
+      output.push(input[(index + round) % input.length] as OpenerRegressionCase);
+    }
+  }
+  return output;
+}

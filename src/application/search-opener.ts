@@ -6,6 +6,7 @@ import type {
   NativeFirepowerSummary,
   NativeKickTable,
   NativeOpenerBagEvaluation,
+  NativeSpinMode,
   NativeSpinDetection
 } from "../infrastructure/native/binding-types";
 
@@ -18,6 +19,7 @@ export interface SearchOpenerBeamInput {
   readonly maxDepth?: number;
   readonly comboTable?: NativeComboTable;
   readonly kickTable?: NativeKickTable;
+  readonly spinMode?: NativeSpinMode;
 }
 
 export interface EvaluateOpenerBagInput {
@@ -29,6 +31,7 @@ export interface EvaluateOpenerBagInput {
   readonly topQueueCount?: number;
   readonly comboTable?: NativeComboTable;
   readonly kickTable?: NativeKickTable;
+  readonly spinMode?: NativeSpinMode;
 }
 
 export type SearchOpenerBeamNode = NativeBeamSearchNode;
@@ -41,6 +44,7 @@ export interface OpenerPlacementReachabilityInput {
   readonly x: number;
   readonly y: number;
   readonly kickTable?: NativeKickTable;
+  readonly spinMode?: NativeSpinMode;
 }
 
 export function searchOpenerBeam(input: SearchOpenerBeamInput): SearchOpenerBeamNode[] {
@@ -51,7 +55,8 @@ export function searchOpenerBeam(input: SearchOpenerBeamInput): SearchOpenerBeam
     input.hold ?? true,
     input.maxDepth ?? queue.length,
     input.comboTable,
-    input.kickTable
+    input.kickTable,
+    input.spinMode
   );
 }
 
@@ -63,7 +68,8 @@ export function searchOpenerBeamWithPlacements(input: SearchOpenerBeamInput): Se
     input.hold ?? true,
     input.maxDepth ?? queue.length,
     input.comboTable,
-    input.kickTable
+    input.kickTable,
+    input.spinMode
   );
 }
 
@@ -77,7 +83,8 @@ export function evaluateOpenerBag(input: EvaluateOpenerBagInput = {}): OpenerBag
     input.maxQueues ?? 0,
     input.topQueueCount ?? 16,
     input.comboTable,
-    input.kickTable
+    input.kickTable,
+    input.spinMode
   );
 }
 
@@ -86,7 +93,7 @@ export function canReachOpenerPlacement(input: OpenerPlacementReachabilityInput)
 }
 
 export function detectOpenerSpin(input: OpenerPlacementReachabilityInput): NativeSpinDetection {
-  return loadNativeBinding().detectOpenerSpin(input.rows, input.piece, input.rotation, input.x, input.y);
+  return loadNativeBinding().detectOpenerSpin(input.rows, input.piece, input.rotation, input.x, input.y, input.spinMode);
 }
 
 export function evaluateOpenerFirepower(events: readonly NativeFirepowerInput[]): NativeFirepowerSummary {

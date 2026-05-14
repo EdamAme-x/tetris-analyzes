@@ -11,7 +11,7 @@ pub(crate) enum Piece {
     L,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Eq, PartialEq)]
 pub(crate) struct Cell {
     pub(crate) x: i8,
     pub(crate) y: i8,
@@ -218,13 +218,45 @@ const I_SHAPES: &[Shape] = &[
         height: 4,
         cells: I1,
     },
+    Shape {
+        rotation: 2,
+        width: 4,
+        height: 1,
+        cells: I0,
+    },
+    Shape {
+        rotation: 3,
+        width: 1,
+        height: 4,
+        cells: I1,
+    },
 ];
-const O_SHAPES: &[Shape] = &[Shape {
-    rotation: 0,
-    width: 2,
-    height: 2,
-    cells: O0,
-}];
+const O_SHAPES: &[Shape] = &[
+    Shape {
+        rotation: 0,
+        width: 2,
+        height: 2,
+        cells: O0,
+    },
+    Shape {
+        rotation: 1,
+        width: 2,
+        height: 2,
+        cells: O0,
+    },
+    Shape {
+        rotation: 2,
+        width: 2,
+        height: 2,
+        cells: O0,
+    },
+    Shape {
+        rotation: 3,
+        width: 2,
+        height: 2,
+        cells: O0,
+    },
+];
 const T_SHAPES: &[Shape] = &[
     Shape {
         rotation: 0,
@@ -264,6 +296,18 @@ const S_SHAPES: &[Shape] = &[
         height: 3,
         cells: S1,
     },
+    Shape {
+        rotation: 2,
+        width: 3,
+        height: 2,
+        cells: S0,
+    },
+    Shape {
+        rotation: 3,
+        width: 2,
+        height: 3,
+        cells: S1,
+    },
 ];
 const Z_SHAPES: &[Shape] = &[
     Shape {
@@ -274,6 +318,18 @@ const Z_SHAPES: &[Shape] = &[
     },
     Shape {
         rotation: 1,
+        width: 2,
+        height: 3,
+        cells: Z1,
+    },
+    Shape {
+        rotation: 2,
+        width: 3,
+        height: 2,
+        cells: Z0,
+    },
+    Shape {
+        rotation: 3,
         width: 2,
         height: 3,
         cells: Z1,
@@ -341,5 +397,13 @@ pub(crate) fn piece_shapes(piece: Piece) -> &'static [Shape] {
         Piece::Z => Z_SHAPES,
         Piece::J => J_SHAPES,
         Piece::L => L_SHAPES,
+    }
+}
+
+pub(crate) fn placement_shape_indices(piece: Piece) -> &'static [usize] {
+    match piece {
+        Piece::I | Piece::S | Piece::Z => &[0, 1],
+        Piece::O => &[0],
+        Piece::T | Piece::J | Piece::L => &[0, 1, 2, 3],
     }
 }

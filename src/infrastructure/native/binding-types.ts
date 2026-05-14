@@ -29,8 +29,19 @@ export interface NativeBeamPlacement {
 }
 
 export type NativeSpinKind = "NONE" | "T_SPIN" | "T_SPIN_MINI" | "IMMOBILE_SPIN";
+export type NativeSpinMode =
+  | "T-SPINS"
+  | "T-SPINS+"
+  | "ALL-SPINS+"
+  | "ALL-SPINS"
+  | "ALL-MINI+"
+  | "ALL-MINI"
+  | "MINI-ONLY"
+  | "HANDHELD"
+  | "STUPID"
+  | "NONE";
 export type NativeComboTable = "MULTIPLIER" | "NONE" | "CLASSIC GUIDELINE" | "MODERN GUIDELINE";
-export type NativeKickTable = "SRS+" | "SRS" | "NONE";
+export type NativeKickTable = "SRS+" | "SRS" | "SRS-X" | "TETRA-X" | "NRS" | "ARS" | "ASC" | "NONE";
 export type NativeClearName =
   | "NONE"
   | "SINGLE"
@@ -157,7 +168,14 @@ export interface NativeBinding {
   rowsToFumenField(rows: Uint16Array): string;
   batchRowsToFumenFields(rows: Uint16Array, boardCount: number): string[];
   canReachOpenerPlacement(rows: Uint16Array, piece: string, rotation: number, x: number, y: number, kickTable?: NativeKickTable): boolean;
-  detectOpenerSpin(rows: Uint16Array, piece: string, rotation: number, x: number, y: number): NativeSpinDetection;
+  detectOpenerSpin(
+    rows: Uint16Array,
+    piece: string,
+    rotation: number,
+    x: number,
+    y: number,
+    spinMode?: NativeSpinMode
+  ): NativeSpinDetection;
   evaluateOpenerFirepower(events: NativeFirepowerInput[]): NativeFirepowerSummary;
   searchOpenerBeam(
     queue: string,
@@ -165,7 +183,8 @@ export interface NativeBinding {
     holdEnabled: boolean,
     maxDepth: number,
     comboTable?: NativeComboTable,
-    kickTable?: NativeKickTable
+    kickTable?: NativeKickTable,
+    spinMode?: NativeSpinMode
   ): NativeBeamSearchNode[];
   searchOpenerBeamWithPlacements(
     queue: string,
@@ -173,7 +192,8 @@ export interface NativeBinding {
     holdEnabled: boolean,
     maxDepth: number,
     comboTable?: NativeComboTable,
-    kickTable?: NativeKickTable
+    kickTable?: NativeKickTable,
+    spinMode?: NativeSpinMode
   ): NativeBeamSearchNode[];
   evaluateOpenerBag(
     bag: string,
@@ -183,6 +203,7 @@ export interface NativeBinding {
     maxQueues: number,
     topQueueCount: number,
     comboTable?: NativeComboTable,
-    kickTable?: NativeKickTable
+    kickTable?: NativeKickTable,
+    spinMode?: NativeSpinMode
   ): NativeOpenerBagEvaluation;
 }
