@@ -455,13 +455,15 @@ export function renderOpenerExperimentMarkdown(report: OpenerExperimentReport): 
     }
 
     lines.push(
-      "| rank | attack | difficult attack | other attack | tspin | tspin attack | b2b | tspin potential | points | score | holes | bumpiness | clears | path | preview |",
-      "| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- | --- |"
+      "| rank | queue index | hold | attack | difficult attack | other attack | tspin | tspin attack | b2b | tspin potential | points | score | holes | bumpiness | clears | path | preview |",
+      "| ---: | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- | --- |"
     );
     for (const candidate of scenario.top) {
       lines.push(
         [
           String(candidate.rank),
+          String(candidate.queueIndex),
+          candidate.hold ?? "-",
           String(candidate.attack),
           String(candidate.difficultAttack),
           String(candidate.nonDifficultAttack),

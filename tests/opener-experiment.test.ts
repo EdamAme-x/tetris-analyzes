@@ -277,6 +277,30 @@ describe("opener experiment runner", () => {
     expect(summary).not.toContain("fake-scenario | TI");
   });
 
+  test("renders native candidate queue and hold state in reports", () => {
+    const report = runOpenerExperiment({
+      scenarios: [
+        {
+          name: "native-state",
+          queue: "TIOSZJL",
+          hold: true,
+          beamWidth: 4,
+          maxDepth: 3,
+          warmups: 0,
+          iterations: 1,
+          top: 1
+        }
+      ],
+      clock: createClock("2026-05-14T00:00:00.000Z", [0, 2]),
+      fumenCodec: fakeCodec,
+      search: () => [{ ...candidateNode("native-state"), hold: "S", queueIndex: 3 }]
+    });
+
+    expect(report.scenarios[0]?.top[0]).toMatchObject({ hold: "S", queueIndex: 3 });
+    expect(renderOpenerExperimentConsoleSummary(report, 1)).toContain("queueIndex=3 hold=S");
+    expect(renderOpenerExperimentMarkdown(report)).toContain("1 | 3 | S | 0 | 0 | 0 | 0 | 0 |");
+  });
+
   test("does not rank exhausted queues by post-search T-spin potential", () => {
     const readyRows = new Array(20).fill(0);
     readyRows[1] = (1 << 3) | (1 << 5);

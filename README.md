@@ -67,3 +67,4 @@ Executable examples live in `tests/`.
 - [x] Add fumen parity coverage for real native hold and line-clear placement histories
 - [x] Scan occupied row bits directly during native board evaluation
 - [x] Combine native line-clear counting and clearing during placement evaluation
+- [x] Show native candidate queue index and hold state in opener Markdown reports
