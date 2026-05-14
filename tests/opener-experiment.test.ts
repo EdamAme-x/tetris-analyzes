@@ -514,9 +514,9 @@ describe("opener experiment runner", () => {
 
     const summary = renderOpenerExperimentConsoleSummary(report, 1);
     expect(summary).toContain("Best opener templates (replayed)");
-    expect(summary).toContain("replay=1/2 (50.0%) phase=1/2 (50.0%) grouped=1/1 (100.0%)");
+    expect(summary).toContain("replay=1/2 (50.0%) phase=1/2 (50.0%) quality=0/2 (0.0%) grouped=1/1 (100.0%)");
     expect(renderOpenerExperimentMarkdown(report)).toContain("## Template replay");
-    expect(renderOpenerExperimentMarkdown(report)).toContain("1/2 (50.0%) | 1/2 (50.0%) | 1/1 (100.0%) | source");
+    expect(renderOpenerExperimentMarkdown(report)).toContain("1/2 (50.0%) | 1/2 (50.0%) | 0/2 (0.0%) | 1/1 (100.0%) | source");
   });
 
   test("prioritizes replayed templates before unreplayed firepower in replay reports", () => {
@@ -735,6 +735,70 @@ describe("opener experiment runner", () => {
       replayHitCount: 0,
       phaseReplayHitCount: 1,
       phaseReplayHitRate: 1
+    });
+  });
+
+  test("counts quality replay hits separately from exact template matches", () => {
+    const targetRows = [7, 11, 13, ...new Array(17).fill(0)];
+    const hitRows = [3, 5, 9, ...new Array(17).fill(0)];
+    const missRows = [1, 2, 4, ...new Array(17).fill(0)];
+    const report = runOpenerExperiment({
+      scenarios: [rankingScenario("source", "TI")],
+      templateReplay: {
+        scenarios: [replayScenario("quality-hit", "JO"), replayScenario("quality-miss", "LO")],
+        topTemplates: 1
+      },
+      clock: createClock("2026-05-14T00:00:00.000Z", [0, 1]),
+      fumenCodec: fakeCodec,
+      search: (input) => {
+        if (input.queue === "TI") {
+          return [
+            {
+              ...candidateNode("source"),
+              rows: targetRows,
+              attack: 12,
+              difficultAttack: 12,
+              difficultClears: 3,
+              tSpinClears: 3,
+              tSpinAttack: 12,
+              backToBackChain: 3
+            }
+          ];
+        }
+        if (input.queue === "JO") {
+          return [
+            {
+              ...candidateNode("quality-hit"),
+              rows: hitRows,
+              attack: 12,
+              difficultAttack: 12,
+              difficultClears: 3,
+              tSpinClears: 3,
+              tSpinAttack: 12,
+              backToBackChain: 3
+            }
+          ];
+        }
+        return [
+          {
+            ...candidateNode("quality-miss"),
+            rows: missRows,
+            attack: 8,
+            difficultAttack: 8,
+            difficultClears: 2,
+            tSpinClears: 2,
+            tSpinAttack: 8,
+            backToBackChain: 2
+          }
+        ];
+      }
+    });
+
+    expect(report.templateReplay?.templates[0]).toMatchObject({
+      replayHitCount: 0,
+      phaseReplayHitCount: 0,
+      qualityReplayHitCount: 1,
+      qualityReplayHitRate: 0.5
     });
   });
 

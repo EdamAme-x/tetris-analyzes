@@ -114,6 +114,8 @@ export interface OpenerTemplateReplayEntry {
   readonly replayHitRate: number;
   readonly phaseReplayHitCount: number;
   readonly phaseReplayHitRate: number;
+  readonly qualityReplayHitCount: number;
+  readonly qualityReplayHitRate: number;
   readonly sources: readonly string[];
   readonly best: RankedOpenerCandidate;
   readonly hits: readonly OpenerTemplateReplayHit[];
@@ -143,6 +145,7 @@ export interface OpenerExperimentScenarioResult {
   readonly searchesPerSecond: number;
   readonly reachableTemplates: readonly OpenerScenarioReachableTemplate[];
   readonly reachableTemplatePhases: readonly OpenerScenarioReachablePhase[];
+  readonly reachableQualities: readonly OpenerScenarioReachableQuality[];
   readonly top: readonly OpenerExperimentCandidate[];
   readonly tags: readonly string[];
 }
@@ -156,6 +159,16 @@ export interface OpenerScenarioReachablePhase {
   readonly key: string;
   readonly phaseKey: string;
   readonly rank: number;
+}
+
+export interface OpenerScenarioReachableQuality {
+  readonly rank: number;
+  readonly queueIndex: number;
+  readonly difficultAttack: number;
+  readonly tSpinClears: number;
+  readonly tSpinAttack: number;
+  readonly backToBackChain: number;
+  readonly holes: number;
 }
 
 export interface OpenerExperimentReport {
@@ -424,8 +437,8 @@ export function renderOpenerExperimentMarkdown(report: OpenerExperimentReport): 
       "",
       "## Template replay",
       "",
-      "| rank | replay hits | phase hits | grouped survival | sources | attack | difficult attack | tspin | tspin attack | b2b | best replay rank | clears | preview |",
-      "| ---: | ---: | ---: | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- |"
+      "| rank | replay hits | phase hits | quality hits | grouped survival | sources | attack | difficult attack | tspin | tspin attack | b2b | best replay rank | clears | preview |",
+      "| ---: | ---: | ---: | ---: | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- |"
     );
     for (const template of report.templateReplay.templates.slice(0, 12)) {
       lines.push(
@@ -433,6 +446,7 @@ export function renderOpenerExperimentMarkdown(report: OpenerExperimentReport): 
           String(template.rank),
           formatReplaySurvival(template),
           formatPhaseReplaySurvival(template),
+          formatQualityReplaySurvival(template),
           formatGroupedReplaySurvival(template),
           template.sources.join(" "),
           String(template.best.attack),
@@ -524,7 +538,7 @@ export function renderOpenerExperimentConsoleSummary(report: OpenerExperimentRep
     for (const template of report.templateReplay.templates.slice(0, topCount)) {
       const candidate = template.best;
       lines.push(
-        `#${template.rank} sources=${template.sources.join(",")} replay=${formatReplaySurvival(template)} phase=${formatPhaseReplaySurvival(template)} grouped=${formatGroupedReplaySurvival(template)} queueIndex=${candidate.queueIndex} hold=${candidate.hold ?? "-"} attack=${candidate.attack} difficultAttack=${candidate.difficultAttack} otherAttack=${candidate.nonDifficultAttack} tspin=${candidate.tSpinClears} tspinAttack=${candidate.tSpinAttack} b2b=${candidate.backToBackChain} tspinPotential=${candidate.tSpinPotential} points=${candidate.points} score=${candidate.score.toFixed(1)} holes=${candidate.holes} bump=${candidate.bumpiness}`,
+        `#${template.rank} sources=${template.sources.join(",")} replay=${formatReplaySurvival(template)} phase=${formatPhaseReplaySurvival(template)} quality=${formatQualityReplaySurvival(template)} grouped=${formatGroupedReplaySurvival(template)} queueIndex=${candidate.queueIndex} hold=${candidate.hold ?? "-"} attack=${candidate.attack} difficultAttack=${candidate.difficultAttack} otherAttack=${candidate.nonDifficultAttack} tspin=${candidate.tSpinClears} tspinAttack=${candidate.tSpinAttack} b2b=${candidate.backToBackChain} tspinPotential=${candidate.tSpinPotential} points=${candidate.points} score=${candidate.score.toFixed(1)} holes=${candidate.holes} bump=${candidate.bumpiness}`,
         `clears: ${formatClearSequence(candidate.clearSequence)}`,
         `path: ${candidate.path.join(" ")}`,
         `view: ${candidate.previewUrl}`,
@@ -623,6 +637,7 @@ export function replayOpenerTemplateSurvivability(
   const hitsByTemplate = new Map<string, OpenerTemplateReplayHit[]>();
   const templateKeys = new Set(templates.map((template) => template.key));
   const phaseHitsByTemplate = new Map<string, Set<string>>();
+  const qualityHitsByTemplate = new Map<string, Set<string>>();
   const templateKeysByPhase = new Map<string, string[]>();
   for (const template of templates) {
     for (const phaseKey of template.phaseTemplateKeys) {
@@ -633,10 +648,14 @@ export function replayOpenerTemplateSurvivability(
   for (const scenario of input.scenarios) {
     const scenarioHits = new Set<string>();
     const scenarioPhaseHits = new Set<string>();
+    const scenarioQualityHits = new Set<string>();
     const cachedScenario = cachedScenarios.get(scenarioSignature(scenario));
     if (cachedScenario !== undefined) {
       for (const reachablePhase of cachedScenario.reachableTemplatePhases) {
         addPhaseReplayHits(phaseHitsByTemplate, templateKeysByPhase, reachablePhase.phaseKey, scenario.name, scenarioPhaseHits);
+      }
+      for (const quality of cachedScenario.reachableQualities) {
+        addQualityReplayHits(qualityHitsByTemplate, templates, quality, scenario.name, scenarioQualityHits);
       }
       for (const reachableTemplate of cachedScenario.reachableTemplates) {
         const key = reachableTemplate.key;
@@ -659,6 +678,7 @@ export function replayOpenerTemplateSurvivability(
 
     const nodes = search(searchInput(scenario));
     for (const [index, node] of nodes.entries()) {
+      addQualityReplayHits(qualityHitsByTemplate, templates, searchNodeQuality(node, index), scenario.name, scenarioQualityHits);
       addPhaseReplayHits(
         phaseHitsByTemplate,
         templateKeysByPhase,
@@ -709,6 +729,8 @@ export function replayOpenerTemplateSurvivability(
           replayHitRate: hits.length / input.scenarios.length,
           phaseReplayHitCount: phaseHitsByTemplate.get(template.key)?.size ?? 0,
           phaseReplayHitRate: (phaseHitsByTemplate.get(template.key)?.size ?? 0) / input.scenarios.length,
+          qualityReplayHitCount: qualityHitsByTemplate.get(template.key)?.size ?? 0,
+          qualityReplayHitRate: (qualityHitsByTemplate.get(template.key)?.size ?? 0) / input.scenarios.length,
           sources: template.sources,
           best: template.best,
           hits
@@ -769,6 +791,7 @@ function runScenario(
     searchesPerSecond: stats.median === 0 ? 0 : 1_000 / stats.median,
     reachableTemplates: createReachableTemplates(lastNodes),
     reachableTemplatePhases: createReachableTemplatePhases(lastNodes, scenario),
+    reachableQualities: createReachableQualities(lastNodes),
     top: topCandidates,
     tags: scenario.tags ?? []
   };
@@ -840,6 +863,10 @@ function createReachableTemplatePhases(
     }
   }
   return [...ranksByTemplatePhase.values()];
+}
+
+function createReachableQualities(nodes: readonly SearchOpenerBeamNode[]): OpenerScenarioReachableQuality[] {
+  return nodes.map(searchNodeQuality);
 }
 
 function assertScenarioQualityGate(scenario: OpenerExperimentScenario, candidate: OpenerExperimentCandidate | undefined): void {
@@ -977,10 +1004,29 @@ function compareReplayTemplates(left: OpenerTemplateReplayEntry, right: OpenerTe
   return (
     right.replayHitCount - left.replayHitCount ||
     right.phaseReplayHitCount - left.phaseReplayHitCount ||
+    right.qualityReplayHitCount - left.qualityReplayHitCount ||
     right.groupedSurvivalCount - left.groupedSurvivalCount ||
     compareRankedOpenerCandidates(left.best, right.best) ||
     left.key.localeCompare(right.key)
   );
+}
+
+function addQualityReplayHits(
+  hitsByTemplate: Map<string, Set<string>>,
+  templates: readonly RankedOpenerTemplate[],
+  quality: OpenerScenarioReachableQuality,
+  scenarioName: string,
+  scenarioQualityHits: Set<string>
+): void {
+  for (const template of templates) {
+    if (scenarioQualityHits.has(template.key) || !meetsReplayQuality(quality, template.best)) {
+      continue;
+    }
+    scenarioQualityHits.add(template.key);
+    const hits = hitsByTemplate.get(template.key) ?? new Set<string>();
+    hits.add(scenarioName);
+    hitsByTemplate.set(template.key, hits);
+  }
 }
 
 function addPhaseReplayHits(
@@ -1046,6 +1092,31 @@ function searchNodeTemplateKey(node: Pick<SearchOpenerBeamNode, "rows" | "hold" 
 
 function searchNodePhaseTemplateKey(node: SearchOpenerBeamNode, scenario: OpenerExperimentScenario): string {
   return rowsTemplateKey(rowsAfterPlacementPrefix(node, templatePhaseDepth(scenario.maxDepth)));
+}
+
+function searchNodeQuality(node: SearchOpenerBeamNode, index: number): OpenerScenarioReachableQuality {
+  return {
+    rank: index + 1,
+    queueIndex: node.queueIndex,
+    difficultAttack: node.difficultAttack,
+    tSpinClears: node.tSpinClears,
+    tSpinAttack: node.tSpinAttack,
+    backToBackChain: node.backToBackChain,
+    holes: node.holes
+  };
+}
+
+function meetsReplayQuality(quality: OpenerScenarioReachableQuality, target: RankedOpenerCandidate): boolean {
+  const hasFirepowerTarget = target.difficultAttack > 0 || target.tSpinClears > 0 || target.backToBackChain > 0;
+  return (
+    hasFirepowerTarget &&
+    quality.queueIndex >= target.queueIndex &&
+    quality.difficultAttack >= target.difficultAttack &&
+    quality.tSpinClears >= target.tSpinClears &&
+    quality.tSpinAttack >= target.tSpinAttack &&
+    quality.backToBackChain >= target.backToBackChain &&
+    quality.holes <= target.holes
+  );
 }
 
 function templatePhaseDepth(maxDepth: number): number {
@@ -1119,6 +1190,12 @@ function formatPhaseReplaySurvival(
   template: Pick<OpenerTemplateReplayEntry, "phaseReplayHitCount" | "phaseReplayHitRate" | "replayScenarioCount">
 ): string {
   return `${template.phaseReplayHitCount}/${template.replayScenarioCount} (${formatPercent(template.phaseReplayHitRate)})`;
+}
+
+function formatQualityReplaySurvival(
+  template: Pick<OpenerTemplateReplayEntry, "qualityReplayHitCount" | "qualityReplayHitRate" | "replayScenarioCount">
+): string {
+  return `${template.qualityReplayHitCount}/${template.replayScenarioCount} (${formatPercent(template.qualityReplayHitRate)})`;
 }
 
 function formatGroupedReplaySurvival(

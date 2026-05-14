@@ -89,3 +89,4 @@ Executable examples live in `tests/`.
 - [x] Track bag-boundary phase replay hits separately from exact final-board replay
 - [x] Reuse full phase indexes for cached replay and grouped template representatives
 - [x] Add an opt-in native setup-pool multiplier for slower high-quality TL search passes
+- [x] Report replay firepower quality hits separately from exact template reconstruction
