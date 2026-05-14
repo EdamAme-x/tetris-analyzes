@@ -2,6 +2,11 @@ import { describe, expect, test } from "bun:test";
 import type { FumenCodec, FumenUrls } from "../src/domain/fumen";
 import type { NativeBeamPlacement, NativeClearName } from "../src/infrastructure/native/binding-types";
 import {
+  createOpenerExperimentCliConfig,
+  defaultReplayTemplatePool,
+  defaultSurvivabilityReplay
+} from "../src/application/opener-experiment-cli";
+import {
   CONTINUATION_OPENER_EXPERIMENT_SCENARIOS,
   DEFAULT_OPENER_EXPERIMENT_SCENARIOS,
   DISCOVERY_OPENER_EXPERIMENT_SCENARIOS,
@@ -74,6 +79,18 @@ describe("opener experiment runner", () => {
     expect(CONTINUATION_OPENER_EXPERIMENT_SCENARIOS.every((scenario) => scenario.maxDepth === 21)).toBe(true);
     expect(CONTINUATION_OPENER_EXPERIMENT_SCENARIOS.every((scenario) => scenario.qualityGate?.minBackToBackChain === 2)).toBe(true);
     expect(CONTINUATION_OPENER_EXPERIMENT_SCENARIOS.every((scenario) => scenario.tags?.includes("three-bag"))).toBe(true);
+  });
+
+  test("defaults continuation CLI runs to wide template replay instead of firepower-only output", () => {
+    const config = createOpenerExperimentCliConfig(["--preset=continuation", "--top=3"]);
+
+    expect(defaultSurvivabilityReplay("continuation")).toBe(16);
+    expect(defaultReplayTemplatePool("continuation", 3)).toBe(512);
+    expect(config.displayTop).toBe(3);
+    expect(config.survivabilityReplay).toBe(16);
+    expect(config.replayTopTemplates).toBe(512);
+    expect(config.experimentTop).toBe(512);
+    expect(config.scenarios).toHaveLength(CONTINUATION_OPENER_EXPERIMENT_SCENARIOS.length);
   });
 
   test("measures native search scenarios and keeps top candidates linkable", () => {
