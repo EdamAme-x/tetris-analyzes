@@ -501,75 +501,86 @@ pub(crate) fn search_opener_states(
                 for shape_index in placement_shape_indices(choice.piece).iter().copied() {
                     let shape = shapes[shape_index];
                     for x in 0..=(BOARD_WIDTH as i8 - shape.width) {
-                        if let Some(placed) = place_and_clear(
-                            &state.rows,
-                            choice,
-                            shape_index,
-                            shape,
-                            x,
-                            include_placements,
-                            kick_table,
-                            spin_mode,
-                        ) {
-                            let rows = placed.rows;
-                            let metrics = board::evaluate_board_unchecked(&rows);
-                            let (firepower, firepower_event) = advance_firepower_with_combo_table(
-                                state.firepower,
-                                placed.spin,
-                                &rows,
-                                combo_table,
-                            );
-                            let score = score_state(metrics, firepower);
-                            let key = SearchKey {
-                                rows,
-                                hold: choice.hold,
-                                queue_index: choice.queue_index,
-                                combo: firepower.combo,
-                                back_to_back_chain: firepower.back_to_back_chain,
-                            };
-                            let should_insert = match next_by_key.get(&key) {
-                                Some(existing) => {
-                                    compare_search_state_to_candidate(
-                                        existing,
-                                        score,
-                                        firepower,
-                                        state.path.len() + 1,
-                                    ) == std::cmp::Ordering::Greater
-                                }
-                                None => true,
-                            };
-
-                            if should_insert {
-                                let mut path = state.path.clone();
-                                path.push(format_placement(
-                                    choice.piece,
-                                    shape.rotation,
+                        let mut can_place_below = false;
+                        for y in 0..=(BOARD_HEIGHT as i8 - shape.height) {
+                            let can_place_here = can_place(&state.rows, shape, x, y);
+                            if can_place_here && !can_place_below {
+                                let Some(placed) = place_grounded_at_y(
+                                    &state.rows,
+                                    choice,
+                                    shape_index,
+                                    shape,
                                     x,
-                                    placed.y,
-                                    choice.used_hold,
-                                ));
-                                let placements = if include_placements {
-                                    let mut placements = state.placements.clone();
-                                    if let Some(mut placement) = placed.placement {
-                                        placement.firepower = firepower_event;
-                                        placements.push(placement);
-                                    }
-                                    placements
-                                } else {
-                                    Vec::new()
+                                    y,
+                                    include_placements,
+                                    kick_table,
+                                    spin_mode,
+                                ) else {
+                                    can_place_below = can_place_here;
+                                    continue;
                                 };
-                                let next_state = SearchState {
+                                let rows = placed.rows;
+                                let metrics = board::evaluate_board_unchecked(&rows);
+                                let (firepower, firepower_event) =
+                                    advance_firepower_with_combo_table(
+                                        state.firepower,
+                                        placed.spin,
+                                        &rows,
+                                        combo_table,
+                                    );
+                                let score = score_state(metrics, firepower);
+                                let key = SearchKey {
                                     rows,
                                     hold: choice.hold,
                                     queue_index: choice.queue_index,
-                                    path,
-                                    placements,
-                                    score,
-                                    metrics,
-                                    firepower,
+                                    combo: firepower.combo,
+                                    back_to_back_chain: firepower.back_to_back_chain,
                                 };
-                                next_by_key.insert(key, next_state);
+                                let should_insert = match next_by_key.get(&key) {
+                                    Some(existing) => {
+                                        compare_search_state_to_candidate(
+                                            existing,
+                                            score,
+                                            firepower,
+                                            state.path.len() + 1,
+                                        ) == std::cmp::Ordering::Greater
+                                    }
+                                    None => true,
+                                };
+
+                                if should_insert {
+                                    let mut path = state.path.clone();
+                                    path.push(format_placement(
+                                        choice.piece,
+                                        shape.rotation,
+                                        x,
+                                        placed.y,
+                                        choice.used_hold,
+                                    ));
+                                    let placements = if include_placements {
+                                        let mut placements = state.placements.clone();
+                                        if let Some(mut placement) = placed.placement {
+                                            placement.firepower = firepower_event;
+                                            placements.push(placement);
+                                        }
+                                        placements
+                                    } else {
+                                        Vec::new()
+                                    };
+                                    let next_state = SearchState {
+                                        rows,
+                                        hold: choice.hold,
+                                        queue_index: choice.queue_index,
+                                        path,
+                                        placements,
+                                        score,
+                                        metrics,
+                                        firepower,
+                                    };
+                                    next_by_key.insert(key, next_state);
+                                }
                             }
+                            can_place_below = can_place_here;
                         }
                     }
                 }
@@ -637,64 +648,60 @@ fn piece_choices(pieces: &[Piece], state: &SearchState, hold_enabled: bool) -> V
     choices
 }
 
-fn place_and_clear(
+fn place_grounded_at_y(
     rows: &BoardRows,
     choice: PieceChoice,
     shape_index: usize,
     shape: Shape,
     x: i8,
+    y: i8,
     include_placement: bool,
     kick_table: KickTable,
     spin_mode: SpinMode,
 ) -> Option<PlacedBoard> {
-    for y in 0..=(BOARD_HEIGHT as i8 - shape.height) {
-        if can_place(rows, shape, x, y) && (y == 0 || !can_place(rows, shape, x, y - 1)) {
-            if !is_reachable_placement(rows, choice.piece, shape_index, x, y, kick_table) {
-                continue;
-            }
+    if !is_reachable_placement(rows, choice.piece, shape_index, x, y, kick_table) {
+        return None;
+    }
 
-            let mut cells = if include_placement {
-                Some(Vec::with_capacity(shape.cells.len()))
-            } else {
-                None
-            };
-            let mut placed = *rows;
-            for cell in shape.cells {
-                let absolute = Cell {
-                    x: x + cell.x,
-                    y: y + cell.y,
-                };
-                let row_index = usize::try_from(absolute.y).ok()?;
-                let column = u32::try_from(absolute.x).ok()?;
-                placed[row_index] |= 1_u16 << column;
-                if let Some(cells) = &mut cells {
-                    cells.push(absolute);
-                }
-            }
-            let cleared_lines = board::count_full_lines_array(&placed);
-            let spin = apply_spin_mode(
-                detect_spin(&placed, choice.piece, shape, x, y, cleared_lines),
-                choice.piece,
-                spin_mode,
-            );
-            return Some(PlacedBoard {
-                rows: board::clear_full_lines_array(placed),
-                y,
-                spin,
-                placement: cells.map(|cells| Placement {
-                    piece: choice.piece,
-                    rotation: shape.rotation,
-                    x,
-                    y,
-                    used_hold: choice.used_hold,
-                    cells,
-                    spin,
-                    firepower: FirepowerEvent::empty(),
-                }),
-            });
+    let mut cells = if include_placement {
+        Some(Vec::with_capacity(shape.cells.len()))
+    } else {
+        None
+    };
+    let mut placed = *rows;
+    for cell in shape.cells {
+        let absolute = Cell {
+            x: x + cell.x,
+            y: y + cell.y,
+        };
+        let row_index = usize::try_from(absolute.y).ok()?;
+        let column = u32::try_from(absolute.x).ok()?;
+        placed[row_index] |= 1_u16 << column;
+        if let Some(cells) = &mut cells {
+            cells.push(absolute);
         }
     }
-    None
+    let cleared_lines = board::count_full_lines_array(&placed);
+    let spin = apply_spin_mode(
+        detect_spin(&placed, choice.piece, shape, x, y, cleared_lines),
+        choice.piece,
+        spin_mode,
+    );
+    Some(PlacedBoard {
+        rows: board::clear_full_lines_array(placed),
+        y,
+        spin,
+        placement: cells.map(|cells| Placement {
+            piece: choice.piece,
+            rotation: shape.rotation,
+            x,
+            y,
+            used_hold: choice.used_hold,
+            cells,
+            spin,
+            firepower: FirepowerEvent::empty(),
+        }),
+    })
 }
 
 fn compare_search_state(left: &SearchState, right: &SearchState) -> std::cmp::Ordering {
@@ -736,7 +743,11 @@ fn compare_search_state_to_candidate(
     right_firepower
         .t_spin_clears
         .cmp(&left.firepower.t_spin_clears)
-        .then_with(|| right_firepower.t_spin_attack.cmp(&left.firepower.t_spin_attack))
+        .then_with(|| {
+            right_firepower
+                .t_spin_attack
+                .cmp(&left.firepower.t_spin_attack)
+        })
         .then_with(|| {
             right_firepower
                 .difficult_clears

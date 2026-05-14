@@ -1,10 +1,11 @@
-use std::collections::{HashSet, VecDeque};
-
 use napi::bindgen_prelude::{Error, Result};
 
 use crate::board::{BoardRows, BOARD_HEIGHT, BOARD_WIDTH};
 use crate::pieces::{piece_shapes, Piece, Shape};
 use crate::tetrio_tables::{kick_table_from_key, kick_table_offsets, Kick, KickGroup, KickTable};
+
+const MOVEMENT_ROTATION_CAPACITY: usize = 4;
+const MOVEMENT_STATE_CAPACITY: usize = MOVEMENT_ROTATION_CAPACITY * BOARD_WIDTH * BOARD_HEIGHT;
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub(crate) struct MovementState {
@@ -43,11 +44,15 @@ pub(crate) fn is_reachable_placement(
         return true;
     }
 
-    let mut visited = HashSet::new();
-    let mut queue = VecDeque::from([spawn]);
-    visited.insert(spawn);
+    let mut visited = [false; MOVEMENT_STATE_CAPACITY];
+    let mut queue = [spawn; MOVEMENT_STATE_CAPACITY];
+    let mut head = 0_usize;
+    let mut tail = 0_usize;
+    push_known_movement_state(spawn, &mut visited, &mut queue, &mut tail);
 
-    while let Some(state) = queue.pop_front() {
+    while head < tail {
+        let state = queue[head];
+        head += 1;
         if state == target
             || (state.x == target_x
                 && state.y == target_y
@@ -59,32 +64,32 @@ pub(crate) fn is_reachable_placement(
         push_movement_state(
             rows,
             shapes,
-            state,
             state.shape_index,
             state.x - 1,
             state.y,
             &mut visited,
             &mut queue,
+            &mut tail,
         );
         push_movement_state(
             rows,
             shapes,
-            state,
             state.shape_index,
             state.x + 1,
             state.y,
             &mut visited,
             &mut queue,
+            &mut tail,
         );
         push_movement_state(
             rows,
             shapes,
-            state,
             state.shape_index,
             state.x,
             state.y - 1,
             &mut visited,
             &mut queue,
+            &mut tail,
         );
         push_rotation_states(
             rows,
@@ -95,6 +100,7 @@ pub(crate) fn is_reachable_placement(
             kick_table,
             &mut visited,
             &mut queue,
+            &mut tail,
         );
         push_rotation_states(
             rows,
@@ -105,6 +111,7 @@ pub(crate) fn is_reachable_placement(
             kick_table,
             &mut visited,
             &mut queue,
+            &mut tail,
         );
         push_rotation_states(
             rows,
@@ -115,6 +122,7 @@ pub(crate) fn is_reachable_placement(
             kick_table,
             &mut visited,
             &mut queue,
+            &mut tail,
         );
     }
 
@@ -141,12 +149,12 @@ pub(crate) fn has_clear_vertical_drop(rows: &BoardRows, shape: Shape, x: i8, tar
 pub(crate) fn push_movement_state(
     rows: &BoardRows,
     shapes: &[Shape],
-    _from: MovementState,
     shape_index: usize,
     x: i8,
     y: i8,
-    visited: &mut HashSet<MovementState>,
-    queue: &mut VecDeque<MovementState>,
+    visited: &mut [bool; MOVEMENT_STATE_CAPACITY],
+    queue: &mut [MovementState; MOVEMENT_STATE_CAPACITY],
+    tail: &mut usize,
 ) {
     if y < 0 {
         return;
@@ -157,9 +165,7 @@ pub(crate) fn push_movement_state(
     }
 
     let next = MovementState { shape_index, x, y };
-    if visited.insert(next) {
-        queue.push_back(next);
-    }
+    push_known_movement_state(next, visited, queue, tail);
 }
 
 pub(crate) fn push_rotation_states(
@@ -169,8 +175,9 @@ pub(crate) fn push_rotation_states(
     state: MovementState,
     direction: i8,
     kick_table: KickTable,
-    visited: &mut HashSet<MovementState>,
-    queue: &mut VecDeque<MovementState>,
+    visited: &mut [bool; MOVEMENT_STATE_CAPACITY],
+    queue: &mut [MovementState; MOVEMENT_STATE_CAPACITY],
+    tail: &mut usize,
 ) {
     if shapes.len() <= 1 {
         return;
@@ -195,11 +202,43 @@ pub(crate) fn push_rotation_states(
                 x,
                 y,
             };
-            if visited.insert(next) {
-                queue.push_back(next);
-            }
+            push_known_movement_state(next, visited, queue, tail);
         }
     }
+}
+
+fn push_known_movement_state(
+    state: MovementState,
+    visited: &mut [bool; MOVEMENT_STATE_CAPACITY],
+    queue: &mut [MovementState; MOVEMENT_STATE_CAPACITY],
+    tail: &mut usize,
+) {
+    let Some(index) = movement_state_index(state) else {
+        return;
+    };
+    if visited[index] || *tail >= queue.len() {
+        return;
+    }
+    visited[index] = true;
+    queue[*tail] = state;
+    *tail += 1;
+}
+
+fn movement_state_index(state: MovementState) -> Option<usize> {
+    if state.shape_index >= MOVEMENT_ROTATION_CAPACITY
+        || state.x < 0
+        || state.x >= BOARD_WIDTH as i8
+        || state.y < 0
+        || state.y >= BOARD_HEIGHT as i8
+    {
+        return None;
+    }
+
+    Some(
+        state.shape_index * BOARD_WIDTH * BOARD_HEIGHT
+            + state.y as usize * BOARD_WIDTH
+            + state.x as usize,
+    )
 }
 
 pub(crate) fn parse_kick_table(input: &str) -> Result<KickTable> {

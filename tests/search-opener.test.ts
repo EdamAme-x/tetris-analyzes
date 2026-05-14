@@ -6,7 +6,8 @@ import {
   evaluateOpenerBag,
   evaluateOpenerFirepower,
   searchOpenerBeam,
-  searchOpenerBeamWithPlacements
+  searchOpenerBeamWithPlacements,
+  type SearchPiece
 } from "../src/application/search-opener";
 import { TETRIO_COMBO_ATTACK_TABLES, TETRIO_GARBAGE_ATTACK_TABLE, TETRIO_SCORING_TABLE } from "../src/domain/tetrio-tables";
 import { bitBoardFromRows } from "../src/infrastructure/bitboard/native-bitboard";
@@ -337,8 +338,55 @@ describe("native opener beam search", () => {
     expect(tightTop?.placements.some((placement) => placement.clearName === "TSPIN_SINGLE")).toBe(true);
   });
 
+  test("only emits placement histories reachable from each intermediate board", () => {
+    const input = {
+      queue: "JLSTZIOT",
+      beamWidth: 32,
+      hold: true,
+      maxDepth: 5,
+      kickTable: "SRS-X",
+      spinMode: "ALL-SPINS",
+      comboTable: "MULTIPLIER"
+    } as const;
+    const nodes = searchOpenerBeamWithPlacements(input);
+
+    for (const node of nodes.slice(0, 8)) {
+      let rows = new Array<number>(20).fill(0);
+      for (const placement of node.placements) {
+        expect(
+          canReachOpenerPlacement({
+            rows: bitBoardFromRows(rows),
+            piece: placement.piece as SearchPiece,
+            rotation: placement.rotation,
+            x: placement.x,
+            y: placement.y,
+            kickTable: input.kickTable
+          })
+        ).toBe(true);
+
+        rows = clearFullRows(lockCells(rows, placement.cells));
+      }
+    }
+  });
+
   test("rejects invalid queues before searching", () => {
     expect(() => searchOpenerBeam({ queue: "TX", beamWidth: 8 })).toThrow("Unknown tetromino");
     expect(() => evaluateOpenerBag({ bag: "TT" })).toThrow("must not repeat");
   });
 });
+
+function lockCells(rows: readonly number[], cells: readonly { readonly x: number; readonly y: number }[]): number[] {
+  const output = [...rows];
+  for (const cell of cells) {
+    output[cell.y] = (output[cell.y] ?? 0) | (1 << cell.x);
+  }
+  return output;
+}
+
+function clearFullRows(rows: readonly number[]): number[] {
+  const output = rows.filter((row) => row !== 0b1111111111);
+  while (output.length < 20) {
+    output.push(0);
+  }
+  return output;
+}
