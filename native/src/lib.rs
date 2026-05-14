@@ -1,6 +1,6 @@
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
-use std::collections::HashMap;
+use std::collections::{hash_map::Entry, HashMap};
 use std::hash::{BuildHasherDefault, Hash, Hasher};
 
 mod bag;
@@ -677,52 +677,41 @@ pub(crate) fn search_opener_states(
                                     combo: firepower.combo,
                                     back_to_back_chain: firepower.back_to_back_chain,
                                 };
-                                let should_insert = match next_by_key.get(&key) {
-                                    Some(existing) => {
-                                        compare_search_state_to_candidate(
-                                            existing,
+                                match next_by_key.entry(key) {
+                                    Entry::Occupied(mut entry) => {
+                                        if compare_search_state_to_candidate(
+                                            entry.get(),
                                             score,
                                             firepower,
                                             state.path.len() + 1,
                                         ) == std::cmp::Ordering::Greater
-                                    }
-                                    None => true,
-                                };
-
-                                if should_insert {
-                                    let mut path = Vec::with_capacity(state.path.len() + 1);
-                                    path.extend_from_slice(&state.path);
-                                    path.push(PlacementStep {
-                                        piece: choice.piece,
-                                        rotation: shape.rotation,
-                                        x,
-                                        y: placed.y,
-                                        used_hold: choice.used_hold,
-                                    });
-                                    let placements = if include_placements {
-                                        let mut placements =
-                                            Vec::with_capacity(state.placements.len() + 1);
-                                        placements.extend_from_slice(&state.placements);
-                                        if let Some(mut placement) = placed.placement {
-                                            placement.firepower = firepower_event;
-                                            placements.push(placement);
+                                        {
+                                            entry.insert(build_next_search_state(
+                                                state,
+                                                choice,
+                                                shape,
+                                                x,
+                                                placed,
+                                                metrics,
+                                                firepower,
+                                                firepower_event,
+                                                score,
+                                            ));
                                         }
-                                        placements
-                                    } else {
-                                        Vec::new()
-                                    };
-                                    let next_state = SearchState {
-                                        rows,
-                                        hold: choice.hold,
-                                        queue_index: choice.queue_index,
-                                        path,
-                                        placements,
-                                        score,
-                                        metrics,
-                                        firepower,
-                                        t_spin_potential,
-                                    };
-                                    next_by_key.insert(key, next_state);
+                                    }
+                                    Entry::Vacant(entry) => {
+                                        entry.insert(build_next_search_state(
+                                            state,
+                                            choice,
+                                            shape,
+                                            x,
+                                            placed,
+                                            metrics,
+                                            firepower,
+                                            firepower_event,
+                                            score,
+                                        ));
+                                    }
                                 }
                             }
                             can_place_below = can_place_here;
@@ -750,6 +739,48 @@ pub(crate) fn search_opener_states(
 
     beam.sort_by(compare_search_state);
     beam
+}
+
+fn build_next_search_state(
+    state: &SearchState,
+    choice: PieceChoice,
+    shape: Shape,
+    x: i8,
+    placed: PlacedBoard,
+    metrics: BoardEvaluation,
+    firepower: FirepowerState,
+    firepower_event: FirepowerEvent,
+    score: f64,
+) -> SearchState {
+    let mut path = Vec::with_capacity(state.path.len() + 1);
+    path.extend_from_slice(&state.path);
+    path.push(PlacementStep {
+        piece: choice.piece,
+        rotation: shape.rotation,
+        x,
+        y: placed.y,
+        used_hold: choice.used_hold,
+    });
+
+    let mut placements = Vec::new();
+    if let Some(mut placement) = placed.placement {
+        placements = Vec::with_capacity(state.placements.len() + 1);
+        placements.extend_from_slice(&state.placements);
+        placement.firepower = firepower_event;
+        placements.push(placement);
+    }
+
+    SearchState {
+        rows: placed.rows,
+        hold: choice.hold,
+        queue_index: choice.queue_index,
+        path,
+        placements,
+        score,
+        metrics,
+        firepower,
+        t_spin_potential: 0,
+    }
 }
 
 fn retain_best_search_states(beam: &mut Vec<SearchState>, beam_width: usize) {
