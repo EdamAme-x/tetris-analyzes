@@ -480,6 +480,8 @@ describe("native opener beam search", () => {
   test("rejects invalid queues before searching", () => {
     expect(() => searchOpenerBeam({ queue: "TX", beamWidth: 8 })).toThrow("Unknown tetromino");
     expect(() => evaluateOpenerBag({ bag: "TT" })).toThrow("must not repeat");
+    expect(() => searchOpenerBeam({ queue: "TIL", setupPoolMultiplier: 26 })).not.toThrow();
+    expect(() => searchOpenerBeam({ queue: "TIL", setupPoolMultiplier: 0 })).toThrow("setupPoolMultiplier");
   });
 });
 

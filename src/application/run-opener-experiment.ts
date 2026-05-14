@@ -17,6 +17,7 @@ export interface OpenerExperimentScenario {
   readonly hold: boolean;
   readonly beamWidth: number;
   readonly maxDepth: number;
+  readonly setupPoolMultiplier?: number;
   readonly rules?: OpenerExperimentSearchRules;
   readonly qualityGate?: OpenerExperimentQualityGate;
   readonly warmups?: number;
@@ -131,6 +132,7 @@ export interface OpenerExperimentScenarioResult {
   readonly rules: OpenerExperimentSearchRules;
   readonly beamWidth: number;
   readonly maxDepth: number;
+  readonly setupPoolMultiplier?: number;
   readonly qualityGate?: OpenerExperimentQualityGate;
   readonly warmups: number;
   readonly iterations: number;
@@ -450,8 +452,8 @@ export function renderOpenerExperimentMarkdown(report: OpenerExperimentReport): 
     "",
     "## Search run",
     "",
-    "| name | queue | hold | spins | combo | kicks | beam | depth | median ms | searches/s | nodes | quality gate |",
-    "| --- | --- | ---: | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | --- |"
+    "| name | queue | hold | spins | combo | kicks | beam | depth | setup pool | median ms | searches/s | nodes | quality gate |",
+    "| --- | --- | ---: | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |"
   );
 
   for (const scenario of report.scenarios) {
@@ -465,6 +467,7 @@ export function renderOpenerExperimentMarkdown(report: OpenerExperimentReport): 
         scenario.rules.kickTable,
         String(scenario.beamWidth),
         String(scenario.maxDepth),
+        String(scenario.setupPoolMultiplier ?? 14),
         scenario.medianMs.toFixed(3),
         scenario.searchesPerSecond.toFixed(1),
         String(scenario.resultCount),
@@ -755,6 +758,7 @@ function runScenario(
     rules,
     beamWidth: scenario.beamWidth,
     maxDepth: scenario.maxDepth,
+    ...(scenario.setupPoolMultiplier === undefined ? {} : { setupPoolMultiplier: scenario.setupPoolMultiplier }),
     ...(scenario.qualityGate === undefined ? {} : { qualityGate: scenario.qualityGate }),
     warmups,
     iterations,
@@ -779,7 +783,8 @@ function searchInput(scenario: OpenerExperimentScenario): SearchOpenerBeamInput 
     maxDepth: scenario.maxDepth,
     spinMode: rules.spinMode,
     comboTable: rules.comboTable,
-    kickTable: rules.kickTable
+    kickTable: rules.kickTable,
+    ...(scenario.setupPoolMultiplier === undefined ? {} : { setupPoolMultiplier: scenario.setupPoolMultiplier })
   };
 }
 
@@ -789,13 +794,25 @@ function scenarioRules(scenario: OpenerExperimentScenario): OpenerExperimentSear
 
 function scenarioSignature(scenario: OpenerExperimentScenario): string {
   const rules = scenarioRules(scenario);
-  return [scenario.queue, String(scenario.hold), String(scenario.beamWidth), String(scenario.maxDepth), formatRules(rules)].join("|");
+  return [
+    scenario.queue,
+    String(scenario.hold),
+    String(scenario.beamWidth),
+    String(scenario.maxDepth),
+    String(scenario.setupPoolMultiplier ?? 14),
+    formatRules(rules)
+  ].join("|");
 }
 
 function scenarioResultSignature(scenario: OpenerExperimentScenarioResult): string {
-  return [scenario.queue, String(scenario.hold), String(scenario.beamWidth), String(scenario.maxDepth), formatRules(scenario.rules)].join(
-    "|"
-  );
+  return [
+    scenario.queue,
+    String(scenario.hold),
+    String(scenario.beamWidth),
+    String(scenario.maxDepth),
+    String(scenario.setupPoolMultiplier ?? 14),
+    formatRules(scenario.rules)
+  ].join("|");
 }
 
 function createReachableTemplates(nodes: readonly SearchOpenerBeamNode[]): OpenerScenarioReachableTemplate[] {

@@ -34,6 +34,8 @@ use spin::{
 use tetrio_tables::{ComboTable, KickTable};
 
 type FastHashMap<K, V> = HashMap<K, V, BuildHasherDefault<FastHasher>>;
+pub(crate) const DEFAULT_SETUP_CANDIDATE_POOL_MULTIPLIER: usize = 14;
+const MAX_SETUP_CANDIDATE_POOL_MULTIPLIER: usize = 64;
 
 #[derive(Default)]
 struct FastHasher {
@@ -517,6 +519,7 @@ pub fn search_opener_beam(
     combo_table: Option<String>,
     kick_table: Option<String>,
     spin_mode: Option<String>,
+    setup_pool_multiplier: Option<u32>,
 ) -> Result<Vec<BeamSearchNode>> {
     search_opener_beam_internal(
         queue,
@@ -527,6 +530,7 @@ pub fn search_opener_beam(
         combo_table,
         kick_table,
         spin_mode,
+        setup_pool_multiplier,
     )
 }
 
@@ -539,6 +543,7 @@ pub fn search_opener_beam_with_placements(
     combo_table: Option<String>,
     kick_table: Option<String>,
     spin_mode: Option<String>,
+    setup_pool_multiplier: Option<u32>,
 ) -> Result<Vec<BeamSearchNode>> {
     search_opener_beam_internal(
         queue,
@@ -549,6 +554,7 @@ pub fn search_opener_beam_with_placements(
         combo_table,
         kick_table,
         spin_mode,
+        setup_pool_multiplier,
     )
 }
 
@@ -589,6 +595,7 @@ fn search_opener_beam_internal(
     combo_table: Option<String>,
     kick_table: Option<String>,
     spin_mode: Option<String>,
+    setup_pool_multiplier: Option<u32>,
 ) -> Result<Vec<BeamSearchNode>> {
     let pieces = parse_queue(&queue)?;
     let max_depth = usize::min(max_depth as usize, pieces.len());
@@ -596,6 +603,7 @@ fn search_opener_beam_internal(
     let combo_table = parse_optional_combo_table(combo_table.as_deref())?;
     let kick_table = parse_optional_kick_table(kick_table.as_deref())?;
     let spin_mode = parse_optional_spin_mode(spin_mode.as_deref())?;
+    let setup_pool_multiplier = validate_setup_candidate_pool_multiplier(setup_pool_multiplier)?;
 
     Ok(search_opener_states(
         &pieces,
@@ -606,6 +614,7 @@ fn search_opener_beam_internal(
         combo_table,
         kick_table,
         spin_mode,
+        setup_pool_multiplier,
     )
     .into_iter()
     .map(BeamSearchNode::from)
@@ -621,6 +630,7 @@ pub(crate) fn search_opener_states(
     combo_table: ComboTable,
     kick_table: KickTable,
     spin_mode: SpinMode,
+    setup_pool_multiplier: usize,
 ) -> Vec<SearchState> {
     let future_pieces_by_queue_index = build_future_pieces_by_queue_index(pieces);
     let empty_rows = [0_u16; BOARD_HEIGHT];
@@ -641,7 +651,7 @@ pub(crate) fn search_opener_states(
 
     for _depth in 0..max_depth {
         let mut next_by_key = FastHashMap::<SearchKey, SearchState>::with_capacity_and_hasher(
-            next_search_map_capacity(beam.len(), beam_width, hold_enabled),
+            next_search_map_capacity(beam.len(), beam_width, hold_enabled, setup_pool_multiplier),
             BuildHasherDefault::<FastHasher>::default(),
         );
 
@@ -741,7 +751,10 @@ pub(crate) fn search_opener_states(
         }
 
         beam = next_by_key.into_values().collect();
-        retain_best_search_states(&mut beam, setup_candidate_pool_width(beam_width));
+        retain_best_search_states(
+            &mut beam,
+            setup_candidate_pool_width(beam_width, setup_pool_multiplier),
+        );
         score_t_spin_setup_potential(
             &mut beam,
             &future_pieces_by_queue_index,
@@ -811,14 +824,20 @@ fn retain_best_search_states(beam: &mut Vec<SearchState>, beam_width: usize) {
     beam.truncate(beam_width);
 }
 
-fn setup_candidate_pool_width(beam_width: usize) -> usize {
-    beam_width.saturating_mul(14).max(beam_width)
+fn setup_candidate_pool_width(beam_width: usize, multiplier: usize) -> usize {
+    beam_width.saturating_mul(multiplier).max(beam_width)
 }
 
-fn next_search_map_capacity(active_states: usize, beam_width: usize, hold_enabled: bool) -> usize {
+fn next_search_map_capacity(
+    active_states: usize,
+    beam_width: usize,
+    hold_enabled: bool,
+    setup_pool_multiplier: usize,
+) -> usize {
     let choices_per_state = if hold_enabled { 2 } else { 1 };
     let state_expansion_hint = active_states.saturating_mul(choices_per_state * 40);
-    let prune_pool_hint = setup_candidate_pool_width(beam_width).saturating_mul(8);
+    let prune_pool_hint =
+        setup_candidate_pool_width(beam_width, setup_pool_multiplier).saturating_mul(8);
     state_expansion_hint.min(prune_pool_hint).max(beam_width)
 }
 
@@ -1124,6 +1143,18 @@ pub(crate) fn validate_beam_width(beam_width: u32) -> Result<usize> {
         .ok()
         .filter(|width| *width > 0)
         .ok_or_else(|| Error::from_reason(format!("beamWidth must be positive, got {beam_width}.")))
+}
+
+fn validate_setup_candidate_pool_multiplier(multiplier: Option<u32>) -> Result<usize> {
+    let multiplier = multiplier.unwrap_or(DEFAULT_SETUP_CANDIDATE_POOL_MULTIPLIER as u32);
+    usize::try_from(multiplier)
+        .ok()
+        .filter(|value| (1..=MAX_SETUP_CANDIDATE_POOL_MULTIPLIER).contains(value))
+        .ok_or_else(|| {
+            Error::from_reason(format!(
+                "setupPoolMultiplier must be between 1 and {MAX_SETUP_CANDIDATE_POOL_MULTIPLIER}, got {multiplier}."
+            ))
+        })
 }
 
 fn parse_optional_combo_table(input: Option<&str>) -> Result<ComboTable> {

@@ -5,7 +5,7 @@ use crate::firepower::firepower_score;
 use crate::pieces::{parse_queue, piece_name, Piece};
 use crate::spin::SpinMode;
 use crate::tetrio_tables::{ComboTable, KickTable};
-use crate::{search_opener_states, validate_beam_width, SearchState};
+use crate::{search_opener_states, validate_beam_width, SearchState, DEFAULT_SETUP_CANDIDATE_POOL_MULTIPLIER};
 
 const BAG_SAMPLE_MULTIPLIER: usize = 197;
 
@@ -95,6 +95,7 @@ pub(crate) fn evaluate_opener_bag_internal(
             combo_table,
             kick_table,
             spin_mode,
+            DEFAULT_SETUP_CANDIDATE_POOL_MULTIPLIER,
         );
         evaluations.push(evaluate_queue(
             queue_to_string(&queue),

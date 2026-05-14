@@ -87,6 +87,7 @@ describe("opener experiment runner", () => {
           hold: true,
           beamWidth: 8,
           maxDepth: 2,
+          setupPoolMultiplier: 26,
           warmups: 1,
           iterations: 3,
           top: 1
@@ -103,7 +104,8 @@ describe("opener experiment runner", () => {
           maxDepth: 2,
           spinMode: "T-SPINS",
           comboTable: "MULTIPLIER",
-          kickTable: "SRS+"
+          kickTable: "SRS+",
+          setupPoolMultiplier: 26
         });
         return [
           {
@@ -138,6 +140,7 @@ describe("opener experiment runner", () => {
     expect(report.generatedAt).toBe("2026-05-14T00:00:00.000Z");
     expect(report.scenarios[0]?.medianMs).toBe(5);
     expect(report.scenarios[0]?.searchesPerSecond).toBe(200);
+    expect(report.scenarios[0]?.setupPoolMultiplier).toBe(26);
     expect(report.scenarios[0]?.top[0]?.previewUrl).toBe(urls.view);
     expect(report.scenarios[0]?.top[0]?.urls.view).toBe(urls.view);
   });
@@ -190,7 +193,7 @@ describe("opener experiment runner", () => {
     expect(markdown).toContain("Rules: spins=T-SPINS, combo=MULTIPLIER, kicks=SRS+");
     expect(markdown).toContain("## Best openers");
     expect(markdown).toContain("## Template survivability");
-    expect(markdown).toContain("fake-scenario | TI | false | T-SPINS | MULTIPLIER | SRS+ | 4 | 1 | 2.000");
+    expect(markdown).toContain("fake-scenario | TI | false | T-SPINS | MULTIPLIER | SRS+ | 4 | 1 | 14 | 2.000");
     expect(markdown).toContain("quality gate");
     expect(markdown).toContain("## Candidate details");
     expect(markdown).toContain("[view](https://fumen.zui.jp/?m115@test)");
@@ -222,7 +225,7 @@ describe("opener experiment runner", () => {
 
     const markdown = renderOpenerExperimentMarkdown(report);
     expect(markdown).toContain("Rules: spins=NONE, combo=NONE, kicks=NONE");
-    expect(markdown).toContain("custom-rules | TI | false | NONE | NONE | NONE | 4 | 1 | 2.000");
+    expect(markdown).toContain("custom-rules | TI | false | NONE | NONE | NONE | 4 | 1 | 14 | 2.000");
   });
 
   test("fails opener experiments when a scenario quality gate is missed", () => {

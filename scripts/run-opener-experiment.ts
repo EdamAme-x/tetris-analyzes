@@ -15,7 +15,11 @@ const args = parseArgs(process.argv.slice(2));
 const outDir = args.get("--out-dir") ?? "experiments/runs";
 const top = readNumberOption(args, "--top");
 const preset = args.get("--preset") ?? "default";
-const scenarios = scenarioPreset(preset);
+const setupPoolMultiplier = readNumberOption(args, "--setup-pool-multiplier");
+const scenarios = scenarioPreset(preset).map((scenario) => ({
+  ...scenario,
+  ...(setupPoolMultiplier === undefined ? {} : { setupPoolMultiplier })
+}));
 const survivabilityReplay = readNonNegativeNumberOption(args, "--survivability-replay") ?? defaultSurvivabilityReplay(preset);
 const displayTop = top ?? 5;
 const replayTopTemplates = readNumberOption(args, "--replay-top-templates") ?? defaultReplayTemplatePool(preset, displayTop);
@@ -49,7 +53,14 @@ console.log(`full report: ${join(outDir, `${filenameBase}.md`)}`);
 console.log(`json: ${join(outDir, `${filenameBase}.json`)}`);
 
 function parseArgs(argv: readonly string[]): Map<string, string> {
-  const allowed = new Set(["--out-dir", "--top", "--preset", "--survivability-replay", "--replay-top-templates"]);
+  const allowed = new Set([
+    "--out-dir",
+    "--top",
+    "--preset",
+    "--survivability-replay",
+    "--replay-top-templates",
+    "--setup-pool-multiplier"
+  ]);
   const parsed = new Map<string, string>();
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];

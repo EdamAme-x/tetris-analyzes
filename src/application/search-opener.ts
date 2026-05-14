@@ -20,6 +20,7 @@ export interface SearchOpenerBeamInput {
   readonly comboTable?: NativeComboTable;
   readonly kickTable?: NativeKickTable;
   readonly spinMode?: NativeSpinMode;
+  readonly setupPoolMultiplier?: number;
 }
 
 export interface EvaluateOpenerBagInput {
@@ -56,7 +57,8 @@ export function searchOpenerBeam(input: SearchOpenerBeamInput): SearchOpenerBeam
     input.maxDepth ?? queue.length,
     input.comboTable,
     input.kickTable,
-    input.spinMode
+    input.spinMode,
+    input.setupPoolMultiplier
   );
 }
 
@@ -69,7 +71,8 @@ export function searchOpenerBeamWithPlacements(input: SearchOpenerBeamInput): Se
     input.maxDepth ?? queue.length,
     input.comboTable,
     input.kickTable,
-    input.spinMode
+    input.spinMode,
+    input.setupPoolMultiplier
   );
 }
 

@@ -13,6 +13,7 @@ bun run experiment:opener
 bun run experiment:opener -- --preset=survey --top=5
 bun run experiment:opener -- --preset=discovery --top=5
 bun run experiment:opener -- --preset=continuation --top=3
+bun run experiment:opener -- --preset=continuation --top=1 --setup-pool-multiplier=26
 ```
 
 `experiment:opener` writes JSON/Markdown reports with fumen preview URLs under `experiments/runs/`.
@@ -87,3 +88,4 @@ Executable examples live in `tests/`.
 - [x] Keep console top compact while using a wider internal replay template pool
 - [x] Track bag-boundary phase replay hits separately from exact final-board replay
 - [x] Reuse full phase indexes for cached replay and grouped template representatives
+- [x] Add an opt-in native setup-pool multiplier for slower high-quality TL search passes

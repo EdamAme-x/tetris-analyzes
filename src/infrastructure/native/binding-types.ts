@@ -196,7 +196,8 @@ export interface NativeBinding {
     maxDepth: number,
     comboTable?: NativeComboTable,
     kickTable?: NativeKickTable,
-    spinMode?: NativeSpinMode
+    spinMode?: NativeSpinMode,
+    setupPoolMultiplier?: number
   ): NativeBeamSearchNode[];
   searchOpenerBeamWithPlacements(
     queue: string,
@@ -205,7 +206,8 @@ export interface NativeBinding {
     maxDepth: number,
     comboTable?: NativeComboTable,
     kickTable?: NativeKickTable,
-    spinMode?: NativeSpinMode
+    spinMode?: NativeSpinMode,
+    setupPoolMultiplier?: number
   ): NativeBeamSearchNode[];
   evaluateOpenerBag(
     bag: string,
