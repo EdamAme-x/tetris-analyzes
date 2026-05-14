@@ -755,6 +755,12 @@ fn compare_search_state(left: &SearchState, right: &SearchState) -> std::cmp::Or
         .then_with(|| {
             right
                 .firepower
+                .difficult_attack
+                .cmp(&left.firepower.difficult_attack)
+        })
+        .then_with(|| {
+            right
+                .firepower
                 .back_to_back_chain
                 .cmp(&left.firepower.back_to_back_chain)
         })
@@ -784,6 +790,11 @@ fn compare_search_state_to_candidate(
             right_firepower
                 .difficult_clears
                 .cmp(&left.firepower.difficult_clears)
+        })
+        .then_with(|| {
+            right_firepower
+                .difficult_attack
+                .cmp(&left.firepower.difficult_attack)
         })
         .then_with(|| {
             right_firepower

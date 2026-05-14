@@ -16,6 +16,7 @@ pub(crate) struct FirepowerState {
     pub(crate) back_to_back_chain: u32,
     pub(crate) all_clears: u32,
     pub(crate) difficult_clears: u32,
+    pub(crate) difficult_attack: u32,
     pub(crate) t_spin_clears: u32,
     pub(crate) t_spin_attack: u32,
 }
@@ -43,6 +44,7 @@ impl FirepowerState {
             back_to_back_chain: 0,
             all_clears: 0,
             difficult_clears: 0,
+            difficult_attack: 0,
             t_spin_clears: 0,
             t_spin_attack: 0,
         }
@@ -70,11 +72,14 @@ pub(crate) fn score_state(
     firepower: FirepowerState,
     t_spin_potential: u32,
 ) -> f64 {
-    firepower_score(firepower) + t_spin_setup_score(t_spin_potential) + board_shape_score(metrics)
+    firepower_score(firepower)
+        + t_spin_setup_score(t_spin_potential, firepower.back_to_back_chain)
+        + board_shape_score(metrics)
 }
 
 pub(crate) fn firepower_score(firepower: FirepowerState) -> f64 {
     firepower.attack as f64 * 1_000.0
+        + firepower.difficult_attack as f64 * 900.0
         + firepower.t_spin_attack as f64 * 1_500.0
         + firepower.t_spin_clears as f64 * 3_000.0
         + firepower.difficult_clears as f64 * 1_750.0
@@ -92,8 +97,19 @@ pub(crate) fn board_shape_score(metrics: BoardEvaluation) -> f64 {
     cleared_lines * 120.0 - holes * 90.0 - aggregate_height * 2.2 - bumpiness * 7.0
 }
 
-fn t_spin_setup_score(t_spin_potential: u32) -> f64 {
-    f64::from(t_spin_potential) * 2_200.0
+fn t_spin_setup_score(t_spin_potential: u32, back_to_back_chain: u32) -> f64 {
+    if t_spin_potential == 0 {
+        return 0.0;
+    }
+
+    let potential = f64::from(t_spin_potential);
+    let base = potential * 2_200.0;
+    if back_to_back_chain == 0 {
+        return base;
+    }
+
+    let chain_bonus = f64::from(back_to_back_chain.min(5)) * 450.0;
+    base + potential * (1_800.0 + chain_bonus)
 }
 
 pub(crate) fn estimate_t_spin_potential(rows: &BoardRows, kick_table: KickTable) -> u32 {
@@ -244,6 +260,8 @@ pub(crate) fn advance_firepower_for_clear_with_combo_table(
             back_to_back_chain,
             all_clears,
             difficult_clears: previous.difficult_clears + u32::from(difficult_clear),
+            difficult_attack: previous.difficult_attack
+                + if difficult_clear { event_attack } else { 0 },
             t_spin_clears: previous.t_spin_clears + u32::from(t_spin_clear),
             t_spin_attack: previous.t_spin_attack + if t_spin_clear { event_attack } else { 0 },
         },
@@ -369,4 +387,51 @@ fn normalize_table_key(input: &str) -> String {
         .split_whitespace()
         .collect::<Vec<_>>()
         .join(" ")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn flat_metrics() -> BoardEvaluation {
+        [0, 0, 0, 0, 0]
+    }
+
+    #[test]
+    fn tracks_difficult_attack_separately_from_plain_attack() {
+        let (double_state, double_event) = advance_firepower_for_clear_with_combo_table(
+            FirepowerState::empty(),
+            ClearKind::Double,
+            2,
+            false,
+            ComboTable::Multiplier,
+        );
+        let (quad_state, quad_event) = advance_firepower_for_clear_with_combo_table(
+            FirepowerState::empty(),
+            ClearKind::Quad,
+            4,
+            false,
+            ComboTable::Multiplier,
+        );
+
+        assert_eq!(double_event.attack, 1);
+        assert_eq!(double_state.difficult_attack, 0);
+        assert_eq!(quad_event.attack, 4);
+        assert_eq!(quad_state.difficult_attack, 4);
+        assert!(firepower_score(quad_state) > firepower_score(double_state) * 4.0);
+    }
+
+    #[test]
+    fn active_b2b_chain_increases_t_spin_setup_value() {
+        let quiet = FirepowerState::empty();
+        let mut b2b_ready = FirepowerState::empty();
+        b2b_ready.back_to_back_chain = 1;
+
+        let quiet_setup_delta =
+            score_state(flat_metrics(), quiet, 2) - score_state(flat_metrics(), quiet, 0);
+        let b2b_setup_delta =
+            score_state(flat_metrics(), b2b_ready, 2) - score_state(flat_metrics(), b2b_ready, 0);
+
+        assert!(b2b_setup_delta > quiet_setup_delta * 1.8);
+    }
 }

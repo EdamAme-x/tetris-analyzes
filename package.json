@@ -17,8 +17,9 @@
     "format:check": "prettier --check .",
     "generate:tetrio-tables": "bun run scripts/generate-tetrio-tables.ts",
     "lint": "eslint .",
+    "test:native": "cargo test --manifest-path native/Cargo.toml",
     "test": "bun test",
-    "verify": "bun run build:native:debug && bun run check && bun run lint && bun run format:check && bun test"
+    "verify": "bun run build:native:debug && bun run check && bun run lint && bun run format:check && bun run test:native && bun test"
   },
   "napi": {
     "binaryName": "tetris_analyzes_native",
