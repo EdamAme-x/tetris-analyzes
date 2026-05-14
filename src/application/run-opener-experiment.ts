@@ -2,7 +2,12 @@ import { createFumenCodec } from "../infrastructure/fumen/tetris-fumen-codec";
 import type { FumenCodec, FumenUrls } from "../domain/fumen";
 import type { NativeComboTable, NativeKickTable, NativeSpinMode } from "../infrastructure/native/binding-types";
 import { createOpenerFumenPages } from "./create-opener-fumen";
-import { searchOpenerBeamWithPlacements, type SearchOpenerBeamInput, type SearchOpenerBeamNode } from "./search-opener";
+import {
+  estimateOpenerTSpinPotential,
+  searchOpenerBeamWithPlacements,
+  type SearchOpenerBeamInput,
+  type SearchOpenerBeamNode
+} from "./search-opener";
 
 export interface OpenerExperimentSearchRules {
   readonly spinMode: NativeSpinMode;
@@ -46,6 +51,7 @@ export interface OpenerExperimentCandidate {
   readonly difficultClears: number;
   readonly tSpinClears: number;
   readonly tSpinAttack: number;
+  readonly tSpinPotential: number;
   readonly clearSequence: readonly string[];
   readonly occupiedCells: number;
   readonly clearedLines: number;
@@ -174,8 +180,8 @@ export function renderOpenerExperimentMarkdown(report: OpenerExperimentReport): 
     "",
     "## Best openers",
     "",
-    "| rank | attack | difficult attack | other attack | tspin | tspin attack | points | score | holes | bumpiness | clears | path | preview |",
-    "| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- | --- |"
+    "| rank | attack | difficult attack | other attack | tspin | tspin attack | tspin potential | points | score | holes | bumpiness | clears | path | preview |",
+    "| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- | --- |"
   ];
 
   for (const candidate of bestCandidates) {
@@ -187,6 +193,7 @@ export function renderOpenerExperimentMarkdown(report: OpenerExperimentReport): 
         String(candidate.nonDifficultAttack),
         String(candidate.tSpinClears),
         String(candidate.tSpinAttack),
+        String(candidate.tSpinPotential),
         String(candidate.points),
         candidate.score.toFixed(1),
         String(candidate.holes),
@@ -233,8 +240,8 @@ export function renderOpenerExperimentMarkdown(report: OpenerExperimentReport): 
     }
 
     lines.push(
-      "| rank | attack | difficult attack | other attack | tspin | tspin attack | points | score | holes | bumpiness | clears | path | preview |",
-      "| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- | --- |"
+      "| rank | attack | difficult attack | other attack | tspin | tspin attack | tspin potential | points | score | holes | bumpiness | clears | path | preview |",
+      "| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- | --- |"
     );
     for (const candidate of scenario.top) {
       lines.push(
@@ -245,6 +252,7 @@ export function renderOpenerExperimentMarkdown(report: OpenerExperimentReport): 
           String(candidate.nonDifficultAttack),
           String(candidate.tSpinClears),
           String(candidate.tSpinAttack),
+          String(candidate.tSpinPotential),
           String(candidate.points),
           candidate.score.toFixed(1),
           String(candidate.holes),
@@ -266,7 +274,7 @@ export function renderOpenerExperimentConsoleSummary(report: OpenerExperimentRep
   const lines = ["Best opener candidates", ""];
   for (const candidate of rankOpenerCandidates(report, topCount)) {
     lines.push(
-      `#${candidate.rank} attack=${candidate.attack} difficultAttack=${candidate.difficultAttack} otherAttack=${candidate.nonDifficultAttack} tspin=${candidate.tSpinClears} tspinAttack=${candidate.tSpinAttack} points=${candidate.points} score=${candidate.score.toFixed(1)} holes=${candidate.holes} bump=${candidate.bumpiness}`,
+      `#${candidate.rank} attack=${candidate.attack} difficultAttack=${candidate.difficultAttack} otherAttack=${candidate.nonDifficultAttack} tspin=${candidate.tSpinClears} tspinAttack=${candidate.tSpinAttack} tspinPotential=${candidate.tSpinPotential} points=${candidate.points} score=${candidate.score.toFixed(1)} holes=${candidate.holes} bump=${candidate.bumpiness}`,
       `clears: ${formatClearSequence(candidate.clearSequence)}`,
       `path: ${candidate.path.join(" ")}`,
       `view: ${candidate.previewUrl}`,
@@ -363,6 +371,7 @@ function createTopCandidates(
       const data = fumenCodec.encodePages(createOpenerFumenPages(node, { title: `${scenario.name} #${index + 1}` }));
       const urls = fumenCodec.createUrls(data);
       const qualityAttack = difficultAttack(node);
+      const rules = scenarioRules(scenario);
       return {
         rank: index + 1,
         score: node.score,
@@ -381,6 +390,7 @@ function createTopCandidates(
         difficultClears: node.difficultClears,
         tSpinClears: node.tSpinClears,
         tSpinAttack: node.tSpinAttack,
+        tSpinPotential: estimateOpenerTSpinPotential(Uint16Array.from(node.rows), rules.kickTable),
         clearSequence: node.placements
           .filter((placement) => placement.clearName !== "NONE" && placement.clearedLines > 0)
           .map((placement) => `${placement.clearName}:${placement.attack}`),
@@ -417,6 +427,7 @@ function compareRankedOpenerCandidates(left: RankedOpenerCandidate, right: Ranke
     right.tSpinAttack - left.tSpinAttack ||
     right.difficultClears - left.difficultClears ||
     right.difficultAttack - left.difficultAttack ||
+    right.tSpinPotential - left.tSpinPotential ||
     right.attack - left.attack ||
     right.firepowerScore - left.firepowerScore ||
     right.score - left.score ||
