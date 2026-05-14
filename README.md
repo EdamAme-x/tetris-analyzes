@@ -58,3 +58,4 @@ Executable examples live in `tests/`.
 - [x] Use native shape row masks for faster collision and lock operations
 - [x] Add regression tests for B2B carry/reset, empty-hold queue consumption, grounded placements, and TL non-T spin suppression
 - [x] Use static equivalent-rotation lookup for native reachability cache membership
+- [x] Pre-allocate accepted native child paths and placement histories during beam expansion

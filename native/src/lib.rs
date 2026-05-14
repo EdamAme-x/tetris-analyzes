@@ -661,7 +661,8 @@ pub(crate) fn search_opener_states(
                                 };
 
                                 if should_insert {
-                                    let mut path = state.path.clone();
+                                    let mut path = Vec::with_capacity(state.path.len() + 1);
+                                    path.extend_from_slice(&state.path);
                                     path.push(PlacementStep {
                                         piece: choice.piece,
                                         rotation: shape.rotation,
@@ -670,7 +671,9 @@ pub(crate) fn search_opener_states(
                                         used_hold: choice.used_hold,
                                     });
                                     let placements = if include_placements {
-                                        let mut placements = state.placements.clone();
+                                        let mut placements =
+                                            Vec::with_capacity(state.placements.len() + 1);
+                                        placements.extend_from_slice(&state.placements);
                                         if let Some(mut placement) = placed.placement {
                                             placement.firepower = firepower_event;
                                             placements.push(placement);
