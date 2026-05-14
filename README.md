@@ -26,4 +26,7 @@ Executable examples live in `tests/`.
 - [x] Known opener benchmark set and regression report
 - [x] Fumen preview operation parity tests for native SRS piece geometry
 - [x] Native beam pruning prefers T-spin, difficult clear, and B2B chain branches
-- [x] Native T-spin slot potential helper for future setup-aware search
+- [x] Native full grounded placement enumeration with reachable-history regression tests
+- [x] Native T-spin setup-aware pruning with precise report-side potential checks
+- [x] Opener reports show B2B chain, difficult attack, and fumen preview URLs
+- [ ] Broaden deterministic two-bag queue discovery beyond the current survey seeds
