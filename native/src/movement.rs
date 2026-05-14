@@ -1,7 +1,16 @@
 use std::collections::{HashSet, VecDeque};
 
+use napi::bindgen_prelude::{Error, Result};
+
 use crate::board::{BoardRows, BOARD_HEIGHT, BOARD_WIDTH};
-use crate::pieces::{piece_shapes, srs_plus_kicks, Piece, Shape};
+use crate::pieces::{piece_shapes, Cell, Piece, Shape};
+
+#[derive(Clone, Copy, Eq, PartialEq)]
+pub(crate) enum KickTable {
+    SrsPlus,
+    Srs,
+    None,
+}
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub(crate) struct MovementState {
@@ -16,6 +25,7 @@ pub(crate) fn is_reachable_placement(
     target_shape_index: usize,
     target_x: i8,
     target_y: i8,
+    kick_table: KickTable,
 ) -> bool {
     let shapes = piece_shapes(piece);
     let spawn_shape = shapes[0];
@@ -77,8 +87,26 @@ pub(crate) fn is_reachable_placement(
             &mut visited,
             &mut queue,
         );
-        push_rotation_states(rows, piece, shapes, state, 1, &mut visited, &mut queue);
-        push_rotation_states(rows, piece, shapes, state, -1, &mut visited, &mut queue);
+        push_rotation_states(
+            rows,
+            piece,
+            shapes,
+            state,
+            1,
+            kick_table,
+            &mut visited,
+            &mut queue,
+        );
+        push_rotation_states(
+            rows,
+            piece,
+            shapes,
+            state,
+            -1,
+            kick_table,
+            &mut visited,
+            &mut queue,
+        );
     }
 
     false
@@ -127,6 +155,7 @@ pub(crate) fn push_rotation_states(
     shapes: &[Shape],
     state: MovementState,
     direction: i8,
+    kick_table: KickTable,
     visited: &mut HashSet<MovementState>,
     queue: &mut VecDeque<MovementState>,
 ) {
@@ -143,7 +172,7 @@ pub(crate) fn push_rotation_states(
     let to_rotation = shapes[next_shape_index].rotation;
     let next_shape = shapes[next_shape_index];
 
-    for kick in srs_plus_kicks(piece, from_rotation, to_rotation) {
+    for kick in kicks_for(kick_table, piece, from_rotation, to_rotation) {
         let x = state.x + kick.x;
         let y = state.y + kick.y;
         if can_place(rows, next_shape, x, y) {
@@ -156,6 +185,47 @@ pub(crate) fn push_rotation_states(
                 queue.push_back(next);
             }
         }
+    }
+}
+
+pub(crate) fn parse_kick_table(input: &str) -> Result<KickTable> {
+    let normalized = input.trim().to_ascii_uppercase();
+    match normalized.as_str() {
+        "SRS+" | "SRS PLUS" | "SRS_PLUS" => Ok(KickTable::SrsPlus),
+        "SRS" => Ok(KickTable::Srs),
+        "NONE" => Ok(KickTable::None),
+        _ => Err(Error::from_reason(format!(
+            "Unsupported native opener kick table {input}. Supported tables are SRS+, SRS, and NONE."
+        ))),
+    }
+}
+
+pub(crate) fn kicks_for(
+    kick_table: KickTable,
+    piece: Piece,
+    from_rotation: u8,
+    to_rotation: u8,
+) -> &'static [Cell] {
+    if kick_table == KickTable::None {
+        return BASIC_KICKS;
+    }
+
+    if piece == Piece::I {
+        return match (kick_table, from_rotation, to_rotation) {
+            (KickTable::SrsPlus, 0, 1) => SRS_PLUS_I_KICKS_01,
+            (KickTable::SrsPlus, 1, 0) => SRS_PLUS_I_KICKS_10,
+            (KickTable::Srs, 0, 1) => SRS_I_KICKS_01,
+            (KickTable::Srs, 1, 0) => SRS_I_KICKS_10,
+            _ => BASIC_KICKS,
+        };
+    }
+
+    match (from_rotation, to_rotation) {
+        (0, 1) | (2, 1) => JLSTZ_KICKS_01,
+        (1, 0) | (1, 2) => JLSTZ_KICKS_10,
+        (2, 3) | (0, 3) => JLSTZ_KICKS_23,
+        (3, 2) | (3, 0) => JLSTZ_KICKS_32,
+        _ => BASIC_KICKS,
     }
 }
 
@@ -192,3 +262,61 @@ pub(crate) fn lock_shape(rows: &BoardRows, shape: Shape, x: i8, y: i8) -> Option
     }
     Some(output)
 }
+
+const BASIC_KICKS: &[Cell] = &[Cell { x: 0, y: 0 }];
+const JLSTZ_KICKS_01: &[Cell] = &[
+    Cell { x: 0, y: 0 },
+    Cell { x: -1, y: 0 },
+    Cell { x: -1, y: -1 },
+    Cell { x: 0, y: 2 },
+    Cell { x: -1, y: 2 },
+];
+const JLSTZ_KICKS_10: &[Cell] = &[
+    Cell { x: 0, y: 0 },
+    Cell { x: 1, y: 0 },
+    Cell { x: 1, y: 1 },
+    Cell { x: 0, y: -2 },
+    Cell { x: 1, y: -2 },
+];
+const JLSTZ_KICKS_23: &[Cell] = &[
+    Cell { x: 0, y: 0 },
+    Cell { x: 1, y: 0 },
+    Cell { x: 1, y: -1 },
+    Cell { x: 0, y: 2 },
+    Cell { x: 1, y: 2 },
+];
+const JLSTZ_KICKS_32: &[Cell] = &[
+    Cell { x: 0, y: 0 },
+    Cell { x: -1, y: 0 },
+    Cell { x: -1, y: 1 },
+    Cell { x: 0, y: -2 },
+    Cell { x: -1, y: -2 },
+];
+const SRS_PLUS_I_KICKS_01: &[Cell] = &[
+    Cell { x: 0, y: 0 },
+    Cell { x: 1, y: 0 },
+    Cell { x: -2, y: 0 },
+    Cell { x: -2, y: 1 },
+    Cell { x: 1, y: -2 },
+];
+const SRS_PLUS_I_KICKS_10: &[Cell] = &[
+    Cell { x: 0, y: 0 },
+    Cell { x: -1, y: 0 },
+    Cell { x: 2, y: 0 },
+    Cell { x: -1, y: 2 },
+    Cell { x: 2, y: -1 },
+];
+const SRS_I_KICKS_01: &[Cell] = &[
+    Cell { x: 0, y: 0 },
+    Cell { x: -2, y: 0 },
+    Cell { x: 1, y: 0 },
+    Cell { x: -2, y: 1 },
+    Cell { x: 1, y: -2 },
+];
+const SRS_I_KICKS_10: &[Cell] = &[
+    Cell { x: 0, y: 0 },
+    Cell { x: 2, y: 0 },
+    Cell { x: -1, y: 0 },
+    Cell { x: 2, y: -1 },
+    Cell { x: -1, y: 2 },
+];

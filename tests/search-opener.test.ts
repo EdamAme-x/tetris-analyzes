@@ -61,6 +61,23 @@ describe("native opener beam search", () => {
     expect(canReachOpenerPlacement({ rows: bitBoardFromRows(sealedCave), piece: "I", rotation: 0, x: 3, y: 0 })).toBe(false);
   });
 
+  test("applies native kick table options during reachability and search", () => {
+    const kickRequiredRows = new Array(20).fill(0);
+    kickRequiredRows[0] = 33;
+    kickRequiredRows[1] = 25;
+    kickRequiredRows[2] = 9;
+    kickRequiredRows[3] = 8;
+    kickRequiredRows[4] = 462;
+    kickRequiredRows[5] = 33;
+    const board = bitBoardFromRows(kickRequiredRows);
+
+    expect(canReachOpenerPlacement({ rows: board, piece: "T", rotation: 0, x: 4, y: 2, kickTable: "SRS+" })).toBe(true);
+    expect(canReachOpenerPlacement({ rows: board, piece: "T", rotation: 0, x: 4, y: 2, kickTable: "NONE" })).toBe(false);
+    expect(() => searchOpenerBeam({ queue: "TIL", kickTable: "SRS" })).not.toThrow();
+    expect(() => evaluateOpenerBag({ bag: "TIO", kickTable: "NONE", maxQueues: 2 })).not.toThrow();
+    expect(() => searchOpenerBeam({ queue: "TIL", kickTable: "ARS" as "SRS" })).toThrow("Unsupported native opener kick table");
+  });
+
   test("detects T-spin, T-spin mini, and immobile spin primitives in native code", () => {
     const fullTSpinRows = new Array(20).fill(0);
     fullTSpinRows[1] = (1 << 3) | (1 << 5);

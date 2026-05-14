@@ -90,68 +90,6 @@ pub(crate) fn format_placement(
     format!("{prefix}{}@r{},x{},y{}", piece_name(piece), rotation, x, y)
 }
 
-pub(crate) fn srs_plus_kicks(piece: Piece, from_rotation: u8, to_rotation: u8) -> &'static [Cell] {
-    if piece == Piece::I {
-        match (from_rotation, to_rotation) {
-            (0, 1) => I_KICKS_01,
-            (1, 0) => I_KICKS_10,
-            _ => BASIC_KICKS,
-        }
-    } else {
-        match (from_rotation, to_rotation) {
-            (0, 1) | (2, 1) => JLSTZ_KICKS_01,
-            (1, 0) | (1, 2) => JLSTZ_KICKS_10,
-            (2, 3) | (0, 3) => JLSTZ_KICKS_23,
-            (3, 2) | (3, 0) => JLSTZ_KICKS_32,
-            _ => BASIC_KICKS,
-        }
-    }
-}
-
-const BASIC_KICKS: &[Cell] = &[Cell { x: 0, y: 0 }];
-const JLSTZ_KICKS_01: &[Cell] = &[
-    Cell { x: 0, y: 0 },
-    Cell { x: -1, y: 0 },
-    Cell { x: -1, y: -1 },
-    Cell { x: 0, y: 2 },
-    Cell { x: -1, y: 2 },
-];
-const JLSTZ_KICKS_10: &[Cell] = &[
-    Cell { x: 0, y: 0 },
-    Cell { x: 1, y: 0 },
-    Cell { x: 1, y: 1 },
-    Cell { x: 0, y: -2 },
-    Cell { x: 1, y: -2 },
-];
-const JLSTZ_KICKS_23: &[Cell] = &[
-    Cell { x: 0, y: 0 },
-    Cell { x: 1, y: 0 },
-    Cell { x: 1, y: -1 },
-    Cell { x: 0, y: 2 },
-    Cell { x: 1, y: 2 },
-];
-const JLSTZ_KICKS_32: &[Cell] = &[
-    Cell { x: 0, y: 0 },
-    Cell { x: -1, y: 0 },
-    Cell { x: -1, y: 1 },
-    Cell { x: 0, y: -2 },
-    Cell { x: -1, y: -2 },
-];
-const I_KICKS_01: &[Cell] = &[
-    Cell { x: 0, y: 0 },
-    Cell { x: 1, y: 0 },
-    Cell { x: -2, y: 0 },
-    Cell { x: -2, y: 1 },
-    Cell { x: 1, y: -2 },
-];
-const I_KICKS_10: &[Cell] = &[
-    Cell { x: 0, y: 0 },
-    Cell { x: -1, y: 0 },
-    Cell { x: 2, y: 0 },
-    Cell { x: -1, y: 2 },
-    Cell { x: 2, y: -1 },
-];
-
 const I0: &[Cell] = &[
     Cell { x: 0, y: 0 },
     Cell { x: 1, y: 0 },

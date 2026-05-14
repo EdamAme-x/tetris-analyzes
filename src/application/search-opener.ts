@@ -4,6 +4,7 @@ import type {
   NativeComboTable,
   NativeFirepowerInput,
   NativeFirepowerSummary,
+  NativeKickTable,
   NativeOpenerBagEvaluation,
   NativeSpinDetection
 } from "../infrastructure/native/binding-types";
@@ -16,6 +17,7 @@ export interface SearchOpenerBeamInput {
   readonly hold?: boolean;
   readonly maxDepth?: number;
   readonly comboTable?: NativeComboTable;
+  readonly kickTable?: NativeKickTable;
 }
 
 export interface EvaluateOpenerBagInput {
@@ -26,6 +28,7 @@ export interface EvaluateOpenerBagInput {
   readonly maxQueues?: number;
   readonly topQueueCount?: number;
   readonly comboTable?: NativeComboTable;
+  readonly kickTable?: NativeKickTable;
 }
 
 export type SearchOpenerBeamNode = NativeBeamSearchNode;
@@ -37,6 +40,7 @@ export interface OpenerPlacementReachabilityInput {
   readonly rotation: number;
   readonly x: number;
   readonly y: number;
+  readonly kickTable?: NativeKickTable;
 }
 
 export function searchOpenerBeam(input: SearchOpenerBeamInput): SearchOpenerBeamNode[] {
@@ -46,7 +50,8 @@ export function searchOpenerBeam(input: SearchOpenerBeamInput): SearchOpenerBeam
     input.beamWidth ?? 64,
     input.hold ?? true,
     input.maxDepth ?? queue.length,
-    input.comboTable
+    input.comboTable,
+    input.kickTable
   );
 }
 
@@ -57,7 +62,8 @@ export function searchOpenerBeamWithPlacements(input: SearchOpenerBeamInput): Se
     input.beamWidth ?? 64,
     input.hold ?? true,
     input.maxDepth ?? queue.length,
-    input.comboTable
+    input.comboTable,
+    input.kickTable
   );
 }
 
@@ -70,12 +76,13 @@ export function evaluateOpenerBag(input: EvaluateOpenerBagInput = {}): OpenerBag
     input.maxDepth ?? Math.min(4, bag.length),
     input.maxQueues ?? 0,
     input.topQueueCount ?? 16,
-    input.comboTable
+    input.comboTable,
+    input.kickTable
   );
 }
 
 export function canReachOpenerPlacement(input: OpenerPlacementReachabilityInput): boolean {
-  return loadNativeBinding().canReachOpenerPlacement(input.rows, input.piece, input.rotation, input.x, input.y);
+  return loadNativeBinding().canReachOpenerPlacement(input.rows, input.piece, input.rotation, input.x, input.y, input.kickTable);
 }
 
 export function detectOpenerSpin(input: OpenerPlacementReachabilityInput): NativeSpinDetection {

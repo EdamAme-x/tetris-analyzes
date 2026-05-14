@@ -19,6 +19,7 @@ Executable examples live in `tests/`.
 - [x] Native opener beam search with hold and reachability filtering
 - [x] Native spin/firepower scoring with generated TETR.IO clear and combo tables
 - [x] Native 7-bag buildability sampling with Pareto queue ranking
-- [ ] Kick table modes beyond current SRS+ search
+- [x] Native kick table selection for SRS+, SRS, and NONE
+- [ ] Full TETR.IO kick table parity for SRS-X, TETRA-X, NRS, ARS, and ASC
 - [ ] Spin mode variants beyond current T-spin/immobile primitives
 - [ ] Known opener benchmark set and regression report

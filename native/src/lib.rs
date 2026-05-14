@@ -18,7 +18,7 @@ use firepower::{
     clear_kind_cleared_lines, clear_kind_name, firepower_score, parse_clear_kind,
     parse_combo_table, score_state, FirepowerEvent, FirepowerState,
 };
-use movement::{can_place, is_reachable_placement, lock_shape};
+use movement::{can_place, is_reachable_placement, lock_shape, parse_kick_table, KickTable};
 use pieces::{
     format_placement, parse_piece_string, parse_queue, piece_name, piece_shapes, Cell, Piece, Shape,
 };
@@ -236,6 +236,7 @@ pub fn can_reach_opener_placement(
     rotation: u32,
     x: i32,
     y: i32,
+    kick_table: Option<String>,
 ) -> Result<bool> {
     let board = board::rows_to_array(rows.as_ref())?;
     let piece = parse_piece_string(&piece)?;
@@ -255,10 +256,11 @@ pub fn can_reach_opener_placement(
     let y =
         i8::try_from(y).map_err(|_| Error::from_reason(format!("y must fit in i8, got {y}.")))?;
     let shape = piece_shapes(piece)[shape_index];
+    let kick_table = parse_optional_kick_table(kick_table.as_deref())?;
 
     Ok(can_place(&board, shape, x, y)
         && (y == 0 || !can_place(&board, shape, x, y - 1))
-        && is_reachable_placement(&board, piece, shape_index, x, y))
+        && is_reachable_placement(&board, piece, shape_index, x, y, kick_table))
 }
 
 #[napi(js_name = "detectOpenerSpin")]
@@ -347,6 +349,7 @@ pub fn search_opener_beam(
     hold_enabled: bool,
     max_depth: u32,
     combo_table: Option<String>,
+    kick_table: Option<String>,
 ) -> Result<Vec<BeamSearchNode>> {
     search_opener_beam_internal(
         queue,
@@ -355,6 +358,7 @@ pub fn search_opener_beam(
         max_depth,
         false,
         combo_table,
+        kick_table,
     )
 }
 
@@ -365,6 +369,7 @@ pub fn search_opener_beam_with_placements(
     hold_enabled: bool,
     max_depth: u32,
     combo_table: Option<String>,
+    kick_table: Option<String>,
 ) -> Result<Vec<BeamSearchNode>> {
     search_opener_beam_internal(
         queue,
@@ -373,6 +378,7 @@ pub fn search_opener_beam_with_placements(
         max_depth,
         true,
         combo_table,
+        kick_table,
     )
 }
 
@@ -385,8 +391,10 @@ pub fn evaluate_opener_bag(
     max_queues: u32,
     top_queue_count: u32,
     combo_table: Option<String>,
+    kick_table: Option<String>,
 ) -> Result<OpenerBagEvaluation> {
     let combo_table = parse_optional_combo_table(combo_table.as_deref())?;
+    let kick_table = parse_optional_kick_table(kick_table.as_deref())?;
     evaluate_opener_bag_internal(
         &bag,
         beam_width,
@@ -395,6 +403,7 @@ pub fn evaluate_opener_bag(
         max_queues,
         top_queue_count,
         combo_table,
+        kick_table,
     )
 }
 
@@ -405,11 +414,13 @@ fn search_opener_beam_internal(
     max_depth: u32,
     include_placements: bool,
     combo_table: Option<String>,
+    kick_table: Option<String>,
 ) -> Result<Vec<BeamSearchNode>> {
     let pieces = parse_queue(&queue)?;
     let max_depth = usize::min(max_depth as usize, pieces.len());
     let beam_width = validate_beam_width(beam_width)?;
     let combo_table = parse_optional_combo_table(combo_table.as_deref())?;
+    let kick_table = parse_optional_kick_table(kick_table.as_deref())?;
 
     Ok(search_opener_states(
         &pieces,
@@ -418,6 +429,7 @@ fn search_opener_beam_internal(
         max_depth,
         include_placements,
         combo_table,
+        kick_table,
     )
     .into_iter()
     .map(BeamSearchNode::from)
@@ -431,6 +443,7 @@ pub(crate) fn search_opener_states(
     max_depth: usize,
     include_placements: bool,
     combo_table: ComboTable,
+    kick_table: KickTable,
 ) -> Vec<SearchState> {
     let empty_rows = [0_u16; BOARD_HEIGHT];
     let initial_metrics = board::evaluate_board_unchecked(&empty_rows);
@@ -460,6 +473,7 @@ pub(crate) fn search_opener_states(
                             shape,
                             x,
                             include_placements,
+                            kick_table,
                         ) {
                             let rows = placed.rows;
                             let metrics = board::evaluate_board_unchecked(&rows);
@@ -573,10 +587,11 @@ fn place_and_clear(
     shape: Shape,
     x: i8,
     include_placement: bool,
+    kick_table: KickTable,
 ) -> Option<PlacedBoard> {
     for y in 0..=(BOARD_HEIGHT as i8 - shape.height) {
         if can_place(rows, shape, x, y) && (y == 0 || !can_place(rows, shape, x, y - 1)) {
-            if !is_reachable_placement(rows, choice.piece, shape_index, x, y) {
+            if !is_reachable_placement(rows, choice.piece, shape_index, x, y, kick_table) {
                 continue;
             }
 
@@ -640,6 +655,13 @@ fn parse_optional_combo_table(input: Option<&str>) -> Result<ComboTable> {
         .map(parse_combo_table)
         .transpose()
         .map(|combo_table| combo_table.unwrap_or(ComboTable::Multiplier))
+}
+
+fn parse_optional_kick_table(input: Option<&str>) -> Result<KickTable> {
+    input
+        .map(parse_kick_table)
+        .transpose()
+        .map(|kick_table| kick_table.unwrap_or(KickTable::SrsPlus))
 }
 
 impl From<SearchState> for BeamSearchNode {

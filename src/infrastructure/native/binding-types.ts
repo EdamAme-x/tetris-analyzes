@@ -30,6 +30,7 @@ export interface NativeBeamPlacement {
 
 export type NativeSpinKind = "NONE" | "T_SPIN" | "T_SPIN_MINI" | "IMMOBILE_SPIN";
 export type NativeComboTable = "MULTIPLIER" | "NONE" | "CLASSIC GUIDELINE" | "MODERN GUIDELINE";
+export type NativeKickTable = "SRS+" | "SRS" | "NONE";
 export type NativeClearName =
   | "NONE"
   | "SINGLE"
@@ -155,7 +156,7 @@ export interface NativeBinding {
   applyGarbage(rows: Uint16Array, holes: Uint8Array): Uint16Array;
   rowsToFumenField(rows: Uint16Array): string;
   batchRowsToFumenFields(rows: Uint16Array, boardCount: number): string[];
-  canReachOpenerPlacement(rows: Uint16Array, piece: string, rotation: number, x: number, y: number): boolean;
+  canReachOpenerPlacement(rows: Uint16Array, piece: string, rotation: number, x: number, y: number, kickTable?: NativeKickTable): boolean;
   detectOpenerSpin(rows: Uint16Array, piece: string, rotation: number, x: number, y: number): NativeSpinDetection;
   evaluateOpenerFirepower(events: NativeFirepowerInput[]): NativeFirepowerSummary;
   searchOpenerBeam(
@@ -163,14 +164,16 @@ export interface NativeBinding {
     beamWidth: number,
     holdEnabled: boolean,
     maxDepth: number,
-    comboTable?: NativeComboTable
+    comboTable?: NativeComboTable,
+    kickTable?: NativeKickTable
   ): NativeBeamSearchNode[];
   searchOpenerBeamWithPlacements(
     queue: string,
     beamWidth: number,
     holdEnabled: boolean,
     maxDepth: number,
-    comboTable?: NativeComboTable
+    comboTable?: NativeComboTable,
+    kickTable?: NativeKickTable
   ): NativeBeamSearchNode[];
   evaluateOpenerBag(
     bag: string,
@@ -179,6 +182,7 @@ export interface NativeBinding {
     maxDepth: number,
     maxQueues: number,
     topQueueCount: number,
-    comboTable?: NativeComboTable
+    comboTable?: NativeComboTable,
+    kickTable?: NativeKickTable
   ): NativeOpenerBagEvaluation;
 }
