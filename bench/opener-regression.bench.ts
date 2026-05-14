@@ -5,6 +5,7 @@ interface OpenerRegressionCase {
   readonly input: SearchOpenerBeamInput;
   readonly iterations: number;
   readonly minDepth: number;
+  readonly minQueueIndex?: number;
   readonly minAttack?: number;
   readonly minTSpinClears?: number;
   readonly minBackToBackChain?: number;
@@ -13,6 +14,8 @@ interface OpenerRegressionCase {
 interface OpenerRegressionResult {
   readonly name: string;
   readonly resultCount: number;
+  readonly topQueueIndex: number;
+  readonly topHold: string;
   readonly topAttack: number;
   readonly topTSpinClears: number;
   readonly topTSpinAttack: number;
@@ -71,6 +74,7 @@ const cases: OpenerRegressionCase[] = [
     input: { queue: "JLSTZIOJLSTZIOTIJLOSZ", beamWidth: 256, hold: true, maxDepth: 21 },
     iterations: 1,
     minDepth: 20,
+    minQueueIndex: 21,
     minAttack: 12,
     minTSpinClears: 3,
     minBackToBackChain: 3
@@ -94,9 +98,9 @@ for (const bench of rotateCases(cases, rounds)) {
 
 console.log("");
 console.log(
-  "| opener seed | median ms | searches/s | nodes | attack | tspin | tspin attack | difficult | b2b | score | holes | bumpiness | checksum | top path |"
+  "| opener seed | median ms | searches/s | nodes | queue index | hold | attack | tspin | tspin attack | difficult | b2b | score | holes | bumpiness | checksum | top path |"
 );
-console.log("| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |");
+console.log("| --- | ---: | ---: | ---: | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |");
 for (const bench of cases) {
   const timings = samples.get(bench.name) ?? [];
   const summary = summarize(timings);
@@ -112,6 +116,8 @@ for (const bench of cases) {
       summary.median.toFixed(3),
       searchesPerSecond.toFixed(1),
       String(latestResult.resultCount),
+      String(latestResult.topQueueIndex),
+      latestResult.topHold,
       String(latestResult.topAttack),
       String(latestResult.topTSpinClears),
       String(latestResult.topTSpinAttack),
@@ -141,6 +147,9 @@ function runCase(bench: OpenerRegressionCase): OpenerRegressionResult {
   if (top === undefined || top.depth < bench.minDepth) {
     throw new Error(`Regression case ${bench.name} did not build to depth ${bench.minDepth}.`);
   }
+  if (top.queueIndex < (bench.minQueueIndex ?? 0)) {
+    throw new Error(`Regression case ${bench.name} queue index ${top.queueIndex} fell below ${bench.minQueueIndex}.`);
+  }
   if (top.attack < (bench.minAttack ?? 0)) {
     throw new Error(`Regression case ${bench.name} attack ${top.attack} fell below ${bench.minAttack}.`);
   }
@@ -153,6 +162,8 @@ function runCase(bench: OpenerRegressionCase): OpenerRegressionResult {
   return {
     name: bench.name,
     resultCount: nodes.length,
+    topQueueIndex: top.queueIndex,
+    topHold: top.hold ?? "-",
     topAttack: top.attack,
     topTSpinClears: top.tSpinClears,
     topTSpinAttack: top.tSpinAttack,

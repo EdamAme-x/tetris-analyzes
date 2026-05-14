@@ -450,7 +450,7 @@ export function renderOpenerExperimentConsoleSummary(report: OpenerExperimentRep
     for (const template of report.templateReplay.templates.slice(0, topCount)) {
       const candidate = template.best;
       lines.push(
-        `#${template.rank} sources=${template.sources.join(",")} replay=${formatReplaySurvival(template)} grouped=${formatGroupedReplaySurvival(template)} attack=${candidate.attack} difficultAttack=${candidate.difficultAttack} otherAttack=${candidate.nonDifficultAttack} tspin=${candidate.tSpinClears} tspinAttack=${candidate.tSpinAttack} b2b=${candidate.backToBackChain} tspinPotential=${candidate.tSpinPotential} points=${candidate.points} score=${candidate.score.toFixed(1)} holes=${candidate.holes} bump=${candidate.bumpiness}`,
+        `#${template.rank} sources=${template.sources.join(",")} replay=${formatReplaySurvival(template)} grouped=${formatGroupedReplaySurvival(template)} queueIndex=${candidate.queueIndex} hold=${candidate.hold ?? "-"} attack=${candidate.attack} difficultAttack=${candidate.difficultAttack} otherAttack=${candidate.nonDifficultAttack} tspin=${candidate.tSpinClears} tspinAttack=${candidate.tSpinAttack} b2b=${candidate.backToBackChain} tspinPotential=${candidate.tSpinPotential} points=${candidate.points} score=${candidate.score.toFixed(1)} holes=${candidate.holes} bump=${candidate.bumpiness}`,
         `clears: ${formatClearSequence(candidate.clearSequence)}`,
         `path: ${candidate.path.join(" ")}`,
         `view: ${candidate.previewUrl}`,
@@ -464,7 +464,7 @@ export function renderOpenerExperimentConsoleSummary(report: OpenerExperimentRep
   for (const template of rankOpenerTemplates(report, topCount)) {
     const candidate = template.best;
     lines.push(
-      `#${template.rank} sources=${template.sources.join(",")} survival=${formatTemplateSurvival(template)} attack=${candidate.attack} difficultAttack=${candidate.difficultAttack} otherAttack=${candidate.nonDifficultAttack} tspin=${candidate.tSpinClears} tspinAttack=${candidate.tSpinAttack} b2b=${candidate.backToBackChain} tspinPotential=${candidate.tSpinPotential} points=${candidate.points} score=${candidate.score.toFixed(1)} holes=${candidate.holes} bump=${candidate.bumpiness}`,
+      `#${template.rank} sources=${template.sources.join(",")} survival=${formatTemplateSurvival(template)} queueIndex=${candidate.queueIndex} hold=${candidate.hold ?? "-"} attack=${candidate.attack} difficultAttack=${candidate.difficultAttack} otherAttack=${candidate.nonDifficultAttack} tspin=${candidate.tSpinClears} tspinAttack=${candidate.tSpinAttack} b2b=${candidate.backToBackChain} tspinPotential=${candidate.tSpinPotential} points=${candidate.points} score=${candidate.score.toFixed(1)} holes=${candidate.holes} bump=${candidate.bumpiness}`,
       `clears: ${formatClearSequence(candidate.clearSequence)}`,
       `path: ${candidate.path.join(" ")}`,
       `view: ${candidate.previewUrl}`,
