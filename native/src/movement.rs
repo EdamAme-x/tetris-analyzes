@@ -260,16 +260,20 @@ pub(crate) fn push_movement_state(
     queue: &mut [MovementState; MOVEMENT_STATE_CAPACITY],
     tail: &mut usize,
 ) {
-    if y < 0 {
+    let next = MovementState { shape_index, x, y };
+    let Some(index) = movement_state_index(next) else {
+        return;
+    };
+    if visited[index] || *tail >= queue.len() {
         return;
     }
+
     let shape = shapes[shape_index];
     if !can_place(rows, shape, x, y) {
         return;
     }
 
-    let next = MovementState { shape_index, x, y };
-    push_known_movement_state(next, visited, queue, tail);
+    push_indexed_movement_state(next, index, visited, queue, tail);
 }
 
 pub(crate) fn push_rotation_states(
@@ -300,13 +304,19 @@ pub(crate) fn push_rotation_states(
     for kick in kicks_for(kick_table, piece, from_rotation, to_rotation) {
         let x = state.x + kick.x;
         let y = state.y + kick.y;
+        let next = MovementState {
+            shape_index: next_shape_index,
+            x,
+            y,
+        };
+        let Some(index) = movement_state_index(next) else {
+            continue;
+        };
+        if visited[index] || *tail >= queue.len() {
+            continue;
+        }
         if can_place(rows, next_shape, x, y) {
-            let next = MovementState {
-                shape_index: next_shape_index,
-                x,
-                y,
-            };
-            push_known_movement_state(next, visited, queue, tail);
+            push_indexed_movement_state(next, index, visited, queue, tail);
         }
     }
 }
@@ -323,6 +333,16 @@ fn push_known_movement_state(
     if visited[index] || *tail >= queue.len() {
         return;
     }
+    push_indexed_movement_state(state, index, visited, queue, tail);
+}
+
+fn push_indexed_movement_state(
+    state: MovementState,
+    index: usize,
+    visited: &mut [bool; MOVEMENT_STATE_CAPACITY],
+    queue: &mut [MovementState; MOVEMENT_STATE_CAPACITY],
+    tail: &mut usize,
+) {
     visited[index] = true;
     queue[*tail] = state;
     *tail += 1;
