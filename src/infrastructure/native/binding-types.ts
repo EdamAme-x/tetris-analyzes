@@ -113,6 +113,9 @@ export interface NativeBeamSearchNode {
   maxCombo: number;
   backToBackChain: number;
   allClears: number;
+  difficultClears: number;
+  tSpinClears: number;
+  tSpinAttack: number;
   occupiedCells: number;
   clearedLines: number;
   aggregateHeight: number;

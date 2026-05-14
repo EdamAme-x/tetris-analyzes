@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { FumenCodec, FumenUrls } from "../src/domain/fumen";
 import {
+  DEFAULT_OPENER_EXPERIMENT_SCENARIOS,
   renderOpenerExperimentConsoleSummary,
   renderOpenerExperimentMarkdown,
   runOpenerExperiment,
@@ -15,6 +16,16 @@ const urls: FumenUrls = {
 };
 
 describe("opener experiment runner", () => {
+  test("defaults to a two-bag T-spin-oriented opener search", () => {
+    expect(DEFAULT_OPENER_EXPERIMENT_SCENARIOS[0]).toMatchObject({
+      name: "best-two-bag-tspin-openers",
+      queue: "SZILOJTSTOZLJI",
+      hold: true,
+      beamWidth: 1024,
+      maxDepth: 14
+    });
+  });
+
   test("measures native search scenarios and keeps top candidates linkable", () => {
     const clock = createClock("2026-05-14T00:00:00.000Z", [100, 104, 200, 206, 300, 305]);
     let calls = 0;
@@ -50,6 +61,9 @@ describe("opener experiment runner", () => {
             maxCombo: 0,
             backToBackChain: 0,
             allClears: 0,
+            difficultClears: 0,
+            tSpinClears: 0,
+            tSpinAttack: 0,
             occupiedCells: 8,
             clearedLines: 0,
             aggregateHeight: 4,
@@ -97,6 +111,9 @@ describe("opener experiment runner", () => {
           maxCombo: 0,
           backToBackChain: 0,
           allClears: 0,
+          difficultClears: 0,
+          tSpinClears: 0,
+          tSpinAttack: 0,
           occupiedCells: 4,
           clearedLines: 0,
           aggregateHeight: 2,
@@ -143,6 +160,9 @@ describe("opener experiment runner", () => {
           maxCombo: 0,
           backToBackChain: 0,
           allClears: 0,
+          difficultClears: 0,
+          tSpinClears: 0,
+          tSpinAttack: 0,
           occupiedCells: 4,
           clearedLines: 0,
           aggregateHeight: 2,
@@ -154,7 +174,7 @@ describe("opener experiment runner", () => {
 
     const summary = renderOpenerExperimentConsoleSummary(report, 1);
     expect(summary).toContain("Best opener candidates");
-    expect(summary).toContain("#1 attack=0 points=0 score=10.0");
+    expect(summary).toContain("#1 attack=0 tspin=0 tspinAttack=0 points=0 score=10.0");
     expect(summary).toContain("path: T@r0,x3");
     expect(summary).not.toContain("fake-scenario | TI");
   });
@@ -189,6 +209,9 @@ describe("opener experiment runner", () => {
           maxCombo: 0,
           backToBackChain: 0,
           allClears: 0,
+          difficultClears: 0,
+          tSpinClears: 0,
+          tSpinAttack: 0,
           occupiedCells: 4,
           clearedLines: 0,
           aggregateHeight: 2,
@@ -208,6 +231,9 @@ describe("opener experiment runner", () => {
           maxCombo: 0,
           backToBackChain: 0,
           allClears: 0,
+          difficultClears: 0,
+          tSpinClears: 0,
+          tSpinAttack: 0,
           occupiedCells: 4,
           clearedLines: 2,
           aggregateHeight: 2,
@@ -218,6 +244,73 @@ describe("opener experiment runner", () => {
     });
 
     expect(report.scenarios[0]?.top.map((candidate) => candidate.path[0])).toEqual(["attack", "quiet"]);
+  });
+
+  test("ranks real T-spin line clears before combo-only attack", () => {
+    const report = runOpenerExperiment({
+      scenarios: [
+        {
+          name: "ranking",
+          queue: "TT",
+          hold: false,
+          beamWidth: 4,
+          maxDepth: 2,
+          warmups: 0,
+          iterations: 1,
+          top: 2
+        }
+      ],
+      clock: createClock("2026-05-14T00:00:00.000Z", [0, 2]),
+      fumenCodec: fakeCodec,
+      search: () => [
+        {
+          score: 20_000,
+          firepowerScore: 20_000,
+          depth: 2,
+          queueIndex: 2,
+          rows: new Array(20).fill(0),
+          path: ["combo"],
+          placements: [],
+          attack: 10,
+          points: 2_000,
+          maxCombo: 4,
+          backToBackChain: 0,
+          allClears: 0,
+          difficultClears: 0,
+          tSpinClears: 0,
+          tSpinAttack: 0,
+          occupiedCells: 4,
+          clearedLines: 4,
+          aggregateHeight: 2,
+          holes: 0,
+          bumpiness: 0
+        },
+        {
+          score: 9_000,
+          firepowerScore: 9_000,
+          depth: 2,
+          queueIndex: 2,
+          rows: new Array(20).fill(0),
+          path: ["tspin"],
+          placements: [],
+          attack: 4,
+          points: 1_200,
+          maxCombo: 1,
+          backToBackChain: 1,
+          allClears: 0,
+          difficultClears: 1,
+          tSpinClears: 1,
+          tSpinAttack: 4,
+          occupiedCells: 4,
+          clearedLines: 2,
+          aggregateHeight: 2,
+          holes: 0,
+          bumpiness: 0
+        }
+      ]
+    });
+
+    expect(report.scenarios[0]?.top.map((candidate) => candidate.path[0])).toEqual(["tspin", "combo"]);
   });
 });
 

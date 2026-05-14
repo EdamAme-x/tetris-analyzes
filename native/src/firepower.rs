@@ -12,6 +12,9 @@ pub(crate) struct FirepowerState {
     pub(crate) max_combo: u32,
     pub(crate) back_to_back_chain: u32,
     pub(crate) all_clears: u32,
+    pub(crate) difficult_clears: u32,
+    pub(crate) t_spin_clears: u32,
+    pub(crate) t_spin_attack: u32,
 }
 
 #[derive(Clone, Copy)]
@@ -36,6 +39,9 @@ impl FirepowerState {
             max_combo: 0,
             back_to_back_chain: 0,
             all_clears: 0,
+            difficult_clears: 0,
+            t_spin_clears: 0,
+            t_spin_attack: 0,
         }
     }
 }
@@ -62,6 +68,9 @@ pub(crate) fn score_state(metrics: BoardEvaluation, firepower: FirepowerState) -
 
 pub(crate) fn firepower_score(firepower: FirepowerState) -> f64 {
     firepower.attack as f64 * 1_000.0
+        + firepower.t_spin_attack as f64 * 1_500.0
+        + firepower.t_spin_clears as f64 * 3_000.0
+        + firepower.difficult_clears as f64 * 1_000.0
         + firepower.points as f64 * 0.05
         + firepower.max_combo as f64 * 20.0
         + firepower.back_to_back_chain as f64 * 25.0
@@ -146,6 +155,8 @@ pub(crate) fn advance_firepower_for_clear_with_combo_table(
     let event_attack = attack.floor() as u32 + all_clear_bonus;
     let event_points = points + all_clear_points;
     let all_clears = previous.all_clears + u32::from(all_clear);
+    let difficult_clear = is_back_to_back_clear(clear_kind) && cleared_lines > 0;
+    let t_spin_clear = is_real_t_spin_line_clear(clear_kind);
 
     (
         FirepowerState {
@@ -155,6 +166,9 @@ pub(crate) fn advance_firepower_for_clear_with_combo_table(
             max_combo,
             back_to_back_chain,
             all_clears,
+            difficult_clears: previous.difficult_clears + u32::from(difficult_clear),
+            t_spin_clears: previous.t_spin_clears + u32::from(t_spin_clear),
+            t_spin_attack: previous.t_spin_attack + if t_spin_clear { event_attack } else { 0 },
         },
         FirepowerEvent {
             clear_kind,
@@ -242,6 +256,17 @@ fn clear_kind_points(kind: ClearKind) -> u32 {
 
 fn is_back_to_back_clear(kind: ClearKind) -> bool {
     tetrio_tables::is_back_to_back_clear(kind)
+}
+
+fn is_real_t_spin_line_clear(kind: ClearKind) -> bool {
+    matches!(
+        kind,
+        ClearKind::TSpinSingle
+            | ClearKind::TSpinDouble
+            | ClearKind::TSpinTriple
+            | ClearKind::TSpinQuad
+            | ClearKind::TSpinPenta
+    )
 }
 
 fn back_to_back_chain_bonus(back_to_back_chain: u32) -> f64 {

@@ -33,6 +33,10 @@ export interface OpenerExperimentCandidate {
   readonly maxCombo: number;
   readonly backToBackChain: number;
   readonly allClears: number;
+  readonly difficultClears: number;
+  readonly tSpinClears: number;
+  readonly tSpinAttack: number;
+  readonly clearSequence: readonly string[];
   readonly occupiedCells: number;
   readonly clearedLines: number;
   readonly aggregateHeight: number;
@@ -87,14 +91,14 @@ export interface RunOpenerExperimentInput {
 
 export const DEFAULT_OPENER_EXPERIMENT_SCENARIOS: readonly OpenerExperimentScenario[] = [
   {
-    name: "best-openers",
-    queue: "TILJSZOTILJ",
+    name: "best-two-bag-tspin-openers",
+    queue: "SZILOJTSTOZLJI",
     hold: true,
-    beamWidth: 128,
-    maxDepth: 6,
-    iterations: 3,
-    top: 12,
-    tags: ["best", "hold"]
+    beamWidth: 1024,
+    maxDepth: 14,
+    iterations: 1,
+    top: 8,
+    tags: ["best", "hold", "two-bag", "t-spin"]
   }
 ];
 
@@ -128,8 +132,8 @@ export function renderOpenerExperimentMarkdown(report: OpenerExperimentReport): 
     "",
     "## Best openers",
     "",
-    "| rank | attack | points | score | holes | bumpiness | path | preview |",
-    "| ---: | ---: | ---: | ---: | ---: | ---: | --- | --- |"
+    "| rank | attack | tspin | tspin attack | points | score | holes | bumpiness | clears | path | preview |",
+    "| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- | --- |"
   ];
 
   for (const candidate of bestCandidates) {
@@ -137,10 +141,13 @@ export function renderOpenerExperimentMarkdown(report: OpenerExperimentReport): 
       [
         String(candidate.rank),
         String(candidate.attack),
+        String(candidate.tSpinClears),
+        String(candidate.tSpinAttack),
         String(candidate.points),
         candidate.score.toFixed(1),
         String(candidate.holes),
         String(candidate.bumpiness),
+        formatClearSequence(candidate.clearSequence),
         candidate.path.join(" "),
         `[view](${candidate.previewUrl})`
       ].join(" | ")
@@ -179,18 +186,21 @@ export function renderOpenerExperimentMarkdown(report: OpenerExperimentReport): 
     }
 
     lines.push(
-      "| rank | attack | points | score | holes | bumpiness | path | preview |",
-      "| ---: | ---: | ---: | ---: | ---: | ---: | --- | --- |"
+      "| rank | attack | tspin | tspin attack | points | score | holes | bumpiness | clears | path | preview |",
+      "| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- | --- |"
     );
     for (const candidate of scenario.top) {
       lines.push(
         [
           String(candidate.rank),
           String(candidate.attack),
+          String(candidate.tSpinClears),
+          String(candidate.tSpinAttack),
           String(candidate.points),
           candidate.score.toFixed(1),
           String(candidate.holes),
           String(candidate.bumpiness),
+          formatClearSequence(candidate.clearSequence),
           candidate.path.join(" "),
           `[view](${candidate.previewUrl})`
         ].join(" | ")
@@ -207,7 +217,8 @@ export function renderOpenerExperimentConsoleSummary(report: OpenerExperimentRep
   const lines = ["Best opener candidates", ""];
   for (const candidate of rankOpenerCandidates(report, topCount)) {
     lines.push(
-      `#${candidate.rank} attack=${candidate.attack} points=${candidate.points} score=${candidate.score.toFixed(1)} holes=${candidate.holes} bump=${candidate.bumpiness}`,
+      `#${candidate.rank} attack=${candidate.attack} tspin=${candidate.tSpinClears} tspinAttack=${candidate.tSpinAttack} points=${candidate.points} score=${candidate.score.toFixed(1)} holes=${candidate.holes} bump=${candidate.bumpiness}`,
+      `clears: ${formatClearSequence(candidate.clearSequence)}`,
       `path: ${candidate.path.join(" ")}`,
       `view: ${candidate.previewUrl}`,
       ""
@@ -305,6 +316,12 @@ function createTopCandidates(
         maxCombo: node.maxCombo,
         backToBackChain: node.backToBackChain,
         allClears: node.allClears,
+        difficultClears: node.difficultClears,
+        tSpinClears: node.tSpinClears,
+        tSpinAttack: node.tSpinAttack,
+        clearSequence: node.placements
+          .filter((placement) => placement.clearName !== "NONE")
+          .map((placement) => `${placement.clearName}:${placement.attack}`),
         occupiedCells: node.occupiedCells,
         clearedLines: node.clearedLines,
         aggregateHeight: node.aggregateHeight,
@@ -317,6 +334,9 @@ function createTopCandidates(
 
 function compareSearchNodesForOpener(left: SearchOpenerBeamNode, right: SearchOpenerBeamNode): number {
   return (
+    right.tSpinClears - left.tSpinClears ||
+    right.tSpinAttack - left.tSpinAttack ||
+    right.difficultClears - left.difficultClears ||
     right.attack - left.attack ||
     right.firepowerScore - left.firepowerScore ||
     right.score - left.score ||
@@ -330,6 +350,9 @@ function compareSearchNodesForOpener(left: SearchOpenerBeamNode, right: SearchOp
 
 function compareRankedOpenerCandidates(left: RankedOpenerCandidate, right: RankedOpenerCandidate): number {
   return (
+    right.tSpinClears - left.tSpinClears ||
+    right.tSpinAttack - left.tSpinAttack ||
+    right.difficultClears - left.difficultClears ||
     right.attack - left.attack ||
     right.firepowerScore - left.firepowerScore ||
     right.score - left.score ||
@@ -339,6 +362,10 @@ function compareRankedOpenerCandidates(left: RankedOpenerCandidate, right: Ranke
     right.path.length - left.path.length ||
     left.path.join(" ").localeCompare(right.path.join(" "))
   );
+}
+
+function formatClearSequence(clearSequence: readonly string[]): string {
+  return clearSequence.length === 0 ? "-" : clearSequence.join(" ");
 }
 
 function summarizeTimings(samples: readonly number[]): { median: number; min: number; max: number } {
