@@ -415,6 +415,37 @@ describe("native opener beam search", () => {
     expect(tightTop?.placements.some((placement) => placement.clearName === "TSPIN_SINGLE")).toBe(true);
   });
 
+  test("keeps medium-depth TL pruning on B2B T-spin lines", () => {
+    const input = {
+      queue: "SZILOJTSTOZLJI",
+      hold: true,
+      maxDepth: 14,
+      comboTable: "MULTIPLIER",
+      kickTable: "SRS+",
+      spinMode: "T-SPINS"
+    } as const;
+    const [mediumTop] = searchOpenerBeam({ ...input, beamWidth: 256 });
+    const [wideTop] = searchOpenerBeam({ ...input, beamWidth: 512 });
+
+    expect(mediumTop).toMatchObject({
+      queueIndex: 14,
+      tSpinClears: 2,
+      tSpinAttack: 5,
+      backToBackChain: 2,
+      difficultClears: 2,
+      holes: 0
+    });
+    expect(wideTop).toMatchObject({
+      queueIndex: 14,
+      tSpinClears: 2,
+      tSpinAttack: 9,
+      backToBackChain: 2,
+      difficultClears: 2,
+      holes: 0
+    });
+    expect(wideTop?.attack ?? 0).toBeGreaterThanOrEqual(mediumTop?.attack ?? 0);
+  });
+
   test("only emits placement histories reachable from each intermediate board", () => {
     const input = {
       queue: "JLSTZIOT",
