@@ -24,6 +24,7 @@ const nativeBindingSpec = {
   estimateOpenerTSpinPotential: "function",
   evaluateOpenerFirepower: "function",
   searchOpenerBeam: "function",
+  searchOpenerBeamCompact: "function",
   searchOpenerBeamWithPlacements: "function",
   evaluateOpenerBag: "function"
 } satisfies { readonly [K in keyof NativeBinding]: "function" };

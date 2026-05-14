@@ -121,6 +121,7 @@ describe("TetrisFumenCodec", () => {
         events: []
       }),
       searchOpenerBeam: () => [],
+      searchOpenerBeamCompact: () => [],
       searchOpenerBeamWithPlacements: () => [],
       evaluateOpenerBag: () => ({
         bag: "TIJLOSZ",

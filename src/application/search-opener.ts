@@ -62,6 +62,20 @@ export function searchOpenerBeam(input: SearchOpenerBeamInput): SearchOpenerBeam
   );
 }
 
+export function searchOpenerBeamCompact(input: SearchOpenerBeamInput): SearchOpenerBeamNode[] {
+  const queue = typeof input.queue === "string" ? input.queue : input.queue.join("");
+  return loadNativeBinding().searchOpenerBeamCompact(
+    queue,
+    input.beamWidth ?? 64,
+    input.hold ?? true,
+    input.maxDepth ?? queue.length,
+    input.comboTable,
+    input.kickTable,
+    input.spinMode,
+    input.setupPoolMultiplier
+  );
+}
+
 export function searchOpenerBeamWithPlacements(input: SearchOpenerBeamInput): SearchOpenerBeamNode[] {
   const queue = typeof input.queue === "string" ? input.queue : input.queue.join("");
   return loadNativeBinding().searchOpenerBeamWithPlacements(

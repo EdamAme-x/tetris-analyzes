@@ -63,6 +63,7 @@ function createValidBinding(): NativeBinding {
       events: []
     }),
     searchOpenerBeam: () => [],
+    searchOpenerBeamCompact: () => [],
     searchOpenerBeamWithPlacements: () => [],
     evaluateOpenerBag: () => ({
       bag: "TIJLOSZ",

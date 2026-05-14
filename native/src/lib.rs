@@ -528,6 +528,32 @@ pub fn search_opener_beam(
         hold_enabled,
         max_depth,
         false,
+        true,
+        combo_table,
+        kick_table,
+        spin_mode,
+        setup_pool_multiplier,
+    )
+}
+
+#[napi(js_name = "searchOpenerBeamCompact")]
+pub fn search_opener_beam_compact(
+    queue: String,
+    beam_width: u32,
+    hold_enabled: bool,
+    max_depth: u32,
+    combo_table: Option<String>,
+    kick_table: Option<String>,
+    spin_mode: Option<String>,
+    setup_pool_multiplier: Option<u32>,
+) -> Result<Vec<BeamSearchNode>> {
+    search_opener_beam_internal(
+        queue,
+        beam_width,
+        hold_enabled,
+        max_depth,
+        false,
+        false,
         combo_table,
         kick_table,
         spin_mode,
@@ -551,6 +577,7 @@ pub fn search_opener_beam_with_placements(
         beam_width,
         hold_enabled,
         max_depth,
+        true,
         true,
         combo_table,
         kick_table,
@@ -593,6 +620,7 @@ fn search_opener_beam_internal(
     hold_enabled: bool,
     max_depth: u32,
     include_placements: bool,
+    include_path: bool,
     combo_table: Option<String>,
     kick_table: Option<String>,
     spin_mode: Option<String>,
@@ -618,7 +646,7 @@ fn search_opener_beam_internal(
         setup_pool_multiplier,
     )
     .into_iter()
-    .map(BeamSearchNode::from)
+    .map(|state| BeamSearchNode::from_search_state(state, include_path))
     .collect())
 }
 
@@ -1463,6 +1491,12 @@ fn parse_optional_spin_mode(input: Option<&str>) -> Result<SpinMode> {
 
 impl From<SearchState> for BeamSearchNode {
     fn from(state: SearchState) -> Self {
+        Self::from_search_state(state, true)
+    }
+}
+
+impl BeamSearchNode {
+    fn from_search_state(state: SearchState, include_path: bool) -> Self {
         Self {
             score: state.score,
             firepower_score: firepower_score(state.firepower),
@@ -1470,7 +1504,11 @@ impl From<SearchState> for BeamSearchNode {
             queue_index: state.queue_index as u32,
             hold: state.hold.map(piece_name).map(String::from),
             rows: state.rows.to_vec(),
-            path: state.path.into_iter().map(PlacementStep::format).collect(),
+            path: if include_path {
+                state.path.into_iter().map(PlacementStep::format).collect()
+            } else {
+                Vec::new()
+            },
             placements: state
                 .placements
                 .into_iter()

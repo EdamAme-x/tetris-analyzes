@@ -199,6 +199,16 @@ export interface NativeBinding {
     spinMode?: NativeSpinMode,
     setupPoolMultiplier?: number
   ): NativeBeamSearchNode[];
+  searchOpenerBeamCompact(
+    queue: string,
+    beamWidth: number,
+    holdEnabled: boolean,
+    maxDepth: number,
+    comboTable?: NativeComboTable,
+    kickTable?: NativeKickTable,
+    spinMode?: NativeSpinMode,
+    setupPoolMultiplier?: number
+  ): NativeBeamSearchNode[];
   searchOpenerBeamWithPlacements(
     queue: string,
     beamWidth: number,

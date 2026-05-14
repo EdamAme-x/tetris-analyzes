@@ -3,7 +3,12 @@ import { BOARD_HEIGHT, BOARD_WIDTH, ROW_MASK } from "../domain/board";
 import type { FumenCodec, FumenUrls } from "../domain/fumen";
 import type { NativeComboTable, NativeKickTable, NativeSpinMode } from "../infrastructure/native/binding-types";
 import { createOpenerFumenPages } from "./create-opener-fumen";
-import { searchOpenerBeam, searchOpenerBeamWithPlacements, type SearchOpenerBeamInput, type SearchOpenerBeamNode } from "./search-opener";
+import {
+  searchOpenerBeamCompact,
+  searchOpenerBeamWithPlacements,
+  type SearchOpenerBeamInput,
+  type SearchOpenerBeamNode
+} from "./search-opener";
 
 export interface OpenerExperimentSearchRules {
   readonly spinMode: NativeSpinMode;
@@ -387,7 +392,7 @@ export function runOpenerExperiment(input: RunOpenerExperimentInput): OpenerExpe
 
   const clock = input.clock ?? systemClock;
   const search = input.search ?? searchOpenerBeamWithPlacements;
-  const replaySearch = input.replaySearch ?? (input.search === undefined ? searchOpenerBeam : search);
+  const replaySearch = input.replaySearch ?? (input.search === undefined ? searchOpenerBeamCompact : search);
   const fumenCodec = input.fumenCodec ?? createFumenCodec();
   const environment = input.environment ?? { runtime: "bun", nativeProfile: "release" };
   const scenarios = input.scenarios.map((scenario) => runScenario(scenario, input.top, search, fumenCodec, clock));

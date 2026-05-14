@@ -6,6 +6,7 @@ import {
   evaluateOpenerBag,
   evaluateOpenerFirepower,
   searchOpenerBeam,
+  searchOpenerBeamCompact,
   searchOpenerBeamWithPlacements,
   type SearchPiece
 } from "../src/application/search-opener";
@@ -31,6 +32,24 @@ describe("native opener beam search", () => {
     for (let index = 1; index < nodes.length; index += 1) {
       expect(nodes[index - 1]?.score ?? 0).toBeGreaterThanOrEqual(nodes[index]?.score ?? 0);
     }
+  });
+
+  test("returns compact replay nodes without path or placement conversion", () => {
+    const input = { queue: "TILJSZO", beamWidth: 16, hold: true, maxDepth: 4 } as const;
+    const [full] = searchOpenerBeam(input);
+    const [compact] = searchOpenerBeamCompact(input);
+
+    expect(compact).toMatchObject({
+      score: full?.score,
+      firepowerScore: full?.firepowerScore,
+      rows: full?.rows,
+      attack: full?.attack,
+      tSpinAttack: full?.tSpinAttack,
+      backToBackChain: full?.backToBackChain
+    });
+    expect(compact?.depth).toBe(4);
+    expect(compact?.path).toEqual([]);
+    expect(compact?.placements).toEqual([]);
   });
 
   test("returns placement details for fumen preview generation when requested", () => {
