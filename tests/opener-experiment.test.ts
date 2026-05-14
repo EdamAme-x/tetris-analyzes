@@ -72,8 +72,11 @@ describe("opener experiment runner", () => {
   });
 
   test("provides a three-bag continuation preset for B2B T-spin chain experiments", () => {
-    expect(CONTINUATION_OPENER_EXPERIMENT_SCENARIOS).toHaveLength(SURVEY_OPENER_EXPERIMENT_SCENARIOS.length);
+    expect(CONTINUATION_OPENER_EXPERIMENT_SCENARIOS).toHaveLength(8);
     expect(CONTINUATION_OPENER_EXPERIMENT_SCENARIOS.every((scenario) => scenario.name.startsWith("continuation-"))).toBe(true);
+    expect(new Set(CONTINUATION_OPENER_EXPERIMENT_SCENARIOS.map((scenario) => scenario.queue)).size).toBe(
+      CONTINUATION_OPENER_EXPERIMENT_SCENARIOS.length
+    );
     expect(CONTINUATION_OPENER_EXPERIMENT_SCENARIOS.every((scenario) => isThreeBagQueue(scenario.queue))).toBe(true);
     expect(CONTINUATION_OPENER_EXPERIMENT_SCENARIOS.every((scenario) => scenario.beamWidth === 256)).toBe(true);
     expect(CONTINUATION_OPENER_EXPERIMENT_SCENARIOS.every((scenario) => scenario.maxDepth === 21)).toBe(true);

@@ -214,6 +214,7 @@ export interface TemplateReplayScenarioOptions {
   readonly bagCount?: number;
   readonly beamWidth?: number;
   readonly maxDepth?: number;
+  readonly sampleOffset?: number;
 }
 
 const TWO_BAG_TL_SURVEY_QUEUES = [
@@ -227,6 +228,16 @@ const TWO_BAG_TL_SURVEY_QUEUES = [
 ] as const;
 const DISCOVERY_TWO_BAG_SAMPLE_SIZE = 24;
 const DISCOVERY_BAG = "TIJLOSZ";
+const CONTINUATION_THREE_BAG_QUEUES = [
+  ["discover-01", "TIJLOSZTIZJLSOTJSZIOL"],
+  ["discover-02", "TJSIZOLTSILJOZITSOJLZ"],
+  ["discover-04", "TSZLJOIISLOZTJJSLZOTI"],
+  ["discover-06", "ILJTOZSJZTIOLSOJLISTZ"],
+  ["discover-09", "JITSZLOOJSLZITZSIJOLT"],
+  ["discover-11", "JSLTOIZSLITOZJIOTZLSJ"],
+  ["discover-13", "LISOTJZZLOJTSILITOJZS"],
+  ["discover-14", "LOISZJTTIZSJLOOTIJLSZ"]
+] as const;
 const DEFAULT_TWO_BAG_QUALITY_GATE = {
   minQueueIndex: 14,
   minAttack: 9,
@@ -289,10 +300,10 @@ export const SURVEY_OPENER_EXPERIMENT_SCENARIOS: readonly OpenerExperimentScenar
   tags: ["survey", "hold", "two-bag", "t-spin", "tetrio-tl"]
 }));
 
-export const CONTINUATION_OPENER_EXPERIMENT_SCENARIOS: readonly OpenerExperimentScenario[] = TWO_BAG_TL_SURVEY_QUEUES.map(
+export const CONTINUATION_OPENER_EXPERIMENT_SCENARIOS: readonly OpenerExperimentScenario[] = CONTINUATION_THREE_BAG_QUEUES.map(
   ([name, queue]) => ({
     name: `continuation-${name}`,
-    queue: `${queue}${DISCOVERY_BAG}`,
+    queue,
     hold: true,
     beamWidth: 256,
     maxDepth: 21,
@@ -331,7 +342,7 @@ export function createTemplateReplayScenarios(sampleSize: number, options: Templ
   const maxDepth = options.maxDepth ?? bagCount * DISCOVERY_BAG.length;
   const beamWidth = options.beamWidth ?? (bagCount >= 3 ? 256 : 512);
   const bagTag = bagCountTag(bagCount);
-  return createDiscoveryBagQueues(sampleSize, bagCount).map((queue, index) => ({
+  return createDiscoveryBagQueues(sampleSize, bagCount, options.sampleOffset ?? 0).map((queue, index) => ({
     name: `replay-${String(index + 1).padStart(2, "0")}`,
     queue,
     hold: true,
@@ -1358,16 +1369,16 @@ function rulesEqual(left: OpenerExperimentSearchRules, right: OpenerExperimentSe
 }
 
 function createDiscoveryTwoBagQueues(sampleSize: number): string[] {
-  return createDiscoveryBagQueues(sampleSize, 2);
+  return createDiscoveryBagQueues(sampleSize, 2, 0);
 }
 
-function createDiscoveryBagQueues(sampleSize: number, bagCount: number): string[] {
+function createDiscoveryBagQueues(sampleSize: number, bagCount: number, sampleOffset: number): string[] {
   const permutationCount = factorial(DISCOVERY_BAG.length);
   const queues = new Set<string>();
   for (let sample = 0; queues.size < sampleSize && sample < permutationCount * 2; sample += 1) {
     let queue = "";
     for (let bagIndex = 0; bagIndex < bagCount; bagIndex += 1) {
-      queue += nthPermutation(DISCOVERY_BAG, permutationIndex(sample, bagIndex, permutationCount));
+      queue += nthPermutation(DISCOVERY_BAG, permutationIndex(sample + sampleOffset, bagIndex, permutationCount));
     }
     queues.add(queue);
   }
