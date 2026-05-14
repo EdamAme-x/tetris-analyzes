@@ -1,7 +1,10 @@
 use napi::bindgen_prelude::{Error, Result};
 
-use crate::board::{self, BoardEvaluation, BoardRows};
-use crate::spin::{SpinDetection, SpinKind};
+use crate::board::{self, BoardEvaluation, BoardRows, BOARD_HEIGHT, BOARD_WIDTH};
+use crate::movement::{can_place, is_reachable_placement, lock_shape};
+use crate::pieces::{piece_shapes, placement_shape_indices, Piece};
+use crate::spin::{detect_spin, SpinDetection, SpinKind};
+use crate::tetrio_tables::KickTable;
 use crate::tetrio_tables::{self, ClearKind, ComboTable};
 
 #[derive(Clone, Copy)]
@@ -83,6 +86,37 @@ pub(crate) fn board_shape_score(metrics: BoardEvaluation) -> f64 {
     let holes = metrics[3] as f64;
     let bumpiness = metrics[4] as f64;
     cleared_lines * 120.0 - holes * 90.0 - aggregate_height * 2.2 - bumpiness * 7.0
+}
+
+pub(crate) fn estimate_t_spin_potential(rows: &BoardRows, kick_table: KickTable) -> u32 {
+    let mut best = 0_u32;
+    let shapes = piece_shapes(Piece::T);
+    for shape_index in placement_shape_indices(Piece::T).iter().copied() {
+        let shape = shapes[shape_index];
+        for x in 0..=(BOARD_WIDTH as i8 - shape.width) {
+            for y in 0..=(BOARD_HEIGHT as i8 - shape.height) {
+                if !can_place(rows, shape, x, y) || (y > 0 && can_place(rows, shape, x, y - 1)) {
+                    continue;
+                }
+                if !is_reachable_placement(rows, Piece::T, shape_index, x, y, kick_table) {
+                    break;
+                }
+                let Some(placed) = lock_shape(rows, shape, x, y) else {
+                    continue;
+                };
+                let cleared_lines = board::count_full_lines_array(&placed);
+                let spin = detect_spin(&placed, Piece::T, shape, x, y, cleared_lines);
+                let value = match spin.kind {
+                    SpinKind::TSpin => 1 + cleared_lines,
+                    SpinKind::TSpinMini if cleared_lines > 0 => 1,
+                    SpinKind::None | SpinKind::TSpinMini | SpinKind::ImmobileSpin => 0,
+                };
+                best = best.max(value);
+                break;
+            }
+        }
+    }
+    best
 }
 
 pub(crate) fn advance_firepower_with_combo_table(

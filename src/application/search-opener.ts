@@ -96,6 +96,10 @@ export function detectOpenerSpin(input: OpenerPlacementReachabilityInput): Nativ
   return loadNativeBinding().detectOpenerSpin(input.rows, input.piece, input.rotation, input.x, input.y, input.spinMode);
 }
 
+export function estimateOpenerTSpinPotential(rows: Uint16Array, kickTable?: NativeKickTable): number {
+  return loadNativeBinding().estimateOpenerTSpinPotential(rows, kickTable);
+}
+
 export function evaluateOpenerFirepower(events: readonly NativeFirepowerInput[]): NativeFirepowerSummary {
   return loadNativeBinding().evaluateOpenerFirepower([...events]);
 }

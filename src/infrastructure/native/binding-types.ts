@@ -179,6 +179,7 @@ export interface NativeBinding {
     y: number,
     spinMode?: NativeSpinMode
   ): NativeSpinDetection;
+  estimateOpenerTSpinPotential(rows: Uint16Array, kickTable?: NativeKickTable): number;
   evaluateOpenerFirepower(events: NativeFirepowerInput[]): NativeFirepowerSummary;
   searchOpenerBeam(
     queue: string,

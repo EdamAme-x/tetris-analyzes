@@ -21,6 +21,7 @@ const nativeBindingSpec = {
   batchRowsToFumenFields: "function",
   canReachOpenerPlacement: "function",
   detectOpenerSpin: "function",
+  estimateOpenerTSpinPotential: "function",
   evaluateOpenerFirepower: "function",
   searchOpenerBeam: "function",
   searchOpenerBeamWithPlacements: "function",

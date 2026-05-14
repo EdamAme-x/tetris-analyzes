@@ -15,7 +15,7 @@ use bag::{evaluate_opener_bag_internal, OpenerBagEvaluation};
 use board::{BoardEvaluation, BoardRows, BOARD_HEIGHT, BOARD_WIDTH};
 use firepower::{
     advance_firepower_for_clear_with_combo_table, advance_firepower_with_combo_table,
-    clear_kind_cleared_lines, clear_kind_name, firepower_score, parse_clear_kind,
+    clear_kind_cleared_lines, clear_kind_name, estimate_t_spin_potential, firepower_score, parse_clear_kind,
     parse_combo_table, score_state, FirepowerEvent, FirepowerState,
 };
 use movement::{can_place, is_reachable_placement, lock_shape, parse_kick_table};
@@ -315,6 +315,16 @@ pub fn detect_opener_spin(
         None => detected,
     };
     Ok(BeamSpinDetection::from(spin))
+}
+
+#[napi(js_name = "estimateOpenerTSpinPotential")]
+pub fn estimate_opener_t_spin_potential(
+    rows: Uint16Array,
+    kick_table: Option<String>,
+) -> Result<u32> {
+    let board = board::rows_to_array(rows.as_ref())?;
+    let kick_table = parse_optional_kick_table(kick_table.as_deref())?;
+    Ok(estimate_t_spin_potential(&board, kick_table))
 }
 
 #[napi(js_name = "evaluateOpenerFirepower")]

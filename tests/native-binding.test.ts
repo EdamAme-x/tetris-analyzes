@@ -51,6 +51,7 @@ function createValidBinding(): NativeBinding {
     batchRowsToFumenFields: () => [],
     canReachOpenerPlacement: () => false,
     detectOpenerSpin: () => ({ kind: "NONE", spin: false, mini: false, immobile: false, occupiedCorners: 0, clearedLines: 0 }),
+    estimateOpenerTSpinPotential: () => 0,
     evaluateOpenerFirepower: () => ({
       attack: 0,
       points: 0,

@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
   canReachOpenerPlacement,
   detectOpenerSpin,
+  estimateOpenerTSpinPotential,
   evaluateOpenerBag,
   evaluateOpenerFirepower,
   searchOpenerBeam,
@@ -113,6 +114,25 @@ describe("native opener beam search", () => {
       spin: true,
       immobile: true
     });
+  });
+
+  test("estimates T-spin slot potential before the clearing T is placed", () => {
+    const empty = bitBoardFromRows(new Array(20).fill(0));
+    const readyRows = new Array(20).fill(0);
+    readyRows[1] = (1 << 3) | (1 << 5);
+    const unreachableRows = new Array(20).fill(0);
+    unreachableRows[0] = 660;
+    unreachableRows[1] = 553;
+    unreachableRows[2] = 832;
+    unreachableRows[3] = 964;
+    unreachableRows[4] = 68;
+    unreachableRows[5] = 588;
+    unreachableRows[6] = 32;
+    unreachableRows[7] = 496;
+
+    expect(estimateOpenerTSpinPotential(empty)).toBe(0);
+    expect(estimateOpenerTSpinPotential(bitBoardFromRows(readyRows))).toBeGreaterThanOrEqual(1);
+    expect(estimateOpenerTSpinPotential(bitBoardFromRows(unreachableRows))).toBe(0);
   });
 
   test("applies native spin mode options before firepower scoring", () => {

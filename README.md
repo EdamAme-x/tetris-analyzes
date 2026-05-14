@@ -25,3 +25,4 @@ Executable examples live in `tests/`.
 - [x] Known opener benchmark set and regression report
 - [x] Fumen preview operation parity tests for native SRS piece geometry
 - [x] Native beam pruning prefers T-spin, difficult clear, and B2B chain branches
+- [x] Native T-spin slot potential helper for future setup-aware search
