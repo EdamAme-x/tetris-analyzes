@@ -86,3 +86,4 @@ Executable examples live in `tests/`.
 - [x] Prioritize replay-hit survivability before firepower inside replay reports
 - [x] Keep console top compact while using a wider internal replay template pool
 - [x] Track bag-boundary phase replay hits separately from exact final-board replay
+- [x] Reuse full phase indexes for cached replay and grouped template representatives

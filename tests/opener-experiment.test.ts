@@ -511,9 +511,9 @@ describe("opener experiment runner", () => {
 
     const summary = renderOpenerExperimentConsoleSummary(report, 1);
     expect(summary).toContain("Best opener templates (replayed)");
-    expect(summary).toContain("replay=1/2 (50.0%) phase=1/2 (50.0%) grouped=1 (100.0%)");
+    expect(summary).toContain("replay=1/2 (50.0%) phase=1/2 (50.0%) grouped=1/1 (100.0%)");
     expect(renderOpenerExperimentMarkdown(report)).toContain("## Template replay");
-    expect(renderOpenerExperimentMarkdown(report)).toContain("1/2 (50.0%) | 1/2 (50.0%) | 1 (100.0%) | source");
+    expect(renderOpenerExperimentMarkdown(report)).toContain("1/2 (50.0%) | 1/2 (50.0%) | 1/1 (100.0%) | source");
   });
 
   test("prioritizes replayed templates before unreplayed firepower in replay reports", () => {
@@ -732,6 +732,169 @@ describe("opener experiment runner", () => {
       replayHitCount: 0,
       phaseReplayHitCount: 1,
       phaseReplayHitRate: 1
+    });
+  });
+
+  test("groups phase replay across non-best sources of the same final template", () => {
+    const sharedRows = [7, 11, 13, ...new Array(17).fill(0)];
+    const phaseA = Array.from({ length: 7 }, () => placementEvent("SINGLE", 0, 0, "I", 0));
+    const phaseB = Array.from({ length: 7 }, () => placementEvent("SINGLE", 0, 0, "I", 4));
+    const report = runOpenerExperiment({
+      scenarios: [
+        {
+          name: "best-source",
+          queue: "TIJLOSZTIJLOSZ",
+          hold: true,
+          beamWidth: 4,
+          maxDepth: 14,
+          warmups: 0,
+          iterations: 1,
+          top: 1
+        },
+        {
+          name: "phase-source",
+          queue: "OJLZISTOJLZIST",
+          hold: true,
+          beamWidth: 4,
+          maxDepth: 14,
+          warmups: 0,
+          iterations: 1,
+          top: 1
+        }
+      ],
+      templateReplay: {
+        scenarios: [
+          {
+            name: "phase-hit",
+            queue: "SZTILJOSZTILJO",
+            hold: true,
+            beamWidth: 4,
+            maxDepth: 14,
+            warmups: 0,
+            iterations: 1
+          }
+        ],
+        topTemplates: 1
+      },
+      clock: createClock("2026-05-14T00:00:00.000Z", [0, 1, 2, 3]),
+      fumenCodec: fakeCodec,
+      search: (input) => {
+        if (input.queue === "TIJLOSZTIJLOSZ") {
+          return [
+            {
+              ...candidateNode("best-source"),
+              rows: sharedRows,
+              placements: [...phaseA, placementEvent("SINGLE", 0, 0, "I", 0)],
+              attack: 12,
+              difficultAttack: 12,
+              difficultClears: 3,
+              tSpinClears: 3,
+              tSpinAttack: 12,
+              backToBackChain: 3
+            }
+          ];
+        }
+        if (input.queue === "OJLZISTOJLZIST") {
+          return [
+            {
+              ...candidateNode("phase-source"),
+              rows: sharedRows,
+              placements: [...phaseB, placementEvent("SINGLE", 0, 0, "I", 0)],
+              backToBackChain: 3
+            }
+          ];
+        }
+        return [
+          {
+            ...candidateNode("phase-hit"),
+            rows: [19, ...new Array(19).fill(0)],
+            placements: [...phaseB, placementEvent("SINGLE", 0, 0, "I", 0)]
+          }
+        ];
+      }
+    });
+
+    expect(report.templateReplay?.templates[0]).toMatchObject({
+      replayHitCount: 0,
+      phaseReplayHitCount: 1,
+      groupedSurvivalCount: 2,
+      groupedScenarioCount: 2
+    });
+  });
+
+  test("reuses cached full phase indexes instead of only cached top candidates", () => {
+    const targetRows = [5, 8, 13, ...new Array(17).fill(0)];
+    const cachedTopRows = [2, 4, 8, ...new Array(17).fill(0)];
+    const cachedLowerRows = [3, 6, 12, ...new Array(17).fill(0)];
+    const targetPhase = Array.from({ length: 7 }, () => placementEvent("SINGLE", 0, 0, "I", 0));
+    const wrongPhase = Array.from({ length: 7 }, () => placementEvent("SINGLE", 0, 0, "I", 4));
+    let calls = 0;
+    const cachedScenario = {
+      name: "cached-source",
+      queue: "OJLZISTOJLZIST",
+      hold: true,
+      beamWidth: 4,
+      maxDepth: 14,
+      warmups: 0,
+      iterations: 1,
+      top: 1
+    };
+    const report = runOpenerExperiment({
+      scenarios: [
+        {
+          name: "target-source",
+          queue: "TIJLOSZTIJLOSZ",
+          hold: true,
+          beamWidth: 4,
+          maxDepth: 14,
+          warmups: 0,
+          iterations: 1,
+          top: 1
+        },
+        cachedScenario
+      ],
+      templateReplay: {
+        scenarios: [{ ...cachedScenario, name: "cached-replay" }],
+        topTemplates: 1
+      },
+      clock: createClock("2026-05-14T00:00:00.000Z", [0, 1, 2, 3]),
+      fumenCodec: fakeCodec,
+      search: (input) => {
+        calls += 1;
+        if (input.queue === "TIJLOSZTIJLOSZ") {
+          return [
+            {
+              ...candidateNode("target-source"),
+              rows: targetRows,
+              placements: [...targetPhase, placementEvent("SINGLE", 0, 0, "I", 0)],
+              attack: 12,
+              difficultAttack: 12,
+              difficultClears: 3,
+              tSpinClears: 3,
+              tSpinAttack: 12,
+              backToBackChain: 3
+            }
+          ];
+        }
+        return [
+          {
+            ...candidateNode("cached-top-wrong-phase"),
+            rows: cachedTopRows,
+            placements: [...wrongPhase, placementEvent("SINGLE", 0, 0, "I", 0)]
+          },
+          {
+            ...candidateNode("cached-lower-target-phase"),
+            rows: cachedLowerRows,
+            placements: [...targetPhase, placementEvent("SINGLE", 0, 0, "I", 0)]
+          }
+        ];
+      }
+    });
+
+    expect(calls).toBe(2);
+    expect(report.templateReplay?.templates[0]).toMatchObject({
+      replayHitCount: 0,
+      phaseReplayHitCount: 1
     });
   });
 

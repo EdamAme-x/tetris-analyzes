@@ -82,6 +82,7 @@ export interface RankedOpenerTemplate {
   readonly survivalCount: number;
   readonly survivalRate: number;
   readonly sources: readonly string[];
+  readonly phaseTemplateKeys: readonly string[];
   readonly best: RankedOpenerCandidate;
 }
 
@@ -105,6 +106,7 @@ export interface OpenerTemplateReplayEntry {
   readonly rank: number;
   readonly key: string;
   readonly groupedSurvivalCount: number;
+  readonly groupedScenarioCount: number;
   readonly groupedSurvivalRate: number;
   readonly replayScenarioCount: number;
   readonly replayHitCount: number;
@@ -138,12 +140,19 @@ export interface OpenerExperimentScenarioResult {
   readonly maxMs: number;
   readonly searchesPerSecond: number;
   readonly reachableTemplates: readonly OpenerScenarioReachableTemplate[];
+  readonly reachableTemplatePhases: readonly OpenerScenarioReachablePhase[];
   readonly top: readonly OpenerExperimentCandidate[];
   readonly tags: readonly string[];
 }
 
 export interface OpenerScenarioReachableTemplate {
   readonly key: string;
+  readonly rank: number;
+}
+
+export interface OpenerScenarioReachablePhase {
+  readonly key: string;
+  readonly phaseKey: string;
   readonly rank: number;
 }
 
@@ -553,15 +562,23 @@ export function rankOpenerCandidates(report: OpenerExperimentReport, topCount: n
 }
 
 export function rankOpenerTemplates(report: OpenerExperimentReport, topCount: number): RankedOpenerTemplate[] {
-  const byKey = new Map<string, { best: RankedOpenerCandidate; sources: Set<string> }>();
+  const phaseKeysByTemplate = collectReachablePhaseKeysByTemplate(report);
+  const byKey = new Map<string, { best: RankedOpenerCandidate; sources: Set<string>; phaseKeys: Set<string> }>();
   for (const candidate of rankOpenerCandidates(report, Number.MAX_SAFE_INTEGER)) {
     const key = templateKey(candidate);
     const current = byKey.get(key);
     if (current === undefined) {
-      byKey.set(key, { best: candidate, sources: new Set([candidate.sourceScenario]) });
+      byKey.set(key, {
+        best: candidate,
+        sources: new Set([candidate.sourceScenario]),
+        phaseKeys: new Set(phaseKeysByTemplate.get(key) ?? [candidate.phaseTemplateKey])
+      });
       continue;
     }
     current.sources.add(candidate.sourceScenario);
+    for (const phaseKey of phaseKeysByTemplate.get(key) ?? [candidate.phaseTemplateKey]) {
+      current.phaseKeys.add(phaseKey);
+    }
     if (compareRankedOpenerCandidates(candidate, current.best) < 0) {
       current.best = candidate;
     }
@@ -574,6 +591,7 @@ export function rankOpenerTemplates(report: OpenerExperimentReport, topCount: nu
       survivalCount: group.sources.size,
       survivalRate: group.sources.size / report.scenarios.length,
       sources: [...group.sources].sort(),
+      phaseTemplateKeys: [...group.phaseKeys].sort(),
       best: group.best
     }))
     .sort(compareRankedOpenerTemplates)
@@ -604,10 +622,9 @@ export function replayOpenerTemplateSurvivability(
   const phaseHitsByTemplate = new Map<string, Set<string>>();
   const templateKeysByPhase = new Map<string, string[]>();
   for (const template of templates) {
-    templateKeysByPhase.set(template.best.phaseTemplateKey, [
-      ...(templateKeysByPhase.get(template.best.phaseTemplateKey) ?? []),
-      template.key
-    ]);
+    for (const phaseKey of template.phaseTemplateKeys) {
+      templateKeysByPhase.set(phaseKey, [...(templateKeysByPhase.get(phaseKey) ?? []), template.key]);
+    }
   }
   const cachedScenarios = new Map(report.scenarios.map((scenario) => [scenarioResultSignature(scenario), scenario]));
   for (const scenario of input.scenarios) {
@@ -615,8 +632,8 @@ export function replayOpenerTemplateSurvivability(
     const scenarioPhaseHits = new Set<string>();
     const cachedScenario = cachedScenarios.get(scenarioSignature(scenario));
     if (cachedScenario !== undefined) {
-      for (const candidate of cachedScenario.top) {
-        addPhaseReplayHits(phaseHitsByTemplate, templateKeysByPhase, candidate.phaseTemplateKey, scenario.name, scenarioPhaseHits);
+      for (const reachablePhase of cachedScenario.reachableTemplatePhases) {
+        addPhaseReplayHits(phaseHitsByTemplate, templateKeysByPhase, reachablePhase.phaseKey, scenario.name, scenarioPhaseHits);
       }
       for (const reachableTemplate of cachedScenario.reachableTemplates) {
         const key = reachableTemplate.key;
@@ -682,6 +699,7 @@ export function replayOpenerTemplateSurvivability(
           rank: 0,
           key: template.key,
           groupedSurvivalCount: template.survivalCount,
+          groupedScenarioCount: report.scenarios.length,
           groupedSurvivalRate: template.survivalRate,
           replayScenarioCount: input.scenarios.length,
           replayHitCount: hits.length,
@@ -746,6 +764,7 @@ function runScenario(
     maxMs: stats.max,
     searchesPerSecond: stats.median === 0 ? 0 : 1_000 / stats.median,
     reachableTemplates: createReachableTemplates(lastNodes),
+    reachableTemplatePhases: createReachableTemplatePhases(lastNodes, scenario),
     top: topCandidates,
     tags: scenario.tags ?? []
   };
@@ -788,6 +807,22 @@ function createReachableTemplates(nodes: readonly SearchOpenerBeamNode[]): Opene
     }
   }
   return [...ranksByTemplate.entries()].map(([key, rank]) => ({ key, rank }));
+}
+
+function createReachableTemplatePhases(
+  nodes: readonly SearchOpenerBeamNode[],
+  scenario: OpenerExperimentScenario
+): OpenerScenarioReachablePhase[] {
+  const ranksByTemplatePhase = new Map<string, OpenerScenarioReachablePhase>();
+  for (const [index, node] of nodes.entries()) {
+    const key = searchNodeTemplateKey(node);
+    const phaseKey = searchNodePhaseTemplateKey(node, scenario);
+    const uniqueKey = `${key}\n${phaseKey}`;
+    if (!ranksByTemplatePhase.has(uniqueKey)) {
+      ranksByTemplatePhase.set(uniqueKey, { key, phaseKey, rank: index + 1 });
+    }
+  }
+  return [...ranksByTemplatePhase.values()];
 }
 
 function assertScenarioQualityGate(scenario: OpenerExperimentScenario, candidate: OpenerExperimentCandidate | undefined): void {
@@ -972,6 +1007,18 @@ function countTemplateSurvivors(report: OpenerExperimentReport): Map<string, num
   return new Map([...sourcesByTemplate].map(([key, sources]) => [key, sources.size]));
 }
 
+function collectReachablePhaseKeysByTemplate(report: OpenerExperimentReport): Map<string, Set<string>> {
+  const phaseKeysByTemplate = new Map<string, Set<string>>();
+  for (const scenario of report.scenarios) {
+    for (const reachablePhase of scenario.reachableTemplatePhases) {
+      const phaseKeys = phaseKeysByTemplate.get(reachablePhase.key) ?? new Set<string>();
+      phaseKeys.add(reachablePhase.phaseKey);
+      phaseKeysByTemplate.set(reachablePhase.key, phaseKeys);
+    }
+  }
+  return phaseKeysByTemplate;
+}
+
 function templateKey(candidate: Pick<OpenerExperimentCandidate, "finalRows" | "hold" | "queueIndex" | "backToBackChain">): string {
   return statefulTemplateKey(candidate.finalRows, candidate.hold, candidate.queueIndex, candidate.backToBackChain);
 }
@@ -1057,8 +1104,10 @@ function formatPhaseReplaySurvival(
   return `${template.phaseReplayHitCount}/${template.replayScenarioCount} (${formatPercent(template.phaseReplayHitRate)})`;
 }
 
-function formatGroupedReplaySurvival(template: Pick<OpenerTemplateReplayEntry, "groupedSurvivalCount" | "groupedSurvivalRate">): string {
-  return `${template.groupedSurvivalCount} (${formatPercent(template.groupedSurvivalRate)})`;
+function formatGroupedReplaySurvival(
+  template: Pick<OpenerTemplateReplayEntry, "groupedSurvivalCount" | "groupedScenarioCount" | "groupedSurvivalRate">
+): string {
+  return `${template.groupedSurvivalCount}/${template.groupedScenarioCount} (${formatPercent(template.groupedSurvivalRate)})`;
 }
 
 function formatQualityGate(gate: OpenerExperimentQualityGate | undefined): string {
