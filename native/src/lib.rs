@@ -520,34 +520,6 @@ pub(crate) fn search_opener_states(
                                 combo_table,
                             );
                             let score = score_state(metrics, firepower);
-                            let mut path = state.path.clone();
-                            path.push(format_placement(
-                                choice.piece,
-                                shape.rotation,
-                                x,
-                                placed.y,
-                                choice.used_hold,
-                            ));
-                            let placements = if include_placements {
-                                let mut placements = state.placements.clone();
-                                if let Some(mut placement) = placed.placement {
-                                    placement.firepower = firepower_event;
-                                    placements.push(placement);
-                                }
-                                placements
-                            } else {
-                                Vec::new()
-                            };
-                            let next_state = SearchState {
-                                rows,
-                                hold: choice.hold,
-                                queue_index: choice.queue_index,
-                                path,
-                                placements,
-                                score,
-                                metrics,
-                                firepower,
-                            };
                             let key = SearchKey {
                                 rows,
                                 hold: choice.hold,
@@ -555,13 +527,48 @@ pub(crate) fn search_opener_states(
                                 combo: firepower.combo,
                                 back_to_back_chain: firepower.back_to_back_chain,
                             };
-                            match next_by_key.get(&key) {
-                                Some(existing)
-                                    if compare_search_state(existing, &next_state)
-                                        != std::cmp::Ordering::Greater => {}
-                                _ => {
-                                    next_by_key.insert(key, next_state);
+                            let should_insert = match next_by_key.get(&key) {
+                                Some(existing) => {
+                                    compare_search_state_to_candidate(
+                                        existing,
+                                        score,
+                                        firepower,
+                                        state.path.len() + 1,
+                                    ) == std::cmp::Ordering::Greater
                                 }
+                                None => true,
+                            };
+
+                            if should_insert {
+                                let mut path = state.path.clone();
+                                path.push(format_placement(
+                                    choice.piece,
+                                    shape.rotation,
+                                    x,
+                                    placed.y,
+                                    choice.used_hold,
+                                ));
+                                let placements = if include_placements {
+                                    let mut placements = state.placements.clone();
+                                    if let Some(mut placement) = placed.placement {
+                                        placement.firepower = firepower_event;
+                                        placements.push(placement);
+                                    }
+                                    placements
+                                } else {
+                                    Vec::new()
+                                };
+                                let next_state = SearchState {
+                                    rows,
+                                    hold: choice.hold,
+                                    queue_index: choice.queue_index,
+                                    path,
+                                    placements,
+                                    score,
+                                    metrics,
+                                    firepower,
+                                };
+                                next_by_key.insert(key, next_state);
                             }
                         }
                     }
@@ -718,6 +725,32 @@ fn compare_search_state(left: &SearchState, right: &SearchState) -> std::cmp::Or
         .then_with(|| right.firepower.points.cmp(&left.firepower.points))
         .then_with(|| left.path.len().cmp(&right.path.len()))
         .then_with(|| left.path.cmp(&right.path))
+}
+
+fn compare_search_state_to_candidate(
+    left: &SearchState,
+    right_score: f64,
+    right_firepower: FirepowerState,
+    right_path_len: usize,
+) -> std::cmp::Ordering {
+    right_firepower
+        .t_spin_clears
+        .cmp(&left.firepower.t_spin_clears)
+        .then_with(|| right_firepower.t_spin_attack.cmp(&left.firepower.t_spin_attack))
+        .then_with(|| {
+            right_firepower
+                .difficult_clears
+                .cmp(&left.firepower.difficult_clears)
+        })
+        .then_with(|| {
+            right_firepower
+                .back_to_back_chain
+                .cmp(&left.firepower.back_to_back_chain)
+        })
+        .then_with(|| right_firepower.attack.cmp(&left.firepower.attack))
+        .then_with(|| right_score.total_cmp(&left.score))
+        .then_with(|| right_firepower.points.cmp(&left.firepower.points))
+        .then_with(|| left.path.len().cmp(&right_path_len))
 }
 
 pub(crate) fn validate_beam_width(beam_width: u32) -> Result<usize> {
