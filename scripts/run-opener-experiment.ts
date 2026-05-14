@@ -2,6 +2,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import {
   DEFAULT_OPENER_EXPERIMENT_SCENARIOS,
+  SURVEY_OPENER_EXPERIMENT_SCENARIOS,
   renderOpenerExperimentConsoleSummary,
   renderOpenerExperimentMarkdown,
   runOpenerExperiment
@@ -9,8 +10,9 @@ import {
 
 const outDir = readOption("--out-dir") ?? "experiments/runs";
 const top = readNumberOption("--top");
+const preset = readOption("--preset") ?? "default";
 const report = runOpenerExperiment({
-  scenarios: DEFAULT_OPENER_EXPERIMENT_SCENARIOS,
+  scenarios: scenarioPreset(preset),
   environment: {
     runtime: `bun ${Bun.version}`,
     nativeProfile: "release"
@@ -44,4 +46,15 @@ function readNumberOption(name: string): number | undefined {
     throw new Error(`${name} must be a positive integer.`);
   }
   return value;
+}
+
+function scenarioPreset(name: string) {
+  switch (name) {
+    case "default":
+      return DEFAULT_OPENER_EXPERIMENT_SCENARIOS;
+    case "survey":
+      return SURVEY_OPENER_EXPERIMENT_SCENARIOS;
+    default:
+      throw new Error(`Unknown opener experiment preset ${name}. Expected default or survey.`);
+  }
 }

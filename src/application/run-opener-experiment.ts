@@ -98,6 +98,16 @@ export interface RunOpenerExperimentInput {
   readonly top?: number;
 }
 
+const TWO_BAG_TL_SURVEY_QUEUES = [
+  ["seed-szilojt", "SZILOJTSTOZLJI"],
+  ["seed-tiljszo", "TILJSZOTILJSZO"],
+  ["seed-tjlziso", "TJLZISOTJLZISO"],
+  ["seed-tsljzio", "TSLJZIOTSLJZIO"],
+  ["seed-jlstzio", "JLSTZIOTJLSTZIO"],
+  ["seed-stziljo", "STZILJOTSTZILJO"],
+  ["seed-lstzjio", "LSTZJIOOLSTZJI"]
+] as const;
+
 export const TETRIO_TL_OPENER_SEARCH_RULES = {
   spinMode: "T-SPINS",
   comboTable: "MULTIPLIER",
@@ -117,6 +127,19 @@ export const DEFAULT_OPENER_EXPERIMENT_SCENARIOS: readonly OpenerExperimentScena
     tags: ["best", "hold", "two-bag", "t-spin", "tetrio-tl"]
   }
 ];
+
+export const SURVEY_OPENER_EXPERIMENT_SCENARIOS: readonly OpenerExperimentScenario[] = TWO_BAG_TL_SURVEY_QUEUES.map(([name, queue]) => ({
+  name,
+  queue,
+  hold: true,
+  beamWidth: 1024,
+  maxDepth: 14,
+  rules: TETRIO_TL_OPENER_SEARCH_RULES,
+  warmups: 0,
+  iterations: 1,
+  top: 3,
+  tags: ["survey", "hold", "two-bag", "t-spin", "tetrio-tl"]
+}));
 
 export function runOpenerExperiment(input: RunOpenerExperimentInput): OpenerExperimentReport {
   if (input.scenarios.length === 0) {
@@ -350,7 +373,7 @@ function createTopCandidates(
         tSpinClears: node.tSpinClears,
         tSpinAttack: node.tSpinAttack,
         clearSequence: node.placements
-          .filter((placement) => placement.clearName !== "NONE")
+          .filter((placement) => placement.clearName !== "NONE" && placement.clearedLines > 0)
           .map((placement) => `${placement.clearName}:${placement.attack}`),
         occupiedCells: node.occupiedCells,
         clearedLines: node.clearedLines,

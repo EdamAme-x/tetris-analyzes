@@ -1,7 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import type { FumenCodec, FumenUrls } from "../src/domain/fumen";
+import type { NativeBeamPlacement, NativeClearName } from "../src/infrastructure/native/binding-types";
 import {
   DEFAULT_OPENER_EXPERIMENT_SCENARIOS,
+  SURVEY_OPENER_EXPERIMENT_SCENARIOS,
   TETRIO_TL_OPENER_SEARCH_RULES,
   renderOpenerExperimentConsoleSummary,
   renderOpenerExperimentMarkdown,
@@ -26,6 +28,16 @@ describe("opener experiment runner", () => {
       maxDepth: 14,
       rules: TETRIO_TL_OPENER_SEARCH_RULES
     });
+  });
+
+  test("provides a two-bag TL survey preset for comparing several opener seeds", () => {
+    expect(SURVEY_OPENER_EXPERIMENT_SCENARIOS).toHaveLength(7);
+    expect(SURVEY_OPENER_EXPERIMENT_SCENARIOS.every((scenario) => scenario.rules === TETRIO_TL_OPENER_SEARCH_RULES)).toBe(true);
+    expect(new Set(SURVEY_OPENER_EXPERIMENT_SCENARIOS.map((scenario) => scenario.queue)).size).toBe(
+      SURVEY_OPENER_EXPERIMENT_SCENARIOS.length
+    );
+    expect(SURVEY_OPENER_EXPERIMENT_SCENARIOS.every((scenario) => scenario.beamWidth === 1024)).toBe(true);
+    expect(SURVEY_OPENER_EXPERIMENT_SCENARIOS.every((scenario) => scenario.tags?.includes("survey"))).toBe(true);
   });
 
   test("measures native search scenarios and keeps top candidates linkable", () => {
@@ -329,6 +341,33 @@ describe("opener experiment runner", () => {
 
     expect(report.scenarios[0]?.top.map((candidate) => candidate.path[0])).toEqual(["tspin", "combo"]);
   });
+
+  test("omits zero-line spin markers from candidate clear summaries", () => {
+    const report = runOpenerExperiment({
+      scenarios: [
+        {
+          name: "clear-summary",
+          queue: "TT",
+          hold: false,
+          beamWidth: 4,
+          maxDepth: 2,
+          warmups: 0,
+          iterations: 1,
+          top: 1
+        }
+      ],
+      clock: createClock("2026-05-14T00:00:00.000Z", [0, 2]),
+      fumenCodec: fakeCodec,
+      search: () => [
+        {
+          ...candidateNode("spin setup"),
+          placements: [placementEvent("TSPIN_MINI", 0, 0, "T", 0), placementEvent("TSPIN_SINGLE", 2, 1, "I", 4)]
+        }
+      ]
+    });
+
+    expect(report.scenarios[0]?.top[0]?.clearSequence).toEqual(["TSPIN_SINGLE:2"]);
+  });
 });
 
 function candidateNode(path: string) {
@@ -353,6 +392,52 @@ function candidateNode(path: string) {
     aggregateHeight: 2,
     holes: 0,
     bumpiness: 0
+  };
+}
+
+function placementEvent(
+  clearName: Extract<NativeClearName, "TSPIN_MINI" | "TSPIN_SINGLE">,
+  attack: number,
+  clearedLines: number,
+  piece: "T" | "I",
+  x: number
+): NativeBeamPlacement {
+  return {
+    piece,
+    rotation: 0,
+    x,
+    y: 0,
+    usedHold: false,
+    cells:
+      piece === "T"
+        ? [
+            { x, y: 0 },
+            { x: x + 1, y: 0 },
+            { x: x + 2, y: 0 },
+            { x: x + 1, y: 1 }
+          ]
+        : [
+            { x, y: 0 },
+            { x: x + 1, y: 0 },
+            { x: x + 2, y: 0 },
+            { x: x + 3, y: 0 }
+          ],
+    path: `${piece}@r0,x${x},y0`,
+    spinKind: "T_SPIN_MINI",
+    spin: true,
+    mini: true,
+    immobile: false,
+    occupiedCorners: 3,
+    clearedLines,
+    clearName,
+    attack,
+    baseAttack: attack,
+    points: 0,
+    combo: 0,
+    backToBack: false,
+    backToBackBonus: 0,
+    allClear: false,
+    allClearBonus: 0
   };
 }
 
