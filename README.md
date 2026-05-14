@@ -85,3 +85,4 @@ Executable examples live in `tests/`.
 - [x] Key opener template replay by board, hold, queue progress, and B2B state
 - [x] Prioritize replay-hit survivability before firepower inside replay reports
 - [x] Keep console top compact while using a wider internal replay template pool
+- [x] Track bag-boundary phase replay hits separately from exact final-board replay

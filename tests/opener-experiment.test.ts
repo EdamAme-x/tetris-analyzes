@@ -511,9 +511,9 @@ describe("opener experiment runner", () => {
 
     const summary = renderOpenerExperimentConsoleSummary(report, 1);
     expect(summary).toContain("Best opener templates (replayed)");
-    expect(summary).toContain("replay=1/2 (50.0%) grouped=1 (100.0%)");
+    expect(summary).toContain("replay=1/2 (50.0%) phase=1/2 (50.0%) grouped=1 (100.0%)");
     expect(renderOpenerExperimentMarkdown(report)).toContain("## Template replay");
-    expect(renderOpenerExperimentMarkdown(report)).toContain("1/2 (50.0%) | 1 (100.0%) | source");
+    expect(renderOpenerExperimentMarkdown(report)).toContain("1/2 (50.0%) | 1/2 (50.0%) | 1 (100.0%) | source");
   });
 
   test("prioritizes replayed templates before unreplayed firepower in replay reports", () => {
@@ -670,6 +670,68 @@ describe("opener experiment runner", () => {
       replayHitCount: 0,
       replayHitRate: 0,
       hits: []
+    });
+  });
+
+  test("counts phase replay hits at bag boundaries without exact final board matches", () => {
+    const phasePlacements = Array.from({ length: 7 }, () => placementEvent("SINGLE", 0, 0, "I", 0));
+    const report = runOpenerExperiment({
+      scenarios: [
+        {
+          name: "source",
+          queue: "TIJLOSZTIJLOSZ",
+          hold: true,
+          beamWidth: 4,
+          maxDepth: 14,
+          warmups: 0,
+          iterations: 1,
+          top: 1
+        }
+      ],
+      templateReplay: {
+        scenarios: [
+          {
+            name: "phase-hit",
+            queue: "OJLZISTOJLZIST",
+            hold: true,
+            beamWidth: 4,
+            maxDepth: 14,
+            warmups: 0,
+            iterations: 1
+          }
+        ],
+        topTemplates: 1
+      },
+      clock: createClock("2026-05-14T00:00:00.000Z", [0, 2]),
+      fumenCodec: fakeCodec,
+      search: (input) => {
+        if (input.queue === "TIJLOSZTIJLOSZ") {
+          return [
+            {
+              ...candidateNode("source"),
+              depth: 8,
+              queueIndex: 14,
+              rows: [1, ...new Array(19).fill(0)],
+              placements: [...phasePlacements, placementEvent("SINGLE", 0, 0, "I", 4)]
+            }
+          ];
+        }
+        return [
+          {
+            ...candidateNode("phase-hit"),
+            depth: 8,
+            queueIndex: 14,
+            rows: [2, ...new Array(19).fill(0)],
+            placements: [...phasePlacements, placementEvent("SINGLE", 0, 0, "I", 5)]
+          }
+        ];
+      }
+    });
+
+    expect(report.templateReplay?.templates[0]).toMatchObject({
+      replayHitCount: 0,
+      phaseReplayHitCount: 1,
+      phaseReplayHitRate: 1
     });
   });
 
