@@ -21,8 +21,8 @@ use firepower::{
     quad_well_continuation_score, score_state, FirepowerEvent, FirepowerState,
 };
 use movement::{
-    can_place, is_reachable_placement, is_reachable_placement_with_cache, lock_shape,
-    parse_kick_table, ReachabilityCache,
+    can_place, can_place_in_bounds, is_reachable_placement, is_reachable_placement_with_cache,
+    lock_shape, parse_kick_table, ReachabilityCache,
 };
 use pieces::{
     format_placement, parse_piece_string, parse_queue, piece_name, piece_shapes,
@@ -642,7 +642,7 @@ pub(crate) fn search_opener_states(
                     for x in 0..=(BOARD_WIDTH as i8 - shape.width) {
                         let mut can_place_below = false;
                         for y in 0..=(BOARD_HEIGHT as i8 - shape.height) {
-                            let can_place_here = can_place(&state.rows, shape, x, y);
+                            let can_place_here = can_place_in_bounds(&state.rows, shape, x, y);
                             if can_place_here && !can_place_below {
                                 let Some(placed) = place_grounded_at_y(
                                     &state.rows,

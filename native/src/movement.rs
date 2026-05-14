@@ -392,6 +392,10 @@ pub(crate) fn can_place(rows: &BoardRows, shape: Shape, x: i8, y: i8) -> bool {
         return false;
     }
 
+    can_place_in_bounds(rows, shape, x, y)
+}
+
+pub(crate) fn can_place_in_bounds(rows: &BoardRows, shape: Shape, x: i8, y: i8) -> bool {
     let x_shift = x as u32;
     let base_y = y as usize;
     for dy in 0..shape.height as usize {

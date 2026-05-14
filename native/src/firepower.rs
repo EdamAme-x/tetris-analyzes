@@ -1,7 +1,9 @@
 use napi::bindgen_prelude::{Error, Result};
 
 use crate::board::{self, BoardEvaluation, BoardRows, BOARD_HEIGHT, BOARD_WIDTH};
-use crate::movement::{can_place, is_reachable_placement_with_cache, lock_shape, ReachabilityCache};
+use crate::movement::{
+    can_place_in_bounds, is_reachable_placement_with_cache, lock_shape, ReachabilityCache,
+};
 use crate::pieces::{piece_shapes, placement_shape_indices, Piece};
 use crate::spin::{detect_spin, SpinDetection, SpinKind};
 use crate::tetrio_tables::KickTable;
@@ -131,7 +133,7 @@ pub(crate) fn estimate_t_spin_potential(rows: &BoardRows, kick_table: KickTable)
         for x in 0..=(BOARD_WIDTH as i8 - shape.width) {
             let mut can_place_below = false;
             for y in 0..=(BOARD_HEIGHT as i8 - shape.height) {
-                let can_place_here = can_place(rows, shape, x, y);
+                let can_place_here = can_place_in_bounds(rows, shape, x, y);
                 if !can_place_here || can_place_below {
                     can_place_below = can_place_here;
                     continue;

@@ -72,3 +72,4 @@ Executable examples live in `tests/`.
 - [x] Match template survivability replay bag count and depth to the selected opener preset
 - [x] Group mirrored final boards as the same opener template for survivability reports
 - [x] Derive native placement cells at report conversion time instead of cloning cell vectors during search
+- [x] Skip duplicate placement boundary checks inside native opener search scans
