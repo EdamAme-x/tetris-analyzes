@@ -8,6 +8,7 @@
     "build:native:debug": "napi build --manifest-path native/Cargo.toml --package-json-path package.json --output-dir native --platform --js index.js --dts index.d.ts",
     "bench": "bun run bench/bitboard.bench.ts",
     "check": "tsc --noEmit",
+    "generate:tetrio-tables": "bun run scripts/generate-tetrio-tables.ts",
     "test": "bun test",
     "verify": "bun run build:native:debug && bun run check && bun test"
   },
