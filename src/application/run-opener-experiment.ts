@@ -3,7 +3,7 @@ import { BOARD_HEIGHT, BOARD_WIDTH, ROW_MASK } from "../domain/board";
 import type { FumenCodec, FumenUrls } from "../domain/fumen";
 import type { NativeComboTable, NativeKickTable, NativeSpinMode } from "../infrastructure/native/binding-types";
 import { createOpenerFumenPages } from "./create-opener-fumen";
-import { searchOpenerBeamWithPlacements, type SearchOpenerBeamInput, type SearchOpenerBeamNode } from "./search-opener";
+import { searchOpenerBeam, searchOpenerBeamWithPlacements, type SearchOpenerBeamInput, type SearchOpenerBeamNode } from "./search-opener";
 
 export interface OpenerExperimentSearchRules {
   readonly spinMode: NativeSpinMode;
@@ -207,6 +207,7 @@ export interface RunOpenerExperimentInput {
   readonly environment?: OpenerExperimentEnvironment;
   readonly clock?: OpenerExperimentClock;
   readonly search?: OpenerSearch;
+  readonly replaySearch?: OpenerSearch;
   readonly fumenCodec?: FumenCodec;
   readonly top?: number;
   readonly templateReplay?: OpenerTemplateReplayInput;
@@ -385,6 +386,7 @@ export function runOpenerExperiment(input: RunOpenerExperimentInput): OpenerExpe
 
   const clock = input.clock ?? systemClock;
   const search = input.search ?? searchOpenerBeamWithPlacements;
+  const replaySearch = input.replaySearch ?? (input.search === undefined ? searchOpenerBeam : search);
   const fumenCodec = input.fumenCodec ?? createFumenCodec();
   const environment = input.environment ?? { runtime: "bun", nativeProfile: "release" };
   const scenarios = input.scenarios.map((scenario) => runScenario(scenario, input.top, search, fumenCodec, clock));
@@ -395,7 +397,9 @@ export function runOpenerExperiment(input: RunOpenerExperimentInput): OpenerExpe
     scenarios
   };
   const templateReplay =
-    input.templateReplay === undefined ? undefined : replayOpenerTemplateSurvivability(reportWithoutReplay, input.templateReplay, search);
+    input.templateReplay === undefined
+      ? undefined
+      : replayOpenerTemplateSurvivability(reportWithoutReplay, input.templateReplay, replaySearch);
 
   return {
     ...reportWithoutReplay,

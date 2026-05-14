@@ -105,3 +105,4 @@ Executable examples live in `tests/`.
 - [x] Promote measured high-firepower 3T-spin/3B2B continuation queues into discovery
 - [x] Prefer holeless candidates when B2B/T-spin firepower is equivalent in reports
 - [x] Exclude quality-gate failures from opener template replay pools
+- [x] Use placement-light native searches for template replay checks

@@ -647,6 +647,47 @@ describe("opener experiment runner", () => {
     );
   });
 
+  test("uses a separate replay search so replay checks can skip placement payloads", () => {
+    const rows = [7, 11, 13, ...new Array(17).fill(0)];
+    let sourceCalls = 0;
+    let replayCalls = 0;
+    const report = runOpenerExperiment({
+      scenarios: [
+        {
+          name: "source",
+          queue: "IO",
+          hold: false,
+          beamWidth: 4,
+          maxDepth: 1,
+          warmups: 0,
+          iterations: 1,
+          top: 1,
+          rules: { spinMode: "NONE", comboTable: "MULTIPLIER", kickTable: "SRS+" }
+        }
+      ],
+      templateReplay: {
+        scenarios: [replayScenario("replay-hit", "JO")],
+        topTemplates: 1
+      },
+      clock: createClock("2026-05-14T00:00:00.000Z", [0, 2]),
+      fumenCodec: fakeCodec,
+      search: () => {
+        sourceCalls += 1;
+        return [{ ...candidateNode("source-template"), rows, placements: [placementEvent("TSPIN_SINGLE", 2, 1, "T", 4)] }];
+      },
+      replaySearch: () => {
+        replayCalls += 1;
+        return [{ ...candidateNode("replay-template"), rows, placements: [] }];
+      }
+    });
+
+    expect(sourceCalls).toBe(1);
+    expect(replayCalls).toBe(1);
+    expect(report.scenarios[0]?.top[0]?.clearSequence).toEqual(["TSPIN_SINGLE:2"]);
+    expect(report.templateReplay?.templates[0]).toMatchObject({ replayHitCount: 1 });
+    expect(report.templateReplay?.templates[0]?.hits[0]).toMatchObject({ path: ["replay-template"], clearSequence: [] });
+  });
+
   test("prioritizes replayed templates before unreplayed firepower in replay reports", () => {
     const strongRows = [9, 8, 7, ...new Array(17).fill(0)];
     const stableRows = [1, 2, 3, ...new Array(17).fill(0)];
