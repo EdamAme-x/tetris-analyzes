@@ -97,6 +97,11 @@ export interface OpenerExperimentClock {
 
 export type OpenerSearch = (input: SearchOpenerBeamInput) => SearchOpenerBeamNode[];
 
+interface SearchNodeWithReportPotential {
+  readonly node: SearchOpenerBeamNode;
+  readonly tSpinPotential: number;
+}
+
 export interface RunOpenerExperimentInput {
   readonly scenarios: readonly OpenerExperimentScenario[];
   readonly environment?: OpenerExperimentEnvironment;
@@ -111,8 +116,8 @@ const TWO_BAG_TL_SURVEY_QUEUES = [
   ["seed-tiljszo", "TILJSZOTILJSZO"],
   ["seed-tjlziso", "TJLZISOTJLZISO"],
   ["seed-tsljzio", "TSLJZIOTSLJZIO"],
-  ["seed-jlstzio", "JLSTZIOTJLSTZIO"],
-  ["seed-stziljo", "STZILJOTSTZILJO"],
+  ["seed-jlstzio", "JLSTZIOJLSTZIO"],
+  ["seed-stziljo", "STZILJOSTZILJO"],
   ["seed-lstzjio", "LSTZJIOOLSTZJI"]
 ] as const;
 const DISCOVERY_TWO_BAG_SAMPLE_SIZE = 24;
@@ -383,14 +388,21 @@ function createTopCandidates(
   topCount: number,
   fumenCodec: FumenCodec
 ): OpenerExperimentCandidate[] {
+  const rules = scenarioRules(scenario);
   return [...nodes]
+    .map((node) => ({
+      node,
+      tSpinPotential:
+        spinModeAllowsTSpinPotential(rules.spinMode) && hasFutureT(node, scenario)
+          ? estimateOpenerTSpinPotential(Uint16Array.from(node.rows), rules.kickTable)
+          : 0
+    }))
     .sort(compareSearchNodesForOpener)
     .slice(0, topCount)
-    .map((node, index) => {
+    .map(({ node, tSpinPotential }, index) => {
       const data = fumenCodec.encodePages(createOpenerFumenPages(node, { title: `${scenario.name} #${index + 1}` }));
       const urls = fumenCodec.createUrls(data);
       const qualityAttack = difficultAttack(node);
-      const rules = scenarioRules(scenario);
       return {
         rank: index + 1,
         score: node.score,
@@ -409,7 +421,7 @@ function createTopCandidates(
         difficultClears: node.difficultClears,
         tSpinClears: node.tSpinClears,
         tSpinAttack: node.tSpinAttack,
-        tSpinPotential: hasFutureT(node, scenario) ? estimateOpenerTSpinPotential(Uint16Array.from(node.rows), rules.kickTable) : 0,
+        tSpinPotential,
         clearSequence: node.placements
           .filter((placement) => placement.clearName !== "NONE" && placement.clearedLines > 0)
           .map((placement) => `${placement.clearName}:${placement.attack}`),
@@ -423,21 +435,24 @@ function createTopCandidates(
     });
 }
 
-function compareSearchNodesForOpener(left: SearchOpenerBeamNode, right: SearchOpenerBeamNode): number {
+function compareSearchNodesForOpener(left: SearchNodeWithReportPotential, right: SearchNodeWithReportPotential): number {
+  const leftNode = left.node;
+  const rightNode = right.node;
   return (
-    right.tSpinClears - left.tSpinClears ||
-    right.tSpinAttack - left.tSpinAttack ||
-    right.difficultClears - left.difficultClears ||
-    right.backToBackChain - left.backToBackChain ||
-    difficultAttack(right) - difficultAttack(left) ||
-    right.attack - left.attack ||
-    right.firepowerScore - left.firepowerScore ||
-    right.score - left.score ||
-    left.holes - right.holes ||
-    left.bumpiness - right.bumpiness ||
-    right.points - left.points ||
-    right.depth - left.depth ||
-    left.path.join(" ").localeCompare(right.path.join(" "))
+    rightNode.tSpinClears - leftNode.tSpinClears ||
+    rightNode.tSpinAttack - leftNode.tSpinAttack ||
+    rightNode.difficultClears - leftNode.difficultClears ||
+    rightNode.backToBackChain - leftNode.backToBackChain ||
+    right.tSpinPotential - left.tSpinPotential ||
+    difficultAttack(rightNode) - difficultAttack(leftNode) ||
+    rightNode.attack - leftNode.attack ||
+    rightNode.firepowerScore - leftNode.firepowerScore ||
+    rightNode.score - leftNode.score ||
+    leftNode.holes - rightNode.holes ||
+    leftNode.bumpiness - rightNode.bumpiness ||
+    rightNode.points - leftNode.points ||
+    rightNode.depth - leftNode.depth ||
+    leftNode.path.join(" ").localeCompare(rightNode.path.join(" "))
   );
 }
 
@@ -481,6 +496,10 @@ function isDifficultClearName(clearName: string): boolean {
 
 function hasFutureT(node: SearchOpenerBeamNode, scenario: OpenerExperimentScenario): boolean {
   return node.hold === "T" || scenario.queue.slice(node.queueIndex).includes("T");
+}
+
+function spinModeAllowsTSpinPotential(spinMode: NativeSpinMode): boolean {
+  return spinMode !== "NONE";
 }
 
 function formatClearSequence(clearSequence: readonly string[]): string {

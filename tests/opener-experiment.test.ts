@@ -37,6 +37,7 @@ describe("opener experiment runner", () => {
     expect(new Set(SURVEY_OPENER_EXPERIMENT_SCENARIOS.map((scenario) => scenario.queue)).size).toBe(
       SURVEY_OPENER_EXPERIMENT_SCENARIOS.length
     );
+    expect(SURVEY_OPENER_EXPERIMENT_SCENARIOS.every((scenario) => isTwoBagQueue(scenario.queue))).toBe(true);
     expect(SURVEY_OPENER_EXPERIMENT_SCENARIOS.every((scenario) => scenario.beamWidth === 1024)).toBe(true);
     expect(SURVEY_OPENER_EXPERIMENT_SCENARIOS.every((scenario) => scenario.tags?.includes("survey"))).toBe(true);
   });
@@ -250,6 +251,65 @@ describe("opener experiment runner", () => {
     expect(report.scenarios[0]?.top.find((candidate) => candidate.path[0] === "exhausted")?.tSpinPotential).toBe(0);
     expect(report.scenarios[0]?.top.find((candidate) => candidate.path[0] === "held-t")?.tSpinPotential).toBeGreaterThan(0);
     expect(renderOpenerExperimentConsoleSummary(report, 1)).toContain("path: held-t");
+  });
+
+  test("keeps T-spin continuation potential before slicing scenario top candidates", () => {
+    const readyRows = new Array(20).fill(0);
+    readyRows[1] = (1 << 3) | (1 << 5);
+    const report = runOpenerExperiment({
+      scenarios: [
+        {
+          name: "potential-slice",
+          queue: "IT",
+          hold: false,
+          beamWidth: 4,
+          maxDepth: 1,
+          warmups: 0,
+          iterations: 1,
+          top: 1
+        }
+      ],
+      clock: createClock("2026-05-14T00:00:00.000Z", [0, 2]),
+      fumenCodec: fakeCodec,
+      search: () => [
+        { ...candidateNode("aaa-quiet"), queueIndex: 1, rows: new Array(20).fill(0) },
+        { ...candidateNode("zzz-potential"), queueIndex: 1, rows: readyRows }
+      ]
+    });
+
+    expect(report.scenarios[0]?.top).toHaveLength(1);
+    expect(report.scenarios[0]?.top[0]).toMatchObject({
+      path: ["zzz-potential"]
+    });
+    expect(report.scenarios[0]?.top[0]?.tSpinPotential).toBeGreaterThan(0);
+  });
+
+  test("does not add T-spin continuation potential when spins are disabled", () => {
+    const readyRows = new Array(20).fill(0);
+    readyRows[1] = (1 << 3) | (1 << 5);
+    const report = runOpenerExperiment({
+      scenarios: [
+        {
+          name: "spinless",
+          queue: "IT",
+          hold: false,
+          beamWidth: 4,
+          maxDepth: 1,
+          warmups: 0,
+          iterations: 1,
+          top: 1,
+          rules: { spinMode: "NONE", comboTable: "MULTIPLIER", kickTable: "SRS+" }
+        }
+      ],
+      clock: createClock("2026-05-14T00:00:00.000Z", [0, 2]),
+      fumenCodec: fakeCodec,
+      search: () => [{ ...candidateNode("ready-but-spinless"), queueIndex: 1, rows: readyRows }]
+    });
+
+    expect(report.scenarios[0]?.top[0]).toMatchObject({
+      path: ["ready-but-spinless"],
+      tSpinPotential: 0
+    });
   });
 
   test("ranks opener candidates by firepower before search order", () => {
@@ -498,6 +558,17 @@ const fakeCodec: FumenCodec = {
   createUrl: () => urls.edit,
   createUrls: () => urls
 };
+
+function isTwoBagQueue(queue: string): boolean {
+  if (queue.length !== 14) {
+    return false;
+  }
+  return isSingleBag(queue.slice(0, 7)) && isSingleBag(queue.slice(7));
+}
+
+function isSingleBag(queue: string): boolean {
+  return queue.split("").sort().join("") === "IJLOSTZ";
+}
 
 function createClock(iso: string, readings: readonly number[]): OpenerExperimentClock {
   let index = 0;

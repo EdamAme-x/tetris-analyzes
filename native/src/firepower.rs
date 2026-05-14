@@ -125,10 +125,6 @@ pub(crate) fn estimate_t_spin_potential(rows: &BoardRows, kick_table: KickTable)
                     can_place_below = can_place_here;
                     continue;
                 }
-                if !is_reachable_placement(rows, Piece::T, shape_index, x, y, kick_table) {
-                    can_place_below = can_place_here;
-                    continue;
-                }
                 let Some(placed) = lock_shape(rows, shape, x, y) else {
                     can_place_below = can_place_here;
                     continue;
@@ -140,7 +136,11 @@ pub(crate) fn estimate_t_spin_potential(rows: &BoardRows, kick_table: KickTable)
                     SpinKind::TSpinMini if cleared_lines > 0 => 1,
                     SpinKind::None | SpinKind::TSpinMini | SpinKind::ImmobileSpin => 0,
                 };
-                best = best.max(value);
+                if value > best
+                    && is_reachable_placement(rows, Piece::T, shape_index, x, y, kick_table)
+                {
+                    best = value;
+                }
                 can_place_below = can_place_here;
             }
         }

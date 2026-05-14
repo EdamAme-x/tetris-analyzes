@@ -31,6 +31,8 @@ Executable examples live in `tests/`.
 - [x] Native scoring separates B2B-capable difficult attack from ordinary line-clear attack
 - [x] Native full grounded placement enumeration with reachable-history regression tests
 - [x] Native T-spin setup-aware pruning with precise report-side potential checks
+- [x] Native T-spin setup pruning filters unreachable continuation slots before beam ranking
 - [x] Opener reports show B2B chain, difficult attack, and fumen preview URLs
 - [x] Broaden deterministic two-bag queue discovery beyond the current survey seeds
+- [x] Keep survey/discovery queues to valid two-bag inputs
 - [ ] Add deeper opener-template survivability scoring across many queue permutations
