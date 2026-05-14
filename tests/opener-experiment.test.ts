@@ -531,9 +531,11 @@ describe("opener experiment runner", () => {
 
     const summary = renderOpenerExperimentConsoleSummary(report, 1);
     expect(summary).toContain("Best opener templates (replayed)");
-    expect(summary).toContain("replay=1/2 (50.0%) phase=1/2 (50.0%) quality=0/2 (0.0%) grouped=1/1 (100.0%)");
+    expect(summary).toContain("replay=1/2 (50.0%) phase=1/2 (50.0%) profile=1/2 (50.0%) quality=0/2 (0.0%) grouped=1/1 (100.0%)");
     expect(renderOpenerExperimentMarkdown(report)).toContain("## Template replay");
-    expect(renderOpenerExperimentMarkdown(report)).toContain("1/2 (50.0%) | 1/2 (50.0%) | 0/2 (0.0%) | 1/1 (100.0%) | source");
+    expect(renderOpenerExperimentMarkdown(report)).toContain(
+      "1/2 (50.0%) | 1/2 (50.0%) | 1/2 (50.0%) | 0/2 (0.0%) | 1/1 (100.0%) | source"
+    );
   });
 
   test("prioritizes replayed templates before unreplayed firepower in replay reports", () => {

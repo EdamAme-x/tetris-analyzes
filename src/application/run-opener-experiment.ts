@@ -84,6 +84,7 @@ export interface RankedOpenerTemplate {
   readonly survivalRate: number;
   readonly sources: readonly string[];
   readonly phaseTemplateKeys: readonly string[];
+  readonly phaseProfileKeys: readonly string[];
   readonly best: RankedOpenerCandidate;
 }
 
@@ -114,6 +115,8 @@ export interface OpenerTemplateReplayEntry {
   readonly replayHitRate: number;
   readonly phaseReplayHitCount: number;
   readonly phaseReplayHitRate: number;
+  readonly phaseProfileReplayHitCount: number;
+  readonly phaseProfileReplayHitRate: number;
   readonly qualityReplayHitCount: number;
   readonly qualityReplayHitRate: number;
   readonly sources: readonly string[];
@@ -158,6 +161,7 @@ export interface OpenerScenarioReachableTemplate {
 export interface OpenerScenarioReachablePhase {
   readonly key: string;
   readonly phaseKey: string;
+  readonly phaseProfileKey: string;
   readonly rank: number;
 }
 
@@ -437,8 +441,8 @@ export function renderOpenerExperimentMarkdown(report: OpenerExperimentReport): 
       "",
       "## Template replay",
       "",
-      "| rank | replay hits | phase hits | quality hits | grouped survival | sources | attack | difficult attack | tspin | tspin attack | b2b | best replay rank | clears | preview |",
-      "| ---: | ---: | ---: | ---: | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- |"
+      "| rank | replay hits | phase hits | profile hits | quality hits | grouped survival | sources | attack | difficult attack | tspin | tspin attack | b2b | best replay rank | clears | preview |",
+      "| ---: | ---: | ---: | ---: | ---: | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- |"
     );
     for (const template of report.templateReplay.templates.slice(0, 12)) {
       lines.push(
@@ -446,6 +450,7 @@ export function renderOpenerExperimentMarkdown(report: OpenerExperimentReport): 
           String(template.rank),
           formatReplaySurvival(template),
           formatPhaseReplaySurvival(template),
+          formatPhaseProfileReplaySurvival(template),
           formatQualityReplaySurvival(template),
           formatGroupedReplaySurvival(template),
           template.sources.join(" "),
@@ -538,7 +543,7 @@ export function renderOpenerExperimentConsoleSummary(report: OpenerExperimentRep
     for (const template of report.templateReplay.templates.slice(0, topCount)) {
       const candidate = template.best;
       lines.push(
-        `#${template.rank} sources=${template.sources.join(",")} replay=${formatReplaySurvival(template)} phase=${formatPhaseReplaySurvival(template)} quality=${formatQualityReplaySurvival(template)} grouped=${formatGroupedReplaySurvival(template)} queueIndex=${candidate.queueIndex} hold=${candidate.hold ?? "-"} attack=${candidate.attack} difficultAttack=${candidate.difficultAttack} otherAttack=${candidate.nonDifficultAttack} tspin=${candidate.tSpinClears} tspinAttack=${candidate.tSpinAttack} b2b=${candidate.backToBackChain} tspinPotential=${candidate.tSpinPotential} points=${candidate.points} score=${candidate.score.toFixed(1)} holes=${candidate.holes} bump=${candidate.bumpiness}`,
+        `#${template.rank} sources=${template.sources.join(",")} replay=${formatReplaySurvival(template)} phase=${formatPhaseReplaySurvival(template)} profile=${formatPhaseProfileReplaySurvival(template)} quality=${formatQualityReplaySurvival(template)} grouped=${formatGroupedReplaySurvival(template)} queueIndex=${candidate.queueIndex} hold=${candidate.hold ?? "-"} attack=${candidate.attack} difficultAttack=${candidate.difficultAttack} otherAttack=${candidate.nonDifficultAttack} tspin=${candidate.tSpinClears} tspinAttack=${candidate.tSpinAttack} b2b=${candidate.backToBackChain} tspinPotential=${candidate.tSpinPotential} points=${candidate.points} score=${candidate.score.toFixed(1)} holes=${candidate.holes} bump=${candidate.bumpiness}`,
         `clears: ${formatClearSequence(candidate.clearSequence)}`,
         `path: ${candidate.path.join(" ")}`,
         `view: ${candidate.previewUrl}`,
@@ -580,7 +585,11 @@ export function rankOpenerCandidates(report: OpenerExperimentReport, topCount: n
 
 export function rankOpenerTemplates(report: OpenerExperimentReport, topCount: number): RankedOpenerTemplate[] {
   const phaseKeysByTemplate = collectReachablePhaseKeysByTemplate(report);
-  const byKey = new Map<string, { best: RankedOpenerCandidate; sources: Set<string>; phaseKeys: Set<string> }>();
+  const phaseProfileKeysByTemplate = collectReachablePhaseProfileKeysByTemplate(report);
+  const byKey = new Map<
+    string,
+    { best: RankedOpenerCandidate; sources: Set<string>; phaseKeys: Set<string>; phaseProfileKeys: Set<string> }
+  >();
   for (const candidate of rankOpenerCandidates(report, Number.MAX_SAFE_INTEGER)) {
     const key = templateKey(candidate);
     const current = byKey.get(key);
@@ -588,13 +597,17 @@ export function rankOpenerTemplates(report: OpenerExperimentReport, topCount: nu
       byKey.set(key, {
         best: candidate,
         sources: new Set([candidate.sourceScenario]),
-        phaseKeys: new Set(phaseKeysByTemplate.get(key) ?? [candidate.phaseTemplateKey])
+        phaseKeys: new Set(phaseKeysByTemplate.get(key) ?? [candidate.phaseTemplateKey]),
+        phaseProfileKeys: new Set(phaseProfileKeysByTemplate.get(key) ?? [phaseProfileKeyFromRowsKey(candidate.phaseTemplateKey)])
       });
       continue;
     }
     current.sources.add(candidate.sourceScenario);
     for (const phaseKey of phaseKeysByTemplate.get(key) ?? [candidate.phaseTemplateKey]) {
       current.phaseKeys.add(phaseKey);
+    }
+    for (const profileKey of phaseProfileKeysByTemplate.get(key) ?? [phaseProfileKeyFromRowsKey(candidate.phaseTemplateKey)]) {
+      current.phaseProfileKeys.add(profileKey);
     }
     if (compareRankedOpenerCandidates(candidate, current.best) < 0) {
       current.best = candidate;
@@ -609,6 +622,7 @@ export function rankOpenerTemplates(report: OpenerExperimentReport, topCount: nu
       survivalRate: group.sources.size / report.scenarios.length,
       sources: [...group.sources].sort(),
       phaseTemplateKeys: [...group.phaseKeys].sort(),
+      phaseProfileKeys: [...group.phaseProfileKeys].sort(),
       best: group.best
     }))
     .sort(compareRankedOpenerTemplates)
@@ -637,22 +651,35 @@ export function replayOpenerTemplateSurvivability(
   const hitsByTemplate = new Map<string, OpenerTemplateReplayHit[]>();
   const templateKeys = new Set(templates.map((template) => template.key));
   const phaseHitsByTemplate = new Map<string, Set<string>>();
+  const phaseProfileHitsByTemplate = new Map<string, Set<string>>();
   const qualityHitsByTemplate = new Map<string, Set<string>>();
   const templateKeysByPhase = new Map<string, string[]>();
+  const templateKeysByPhaseProfile = new Map<string, string[]>();
   for (const template of templates) {
     for (const phaseKey of template.phaseTemplateKeys) {
       templateKeysByPhase.set(phaseKey, [...(templateKeysByPhase.get(phaseKey) ?? []), template.key]);
+    }
+    for (const profileKey of template.phaseProfileKeys) {
+      templateKeysByPhaseProfile.set(profileKey, [...(templateKeysByPhaseProfile.get(profileKey) ?? []), template.key]);
     }
   }
   const cachedScenarios = new Map(report.scenarios.map((scenario) => [scenarioResultSignature(scenario), scenario]));
   for (const scenario of input.scenarios) {
     const scenarioHits = new Set<string>();
     const scenarioPhaseHits = new Set<string>();
+    const scenarioPhaseProfileHits = new Set<string>();
     const scenarioQualityHits = new Set<string>();
     const cachedScenario = cachedScenarios.get(scenarioSignature(scenario));
     if (cachedScenario !== undefined) {
       for (const reachablePhase of cachedScenario.reachableTemplatePhases) {
         addPhaseReplayHits(phaseHitsByTemplate, templateKeysByPhase, reachablePhase.phaseKey, scenario.name, scenarioPhaseHits);
+        addPhaseReplayHits(
+          phaseProfileHitsByTemplate,
+          templateKeysByPhaseProfile,
+          reachablePhase.phaseProfileKey,
+          scenario.name,
+          scenarioPhaseProfileHits
+        );
       }
       for (const quality of cachedScenario.reachableQualities) {
         addQualityReplayHits(qualityHitsByTemplate, templates, quality, scenario.name, scenarioQualityHits);
@@ -685,6 +712,13 @@ export function replayOpenerTemplateSurvivability(
         searchNodePhaseTemplateKey(node, scenario),
         scenario.name,
         scenarioPhaseHits
+      );
+      addPhaseReplayHits(
+        phaseProfileHitsByTemplate,
+        templateKeysByPhaseProfile,
+        searchNodePhaseProfileKey(node, scenario),
+        scenario.name,
+        scenarioPhaseProfileHits
       );
       const key = searchNodeTemplateKey(node);
       if (!templateKeys.has(key) || scenarioHits.has(key)) {
@@ -729,6 +763,8 @@ export function replayOpenerTemplateSurvivability(
           replayHitRate: hits.length / input.scenarios.length,
           phaseReplayHitCount: phaseHitsByTemplate.get(template.key)?.size ?? 0,
           phaseReplayHitRate: (phaseHitsByTemplate.get(template.key)?.size ?? 0) / input.scenarios.length,
+          phaseProfileReplayHitCount: phaseProfileHitsByTemplate.get(template.key)?.size ?? 0,
+          phaseProfileReplayHitRate: (phaseProfileHitsByTemplate.get(template.key)?.size ?? 0) / input.scenarios.length,
           qualityReplayHitCount: qualityHitsByTemplate.get(template.key)?.size ?? 0,
           qualityReplayHitRate: (qualityHitsByTemplate.get(template.key)?.size ?? 0) / input.scenarios.length,
           sources: template.sources,
@@ -857,9 +893,10 @@ function createReachableTemplatePhases(
   for (const [index, node] of nodes.entries()) {
     const key = searchNodeTemplateKey(node);
     const phaseKey = searchNodePhaseTemplateKey(node, scenario);
+    const phaseProfileKey = searchNodePhaseProfileKey(node, scenario);
     const uniqueKey = `${key}\n${phaseKey}`;
     if (!ranksByTemplatePhase.has(uniqueKey)) {
-      ranksByTemplatePhase.set(uniqueKey, { key, phaseKey, rank: index + 1 });
+      ranksByTemplatePhase.set(uniqueKey, { key, phaseKey, phaseProfileKey, rank: index + 1 });
     }
   }
   return [...ranksByTemplatePhase.values()];
@@ -1004,6 +1041,7 @@ function compareReplayTemplates(left: OpenerTemplateReplayEntry, right: OpenerTe
   return (
     right.replayHitCount - left.replayHitCount ||
     right.phaseReplayHitCount - left.phaseReplayHitCount ||
+    right.phaseProfileReplayHitCount - left.phaseProfileReplayHitCount ||
     compareRankedOpenerCandidates(left.best, right.best) ||
     right.qualityReplayHitCount - left.qualityReplayHitCount ||
     right.groupedSurvivalCount - left.groupedSurvivalCount ||
@@ -1082,6 +1120,18 @@ function collectReachablePhaseKeysByTemplate(report: OpenerExperimentReport): Ma
   return phaseKeysByTemplate;
 }
 
+function collectReachablePhaseProfileKeysByTemplate(report: OpenerExperimentReport): Map<string, Set<string>> {
+  const profileKeysByTemplate = new Map<string, Set<string>>();
+  for (const scenario of report.scenarios) {
+    for (const reachablePhase of scenario.reachableTemplatePhases) {
+      const profileKeys = profileKeysByTemplate.get(reachablePhase.key) ?? new Set<string>();
+      profileKeys.add(reachablePhase.phaseProfileKey);
+      profileKeysByTemplate.set(reachablePhase.key, profileKeys);
+    }
+  }
+  return profileKeysByTemplate;
+}
+
 function templateKey(candidate: Pick<OpenerExperimentCandidate, "finalRows" | "hold" | "queueIndex" | "backToBackChain">): string {
   return statefulTemplateKey(candidate.finalRows, candidate.hold, candidate.queueIndex, candidate.backToBackChain);
 }
@@ -1092,6 +1142,10 @@ function searchNodeTemplateKey(node: Pick<SearchOpenerBeamNode, "rows" | "hold" 
 
 function searchNodePhaseTemplateKey(node: SearchOpenerBeamNode, scenario: OpenerExperimentScenario): string {
   return rowsTemplateKey(rowsAfterPlacementPrefix(node, templatePhaseDepth(scenario.maxDepth)));
+}
+
+function searchNodePhaseProfileKey(node: SearchOpenerBeamNode, scenario: OpenerExperimentScenario): string {
+  return phaseProfileKey(rowsAfterPlacementPrefix(node, templatePhaseDepth(scenario.maxDepth)));
 }
 
 function searchNodeQuality(node: SearchOpenerBeamNode, index: number): OpenerScenarioReachableQuality {
@@ -1162,6 +1216,43 @@ function rowsTemplateKey(rows: readonly number[]): string {
   return direct <= mirrored ? direct : mirrored;
 }
 
+function phaseProfileKeyFromRowsKey(rowsKey: string): string {
+  return phaseProfileKey(rowsKey.split(",").map((row) => Number(row)));
+}
+
+function phaseProfileKey(rows: readonly number[]): string {
+  const direct = rawPhaseProfileKey(rows);
+  const mirrored = rawPhaseProfileKey(rows.map(mirrorRow));
+  return direct <= mirrored ? direct : mirrored;
+}
+
+function rawPhaseProfileKey(rows: readonly number[]): string {
+  const heights = Array.from({ length: BOARD_WIDTH }, (_, x) => columnHeight(rows, x));
+  const minHeight = Math.min(...heights);
+  const normalizedHeights = heights.map((height) => height - minHeight);
+  const holes = Array.from({ length: BOARD_WIDTH }, (_, x) => columnHoles(rows, x, heights[x] ?? 0));
+  return `${normalizedHeights.join(",")}|${holes.join(",")}`;
+}
+
+function columnHeight(rows: readonly number[], x: number): number {
+  for (let y = BOARD_HEIGHT - 1; y >= 0; y -= 1) {
+    if (((rows[y] ?? 0) & (1 << x)) !== 0) {
+      return y + 1;
+    }
+  }
+  return 0;
+}
+
+function columnHoles(rows: readonly number[], x: number, height: number): number {
+  let holes = 0;
+  for (let y = 0; y < height; y += 1) {
+    if (((rows[y] ?? 0) & (1 << x)) === 0) {
+      holes += 1;
+    }
+  }
+  return holes;
+}
+
 function mirrorRow(row: number): number {
   let mirrored = 0;
   for (let x = 0; x < 10; x += 1) {
@@ -1190,6 +1281,12 @@ function formatPhaseReplaySurvival(
   template: Pick<OpenerTemplateReplayEntry, "phaseReplayHitCount" | "phaseReplayHitRate" | "replayScenarioCount">
 ): string {
   return `${template.phaseReplayHitCount}/${template.replayScenarioCount} (${formatPercent(template.phaseReplayHitRate)})`;
+}
+
+function formatPhaseProfileReplaySurvival(
+  template: Pick<OpenerTemplateReplayEntry, "phaseProfileReplayHitCount" | "phaseProfileReplayHitRate" | "replayScenarioCount">
+): string {
+  return `${template.phaseProfileReplayHitCount}/${template.replayScenarioCount} (${formatPercent(template.phaseProfileReplayHitRate)})`;
 }
 
 function formatQualityReplaySurvival(

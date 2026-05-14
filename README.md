@@ -93,5 +93,6 @@ Executable examples live in `tests/`.
 - [x] Preserve native bag-boundary phase families during beam pruning
 - [x] Keep replay reports ordered by B2B/T-spin firepower before quality-only broadness
 - [x] Prune exact native T-spin setup scans only on three-bag continuation beams
+- [x] Report normalized phase-profile replay hits separately from exact phase hits
 - [x] Add an opt-in native setup-pool multiplier for slower high-quality TL search passes
 - [x] Report replay firepower quality hits separately from exact template reconstruction
