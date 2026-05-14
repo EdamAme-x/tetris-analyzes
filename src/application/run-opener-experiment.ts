@@ -1,5 +1,6 @@
 import { createFumenCodec } from "../infrastructure/fumen/tetris-fumen-codec";
 import type { FumenCodec, FumenUrls } from "../domain/fumen";
+import { createOpenerFumenPages } from "./create-opener-fumen";
 import { searchOpenerBeam, type SearchOpenerBeamInput, type SearchOpenerBeamNode } from "./search-opener";
 
 export interface OpenerExperimentScenario {
@@ -245,12 +246,7 @@ function createTopCandidates(
   fumenCodec: FumenCodec
 ): OpenerExperimentCandidate[] {
   return nodes.slice(0, topCount).map((node, index) => {
-    const data = fumenCodec.encodePages([
-      {
-        rows: Uint16Array.from(node.rows),
-        comment: `${scenario.name} #${index + 1}: ${node.path.join(" ")}`
-      }
-    ]);
+    const data = fumenCodec.encodePages(createOpenerFumenPages(node, { title: `${scenario.name} #${index + 1}` }));
     const urls = fumenCodec.createUrls(data);
     return {
       rank: index + 1,

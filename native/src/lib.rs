@@ -40,6 +40,7 @@ struct SearchState {
     hold: Option<Piece>,
     queue_index: usize,
     path: Vec<String>,
+    placements: Vec<Placement>,
     score: f64,
     metrics: [u32; BOARD_EVALUATION_STRIDE],
 }
@@ -59,11 +60,44 @@ pub struct BeamSearchNode {
     pub hold: Option<String>,
     pub rows: Vec<u16>,
     pub path: Vec<String>,
+    pub placements: Vec<BeamPlacement>,
     pub occupied_cells: u32,
     pub cleared_lines: u32,
     pub aggregate_height: u32,
     pub holes: u32,
     pub bumpiness: u32,
+}
+
+#[derive(Clone)]
+struct Placement {
+    piece: Piece,
+    rotation: u8,
+    x: i8,
+    y: i8,
+    used_hold: bool,
+    cells: Vec<Cell>,
+}
+
+struct PlacedBoard {
+    rows: [u16; BOARD_HEIGHT],
+    placement: Placement,
+}
+
+#[napi(object)]
+pub struct BeamPlacementCell {
+    pub x: i32,
+    pub y: i32,
+}
+
+#[napi(object)]
+pub struct BeamPlacement {
+    pub piece: String,
+    pub rotation: u32,
+    pub x: i32,
+    pub y: i32,
+    pub used_hold: bool,
+    pub cells: Vec<BeamPlacementCell>,
+    pub path: String,
 }
 
 #[derive(Clone, Copy)]
@@ -261,6 +295,7 @@ pub fn search_opener_beam(
         hold: None,
         queue_index: 0,
         path: Vec::new(),
+        placements: Vec::new(),
         score: score_metrics(initial_metrics),
         metrics: initial_metrics,
     }];
@@ -272,16 +307,26 @@ pub fn search_opener_beam(
             for choice in piece_choices(&pieces, state, hold_enabled) {
                 for shape in piece_shapes(choice.piece).iter().copied() {
                     for x in 0..=(BOARD_WIDTH as i8 - shape.width) {
-                        if let Some(rows) = place_and_clear(&state.rows, shape, x) {
+                        if let Some(placed) = place_and_clear(&state.rows, choice, shape, x) {
+                            let rows = placed.rows;
                             let metrics = evaluate_board_unchecked(&rows);
                             let score = score_metrics(metrics);
                             let mut path = state.path.clone();
-                            path.push(format_placement(choice, shape, x));
+                            path.push(format_placement(
+                                choice.piece,
+                                shape.rotation,
+                                x,
+                                placed.placement.y,
+                                choice.used_hold,
+                            ));
+                            let mut placements = state.placements.clone();
+                            placements.push(placed.placement);
                             let next_state = SearchState {
                                 rows,
                                 hold: choice.hold,
                                 queue_index: choice.queue_index,
                                 path,
+                                placements,
                                 score,
                                 metrics,
                             };
@@ -567,25 +612,42 @@ fn piece_choices(pieces: &[Piece], state: &SearchState, hold_enabled: bool) -> V
     choices
 }
 
-fn format_placement(choice: PieceChoice, shape: Shape, x: i8) -> String {
-    let prefix = if choice.used_hold { "hold:" } else { "" };
-    format!(
-        "{prefix}{}@r{},x{}",
-        piece_name(choice.piece),
-        shape.rotation,
-        x
-    )
+fn format_placement(piece: Piece, rotation: u8, x: i8, y: i8, used_hold: bool) -> String {
+    let prefix = if used_hold { "hold:" } else { "" };
+    format!("{prefix}{}@r{},x{},y{}", piece_name(piece), rotation, x, y)
 }
 
-fn place_and_clear(rows: &[u16; BOARD_HEIGHT], shape: Shape, x: i8) -> Option<[u16; BOARD_HEIGHT]> {
+fn place_and_clear(
+    rows: &[u16; BOARD_HEIGHT],
+    choice: PieceChoice,
+    shape: Shape,
+    x: i8,
+) -> Option<PlacedBoard> {
     for y in 0..=(BOARD_HEIGHT as i8 - shape.height) {
         if can_place(rows, shape, x, y) && (y == 0 || !can_place(rows, shape, x, y - 1)) {
             let mut placed = *rows;
+            let mut cells = Vec::with_capacity(shape.cells.len());
             for cell in shape.cells {
-                let row_index = usize::try_from(y + cell.y).ok()?;
-                placed[row_index] |= 1_u16 << (x + cell.x);
+                let absolute = Cell {
+                    x: x + cell.x,
+                    y: y + cell.y,
+                };
+                let row_index = usize::try_from(absolute.y).ok()?;
+                let column = u32::try_from(absolute.x).ok()?;
+                placed[row_index] |= 1_u16 << column;
+                cells.push(absolute);
             }
-            return Some(clear_full_lines_array(placed));
+            return Some(PlacedBoard {
+                rows: clear_full_lines_array(placed),
+                placement: Placement {
+                    piece: choice.piece,
+                    rotation: shape.rotation,
+                    x,
+                    y,
+                    used_hold: choice.used_hold,
+                    cells,
+                },
+            });
         }
     }
     None
@@ -630,11 +692,44 @@ impl From<SearchState> for BeamSearchNode {
             hold: state.hold.map(piece_name).map(String::from),
             rows: state.rows.to_vec(),
             path: state.path,
+            placements: state
+                .placements
+                .into_iter()
+                .map(BeamPlacement::from)
+                .collect(),
             occupied_cells: state.metrics[0],
             cleared_lines: state.metrics[1],
             aggregate_height: state.metrics[2],
             holes: state.metrics[3],
             bumpiness: state.metrics[4],
+        }
+    }
+}
+
+impl From<Placement> for BeamPlacement {
+    fn from(placement: Placement) -> Self {
+        let path = format_placement(
+            placement.piece,
+            placement.rotation,
+            placement.x,
+            placement.y,
+            placement.used_hold,
+        );
+        Self {
+            piece: piece_name(placement.piece).to_string(),
+            rotation: u32::from(placement.rotation),
+            x: i32::from(placement.x),
+            y: i32::from(placement.y),
+            used_hold: placement.used_hold,
+            cells: placement
+                .cells
+                .into_iter()
+                .map(|cell| BeamPlacementCell {
+                    x: i32::from(cell.x),
+                    y: i32::from(cell.y),
+                })
+                .collect(),
+            path,
         }
     }
 }

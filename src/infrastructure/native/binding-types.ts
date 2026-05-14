@@ -1,3 +1,18 @@
+export interface NativePlacementCell {
+  x: number;
+  y: number;
+}
+
+export interface NativeBeamPlacement {
+  piece: string;
+  rotation: number;
+  x: number;
+  y: number;
+  usedHold: boolean;
+  cells: NativePlacementCell[];
+  path: string;
+}
+
 export interface NativeBeamSearchNode {
   score: number;
   depth: number;
@@ -5,6 +20,7 @@ export interface NativeBeamSearchNode {
   hold?: string | null;
   rows: number[];
   path: string[];
+  placements: NativeBeamPlacement[];
   occupiedCells: number;
   clearedLines: number;
   aggregateHeight: number;
