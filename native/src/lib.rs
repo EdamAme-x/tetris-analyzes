@@ -100,6 +100,7 @@ pub(crate) struct SearchState {
     pub(crate) metrics: BoardEvaluation,
     pub(crate) firepower: FirepowerState,
     pub(crate) t_spin_potential: u32,
+    phase_family_key: u64,
 }
 
 #[derive(Eq, PartialEq)]
@@ -647,9 +648,11 @@ pub(crate) fn search_opener_states(
         metrics: initial_metrics,
         firepower: initial_firepower,
         t_spin_potential: initial_t_spin_potential,
+        phase_family_key: 0,
     }];
 
-    for _depth in 0..max_depth {
+    let phase_diversity_start_depth = phase_diversity_start_depth(max_depth);
+    for depth in 0..max_depth {
         let mut next_by_key = FastHashMap::<SearchKey, SearchState>::with_capacity_and_hasher(
             next_search_map_capacity(beam.len(), beam_width, hold_enabled, setup_pool_multiplier),
             BuildHasherDefault::<FastHasher>::default(),
@@ -695,6 +698,11 @@ pub(crate) fn search_opener_states(
                                     );
                                 let t_spin_potential = 0;
                                 let score = score_state(metrics, firepower, t_spin_potential);
+                                let phase_family_key = next_phase_family_key(
+                                    state.phase_family_key,
+                                    &rows,
+                                    state.path.len() + 1,
+                                );
                                 let key = SearchKey {
                                     rows,
                                     hold: choice.hold,
@@ -721,6 +729,7 @@ pub(crate) fn search_opener_states(
                                                 firepower,
                                                 firepower_event,
                                                 score,
+                                                phase_family_key,
                                             ));
                                         }
                                     }
@@ -735,6 +744,7 @@ pub(crate) fn search_opener_states(
                                             firepower,
                                             firepower_event,
                                             score,
+                                            phase_family_key,
                                         ));
                                     }
                                 }
@@ -762,7 +772,14 @@ pub(crate) fn search_opener_states(
             kick_table,
             spin_mode,
         );
-        retain_best_search_states(&mut beam, beam_width);
+        match phase_diversity_start_depth {
+            Some(start_depth) if depth + 1 >= start_depth => {
+                retain_phase_diverse_search_states(&mut beam, beam_width);
+            }
+            _ => {
+                retain_best_search_states(&mut beam, beam_width);
+            }
+        }
     }
 
     beam.sort_by(compare_search_state);
@@ -779,6 +796,7 @@ fn build_next_search_state(
     firepower: FirepowerState,
     firepower_event: FirepowerEvent,
     score: f64,
+    phase_family_key: u64,
 ) -> SearchState {
     let mut path = Vec::with_capacity(state.path.len() + 1);
     path.extend_from_slice(&state.path);
@@ -808,6 +826,7 @@ fn build_next_search_state(
         metrics,
         firepower,
         t_spin_potential: 0,
+        phase_family_key,
     }
 }
 
@@ -826,6 +845,106 @@ fn retain_best_search_states(beam: &mut Vec<SearchState>, beam_width: usize) {
 
 fn setup_candidate_pool_width(beam_width: usize, multiplier: usize) -> usize {
     beam_width.saturating_mul(multiplier).max(beam_width)
+}
+
+fn retain_phase_diverse_search_states(beam: &mut Vec<SearchState>, beam_width: usize) {
+    let reserve_width = phase_diversity_reserve_width(beam_width);
+    if reserve_width == 0 || beam.len() <= beam_width {
+        retain_best_search_states(beam, beam_width);
+        return;
+    }
+
+    beam.sort_by(compare_search_state);
+    let sorted = std::mem::take(beam);
+    let mut selected_flags = vec![false; sorted.len()];
+    let best_state = &sorted[0];
+    let mut seen_phase_keys = FastHashMap::<u64, ()>::with_capacity_and_hasher(
+        reserve_width,
+        BuildHasherDefault::<FastHasher>::default(),
+    );
+    let mut reserved = 0;
+    for (index, state) in sorted.iter().enumerate() {
+        if reserved >= reserve_width {
+            break;
+        }
+        if state.phase_family_key == 0 || !is_phase_diversity_candidate(state, best_state) {
+            continue;
+        }
+        if seen_phase_keys.insert(state.phase_family_key, ()).is_none() {
+            selected_flags[index] = true;
+            reserved += 1;
+        }
+    }
+
+    let mut remaining_global = beam_width.saturating_sub(reserved);
+    beam.reserve(beam_width);
+    for (index, state) in sorted.into_iter().enumerate() {
+        if selected_flags[index] {
+            beam.push(state);
+        } else if remaining_global > 0 {
+            beam.push(state);
+            remaining_global -= 1;
+        }
+    }
+}
+
+fn phase_diversity_reserve_width(beam_width: usize) -> usize {
+    if beam_width < 32 {
+        0
+    } else {
+        (beam_width / 8).clamp(4, 32).min(beam_width)
+    }
+}
+
+fn phase_diversity_start_depth(max_depth: usize) -> Option<usize> {
+    if max_depth < 21 {
+        None
+    } else {
+        Some(((max_depth - 1) / 7) * 7)
+    }
+}
+
+fn is_phase_diversity_candidate(state: &SearchState, best: &SearchState) -> bool {
+    state.firepower.t_spin_clears.saturating_add(1) >= best.firepower.t_spin_clears
+        && state.firepower.t_spin_attack.saturating_add(4) >= best.firepower.t_spin_attack
+        && state.firepower.difficult_attack.saturating_add(4) >= best.firepower.difficult_attack
+        && state.firepower.back_to_back_chain.saturating_add(1) >= best.firepower.back_to_back_chain
+}
+
+fn next_phase_family_key(previous_key: u64, rows: &BoardRows, depth: usize) -> u64 {
+    if depth == 0 || depth % 7 != 0 {
+        return previous_key;
+    }
+
+    let mut hasher = FastHasher::default();
+    hasher.write_u64(previous_key);
+    hasher.write_usize(depth);
+    hash_canonical_rows(rows, &mut hasher);
+    hasher.finish()
+}
+
+fn hash_canonical_rows(rows: &BoardRows, hasher: &mut FastHasher) {
+    let use_direct = rows.iter().copied().cmp(rows.iter().copied().map(mirror_row_mask))
+        != std::cmp::Ordering::Greater;
+    if use_direct {
+        for row in rows {
+            hasher.write_u16(*row);
+        }
+    } else {
+        for row in rows.iter().copied().map(mirror_row_mask) {
+            hasher.write_u16(row);
+        }
+    }
+}
+
+fn mirror_row_mask(row: u16) -> u16 {
+    let mut mirrored = 0_u16;
+    for x in 0..BOARD_WIDTH {
+        if row & (1 << x) != 0 {
+            mirrored |= 1 << (BOARD_WIDTH - 1 - x);
+        }
+    }
+    mirrored
 }
 
 fn next_search_map_capacity(
@@ -1309,6 +1428,7 @@ mod tests {
             metrics,
             firepower,
             t_spin_potential: 0,
+            phase_family_key: 0,
         }
     }
 
@@ -1363,6 +1483,47 @@ mod tests {
             }),
             base_hash
         );
+    }
+
+    #[test]
+    fn phase_family_key_updates_only_at_seven_placement_boundaries() {
+        let mut rows = [0_u16; BOARD_HEIGHT];
+        rows[0] = 0b1110000000;
+        let mut mirrored_rows = [0_u16; BOARD_HEIGHT];
+        mirrored_rows[0] = 0b0000000111;
+        let mirror_key = next_phase_family_key(0, &mirrored_rows, 7);
+        let direct_key = next_phase_family_key(0, &rows, 7);
+
+        assert_eq!(next_phase_family_key(0, &rows, 6), 0);
+        assert_ne!(direct_key, 0);
+        assert_eq!(direct_key, mirror_key);
+        assert_ne!(next_phase_family_key(direct_key, &rows, 14), direct_key);
+    }
+
+    #[test]
+    fn phase_diverse_retention_keeps_alternate_bag_scaffolds() {
+        let mut beam = Vec::new();
+        for index in 0..40 {
+            let mut state =
+                search_state_with_rows(14, None, [0_u16; BOARD_HEIGHT], FirepowerState::empty());
+            state.phase_family_key = 1;
+            state.score = 1000.0 - index as f64;
+            beam.push(state);
+        }
+        for index in 0..4 {
+            let mut state =
+                search_state_with_rows(14, None, [0_u16; BOARD_HEIGHT], FirepowerState::empty());
+            state.phase_family_key = 10 + index;
+            state.score = 100.0 - index as f64;
+            beam.push(state);
+        }
+
+        retain_phase_diverse_search_states(&mut beam, 32);
+
+        assert_eq!(beam.len(), 32);
+        assert!(beam.iter().any(|state| state.phase_family_key == 1));
+        assert!(beam.iter().any(|state| state.phase_family_key == 10));
+        assert!(beam.iter().any(|state| state.phase_family_key == 11));
     }
 
     #[test]

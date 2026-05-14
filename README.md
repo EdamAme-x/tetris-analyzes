@@ -90,5 +90,7 @@ Executable examples live in `tests/`.
 - [x] Reuse full phase indexes for cached replay and grouped template representatives
 - [x] Use a wider continuation replay pool so robust B2B/T-spin templates can outrank brittle max-firepower lines
 - [x] Make continuation experiments replay templates by default instead of emitting firepower-only top lines
+- [x] Preserve native bag-boundary phase families during beam pruning
+- [x] Keep replay reports ordered by B2B/T-spin firepower before quality-only broadness
 - [x] Add an opt-in native setup-pool multiplier for slower high-quality TL search passes
 - [x] Report replay firepower quality hits separately from exact template reconstruction

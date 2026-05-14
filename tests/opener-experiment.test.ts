@@ -819,6 +819,65 @@ describe("opener experiment runner", () => {
     });
   });
 
+  test("keeps B2B T-spin firepower ahead of broader quality-only replay matches", () => {
+    const strongRows = [31, 7, 11, ...new Array(17).fill(0)];
+    const broadRows = [3, 5, 9, ...new Array(17).fill(0)];
+    const report = runOpenerExperiment({
+      scenarios: [rankingScenario("strong", "TI"), rankingScenario("broad", "JO")],
+      templateReplay: {
+        scenarios: [replayScenario("broad-quality-a", "LO"), replayScenario("broad-quality-b", "SO")],
+        topTemplates: 2
+      },
+      clock: createClock("2026-05-14T00:00:00.000Z", [0, 1, 2, 3]),
+      fumenCodec: fakeCodec,
+      search: (input) => {
+        if (input.queue === "TI") {
+          return [
+            {
+              ...candidateNode("strong"),
+              rows: strongRows,
+              attack: 12,
+              difficultAttack: 12,
+              difficultClears: 3,
+              tSpinClears: 3,
+              tSpinAttack: 12,
+              backToBackChain: 3
+            }
+          ];
+        }
+        if (input.queue === "JO") {
+          return [
+            {
+              ...candidateNode("broad"),
+              rows: broadRows,
+              attack: 8,
+              difficultAttack: 8,
+              difficultClears: 2,
+              tSpinClears: 2,
+              tSpinAttack: 8,
+              backToBackChain: 2
+            }
+          ];
+        }
+        return [
+          {
+            ...candidateNode("broad-quality"),
+            rows: [1, 2, 4, ...new Array(17).fill(0)],
+            attack: 8,
+            difficultAttack: 8,
+            difficultClears: 2,
+            tSpinClears: 2,
+            tSpinAttack: 8,
+            backToBackChain: 2
+          }
+        ];
+      }
+    });
+
+    expect(report.templateReplay?.templates.map((template) => template.sources[0])).toEqual(["strong", "broad"]);
+    expect(report.templateReplay?.templates.map((template) => template.qualityReplayHitCount)).toEqual([0, 2]);
+  });
+
   test("groups phase replay across non-best sources of the same final template", () => {
     const sharedRows = [7, 11, 13, ...new Array(17).fill(0)];
     const phaseA = Array.from({ length: 7 }, () => placementEvent("SINGLE", 0, 0, "I", 0));

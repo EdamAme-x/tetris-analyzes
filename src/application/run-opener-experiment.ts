@@ -1004,9 +1004,9 @@ function compareReplayTemplates(left: OpenerTemplateReplayEntry, right: OpenerTe
   return (
     right.replayHitCount - left.replayHitCount ||
     right.phaseReplayHitCount - left.phaseReplayHitCount ||
+    compareRankedOpenerCandidates(left.best, right.best) ||
     right.qualityReplayHitCount - left.qualityReplayHitCount ||
     right.groupedSurvivalCount - left.groupedSurvivalCount ||
-    compareRankedOpenerCandidates(left.best, right.best) ||
     left.key.localeCompare(right.key)
   );
 }
