@@ -717,6 +717,34 @@ describe("opener experiment runner", () => {
     expect(report.scenarios[0]?.top[0]?.clearSequence).toEqual(["TSPIN_SINGLE:2"]);
     expect(report.scenarios[0]?.top[0]).toMatchObject({ difficultAttack: 2, nonDifficultAttack: 0 });
   });
+
+  test("omits zero-attack line clears from candidate clear summaries", () => {
+    const report = runOpenerExperiment({
+      scenarios: [
+        {
+          name: "zero-attack-clear",
+          queue: "IT",
+          hold: false,
+          beamWidth: 4,
+          maxDepth: 2,
+          warmups: 0,
+          iterations: 1,
+          top: 1
+        }
+      ],
+      clock: createClock("2026-05-14T00:00:00.000Z", [0, 2]),
+      fumenCodec: fakeCodec,
+      search: () => [
+        {
+          ...candidateNode("single then tspin"),
+          attack: 2,
+          placements: [placementEvent("SINGLE", 0, 1, "I", 4), placementEvent("TSPIN_SINGLE", 2, 1, "T", 0)]
+        }
+      ]
+    });
+
+    expect(report.scenarios[0]?.top[0]?.clearSequence).toEqual(["TSPIN_SINGLE:2"]);
+  });
 });
 
 function candidateNode(path: string) {
@@ -746,12 +774,13 @@ function candidateNode(path: string) {
 }
 
 function placementEvent(
-  clearName: Extract<NativeClearName, "TSPIN_MINI" | "TSPIN_SINGLE">,
+  clearName: Extract<NativeClearName, "SINGLE" | "TSPIN_MINI" | "TSPIN_SINGLE">,
   attack: number,
   clearedLines: number,
   piece: "T" | "I",
   x: number
 ): NativeBeamPlacement {
+  const spinClear = clearName !== "SINGLE";
   return {
     piece,
     rotation: 0,
@@ -773,9 +802,9 @@ function placementEvent(
             { x: x + 3, y: 0 }
           ],
     path: `${piece}@r0,x${x},y0`,
-    spinKind: "T_SPIN_MINI",
-    spin: true,
-    mini: true,
+    spinKind: spinClear ? "T_SPIN_MINI" : "NONE",
+    spin: spinClear,
+    mini: spinClear,
     immobile: false,
     occupiedCorners: 3,
     clearedLines,

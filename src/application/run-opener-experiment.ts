@@ -822,7 +822,7 @@ function difficultAttack(node: SearchOpenerBeamNode): number {
 
 function clearSequence(node: SearchOpenerBeamNode): string[] {
   return node.placements
-    .filter((placement) => placement.clearName !== "NONE" && placement.clearedLines > 0)
+    .filter((placement) => placement.clearName !== "NONE" && placement.clearedLines > 0 && placement.attack > 0)
     .map((placement) => `${placement.clearName}:${placement.attack}`);
 }
 
