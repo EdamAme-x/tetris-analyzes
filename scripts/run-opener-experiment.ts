@@ -120,7 +120,7 @@ function defaultSurvivabilityReplay(presetName: string): number {
 }
 
 function defaultReplayTemplatePool(presetName: string, displayTop: number): number {
-  const minimum = presetName === "continuation" || presetName === "discovery" ? 64 : 16;
+  const minimum = presetName === "continuation" ? 512 : presetName === "discovery" ? 64 : 16;
   return Math.max(displayTop, minimum);
 }
 

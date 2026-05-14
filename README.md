@@ -88,5 +88,6 @@ Executable examples live in `tests/`.
 - [x] Keep console top compact while using a wider internal replay template pool
 - [x] Track bag-boundary phase replay hits separately from exact final-board replay
 - [x] Reuse full phase indexes for cached replay and grouped template representatives
+- [x] Use a wider continuation replay pool so robust B2B/T-spin templates can outrank brittle max-firepower lines
 - [x] Add an opt-in native setup-pool multiplier for slower high-quality TL search passes
 - [x] Report replay firepower quality hits separately from exact template reconstruction
