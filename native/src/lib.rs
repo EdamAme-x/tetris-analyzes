@@ -56,7 +56,9 @@ impl Hasher for FastHasher {
     fn write(&mut self, bytes: &[u8]) {
         let mut chunks = bytes.chunks_exact(8);
         for chunk in &mut chunks {
-            self.write_word(u64::from_ne_bytes(chunk.try_into().expect("chunk is 8 bytes")));
+            self.write_word(u64::from_ne_bytes(
+                chunk.try_into().expect("chunk is 8 bytes"),
+            ));
         }
         let mut tail = 0_u64;
         for (index, byte) in chunks.remainder().iter().copied().enumerate() {
@@ -125,13 +127,7 @@ pub(crate) struct PlacementStep {
 
 impl PlacementStep {
     fn format(self) -> String {
-        format_placement(
-            self.piece,
-            self.rotation,
-            self.x,
-            self.y,
-            self.used_hold,
-        )
+        format_placement(self.piece, self.rotation, self.x, self.y, self.used_hold)
     }
 }
 
@@ -779,12 +775,11 @@ fn score_t_spin_setup_potential(
         } else {
             0
         };
-        let quad_well_potential =
-            if has_b2b_i_continuation {
-                estimate_quad_well_potential(&state.rows)
-            } else {
-                0
-            };
+        let quad_well_potential = if has_b2b_i_continuation {
+            estimate_quad_well_potential(&state.rows)
+        } else {
+            0
+        };
         state.score = score_state(state.metrics, state.firepower, state.t_spin_potential)
             + quad_well_continuation_score(quad_well_potential, state.firepower.back_to_back_chain);
     }
@@ -915,15 +910,17 @@ fn place_grounded_at_y(
         None
     };
     let mut placed = *rows;
-    for cell in shape.cells {
-        let absolute = Cell {
-            x: x + cell.x,
-            y: y + cell.y,
-        };
-        let row_index = usize::try_from(absolute.y).ok()?;
-        let column = u32::try_from(absolute.x).ok()?;
-        placed[row_index] |= 1_u16 << column;
-        if let Some(cells) = &mut cells {
+    let x_shift = u32::try_from(x).ok()?;
+    let base_y = usize::try_from(y).ok()?;
+    for dy in 0..shape.height as usize {
+        placed[base_y + dy] |= shape.row_masks[dy] << x_shift;
+    }
+    if let Some(cells) = &mut cells {
+        for cell in shape.cells {
+            let absolute = Cell {
+                x: x + cell.x,
+                y: y + cell.y,
+            };
             cells.push(absolute);
         }
     }
@@ -1194,10 +1191,25 @@ mod tests {
     fn future_piece_access_is_limited_by_remaining_depth() {
         let future_by_index =
             build_future_pieces_by_queue_index(&[Piece::S, Piece::Z, Piece::I, Piece::T, Piece::O]);
-        let state = search_state_with_rows(0, Some(Piece::O), [0_u16; BOARD_HEIGHT], FirepowerState::empty());
+        let state = search_state_with_rows(
+            0,
+            Some(Piece::O),
+            [0_u16; BOARD_HEIGHT],
+            FirepowerState::empty(),
+        );
 
-        assert!(!can_access_future_piece(&state, future_by_index[0], Piece::I, 2));
-        assert!(can_access_future_piece(&state, future_by_index[0], Piece::I, 3));
+        assert!(!can_access_future_piece(
+            &state,
+            future_by_index[0],
+            Piece::I,
+            2
+        ));
+        assert!(can_access_future_piece(
+            &state,
+            future_by_index[0],
+            Piece::I,
+            3
+        ));
     }
 
     #[test]

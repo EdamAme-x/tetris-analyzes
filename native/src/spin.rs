@@ -104,7 +104,11 @@ pub(crate) fn detect_spin_for_mode(
     cleared_lines: u32,
     mode: SpinMode,
 ) -> SpinDetection {
-    if piece != Piece::T && matches!(mode, SpinMode::TSpins | SpinMode::TSpinsPlus | SpinMode::None)
+    if piece != Piece::T
+        && matches!(
+            mode,
+            SpinMode::TSpins | SpinMode::TSpinsPlus | SpinMode::None
+        )
     {
         return SpinDetection {
             kind: SpinKind::None,
@@ -216,16 +220,18 @@ pub(crate) fn is_placement_immobile(locked_rows: &BoardRows, shape: Shape, x: i8
 
 pub(crate) fn remove_shape_cells(rows: &BoardRows, shape: Shape, x: i8, y: i8) -> BoardRows {
     let mut output = *rows;
-    for cell in shape.cells {
-        let board_x = x + cell.x;
-        let board_y = y + cell.y;
-        if board_x >= 0
-            && board_x < BOARD_WIDTH as i8
-            && board_y >= 0
-            && board_y < BOARD_HEIGHT as i8
-        {
-            output[board_y as usize] &= !(1_u16 << board_x);
-        }
+    if x < 0
+        || y < 0
+        || x + shape.width > BOARD_WIDTH as i8
+        || y + shape.height > BOARD_HEIGHT as i8
+    {
+        return output;
+    }
+
+    let x_shift = x as u32;
+    let base_y = y as usize;
+    for dy in 0..shape.height as usize {
+        output[base_y + dy] &= !(shape.row_masks[dy] << x_shift);
     }
     output
 }

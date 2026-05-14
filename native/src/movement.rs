@@ -371,17 +371,19 @@ fn kick_group_for(piece: Piece) -> KickGroup {
 }
 
 pub(crate) fn can_place(rows: &BoardRows, shape: Shape, x: i8, y: i8) -> bool {
-    for cell in shape.cells {
-        let board_x = x + cell.x;
-        let board_y = y + cell.y;
-        if board_x < 0
-            || board_x >= BOARD_WIDTH as i8
-            || board_y < 0
-            || board_y >= BOARD_HEIGHT as i8
-        {
-            return false;
-        }
-        if rows[board_y as usize] & (1_u16 << board_x) != 0 {
+    if x < 0
+        || y < 0
+        || x + shape.width > BOARD_WIDTH as i8
+        || y + shape.height > BOARD_HEIGHT as i8
+    {
+        return false;
+    }
+
+    let x_shift = x as u32;
+    let base_y = y as usize;
+    for dy in 0..shape.height as usize {
+        let mask = shape.row_masks[dy] << x_shift;
+        if rows[base_y + dy] & mask != 0 {
             return false;
         }
     }
@@ -434,12 +436,10 @@ pub(crate) fn lock_shape(rows: &BoardRows, shape: Shape, x: i8, y: i8) -> Option
     }
 
     let mut output = *rows;
-    for cell in shape.cells {
-        let board_x = x + cell.x;
-        let board_y = y + cell.y;
-        let row_index = usize::try_from(board_y).ok()?;
-        let column = u32::try_from(board_x).ok()?;
-        output[row_index] |= 1_u16 << column;
+    let x_shift = u32::try_from(x).ok()?;
+    let base_y = usize::try_from(y).ok()?;
+    for dy in 0..shape.height as usize {
+        output[base_y + dy] |= shape.row_masks[dy] << x_shift;
     }
     Some(output)
 }

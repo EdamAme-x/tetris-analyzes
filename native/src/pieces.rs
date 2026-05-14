@@ -23,6 +23,7 @@ pub(crate) struct Shape {
     pub(crate) width: i8,
     pub(crate) height: i8,
     pub(crate) cells: &'static [Cell],
+    pub(crate) row_masks: [u16; 4],
 }
 
 pub(crate) fn parse_queue(queue: &str) -> Result<Vec<Piece>> {
@@ -211,24 +212,28 @@ const I_SHAPES: &[Shape] = &[
         width: 4,
         height: 1,
         cells: I0,
+        row_masks: [0b1111, 0, 0, 0],
     },
     Shape {
         rotation: 1,
         width: 1,
         height: 4,
         cells: I1,
+        row_masks: [0b1, 0b1, 0b1, 0b1],
     },
     Shape {
         rotation: 2,
         width: 4,
         height: 1,
         cells: I0,
+        row_masks: [0b1111, 0, 0, 0],
     },
     Shape {
         rotation: 3,
         width: 1,
         height: 4,
         cells: I1,
+        row_masks: [0b1, 0b1, 0b1, 0b1],
     },
 ];
 const O_SHAPES: &[Shape] = &[
@@ -237,24 +242,28 @@ const O_SHAPES: &[Shape] = &[
         width: 2,
         height: 2,
         cells: O0,
+        row_masks: [0b11, 0b11, 0, 0],
     },
     Shape {
         rotation: 1,
         width: 2,
         height: 2,
         cells: O0,
+        row_masks: [0b11, 0b11, 0, 0],
     },
     Shape {
         rotation: 2,
         width: 2,
         height: 2,
         cells: O0,
+        row_masks: [0b11, 0b11, 0, 0],
     },
     Shape {
         rotation: 3,
         width: 2,
         height: 2,
         cells: O0,
+        row_masks: [0b11, 0b11, 0, 0],
     },
 ];
 const T_SHAPES: &[Shape] = &[
@@ -263,24 +272,28 @@ const T_SHAPES: &[Shape] = &[
         width: 3,
         height: 2,
         cells: T0,
+        row_masks: [0b111, 0b010, 0, 0],
     },
     Shape {
         rotation: 1,
         width: 2,
         height: 3,
         cells: T1,
+        row_masks: [0b01, 0b11, 0b01, 0],
     },
     Shape {
         rotation: 2,
         width: 3,
         height: 2,
         cells: T2,
+        row_masks: [0b010, 0b111, 0, 0],
     },
     Shape {
         rotation: 3,
         width: 2,
         height: 3,
         cells: T3,
+        row_masks: [0b10, 0b11, 0b10, 0],
     },
 ];
 const S_SHAPES: &[Shape] = &[
@@ -289,24 +302,28 @@ const S_SHAPES: &[Shape] = &[
         width: 3,
         height: 2,
         cells: S0,
+        row_masks: [0b011, 0b110, 0, 0],
     },
     Shape {
         rotation: 1,
         width: 2,
         height: 3,
         cells: S1,
+        row_masks: [0b10, 0b11, 0b01, 0],
     },
     Shape {
         rotation: 2,
         width: 3,
         height: 2,
         cells: S0,
+        row_masks: [0b011, 0b110, 0, 0],
     },
     Shape {
         rotation: 3,
         width: 2,
         height: 3,
         cells: S1,
+        row_masks: [0b10, 0b11, 0b01, 0],
     },
 ];
 const Z_SHAPES: &[Shape] = &[
@@ -315,24 +332,28 @@ const Z_SHAPES: &[Shape] = &[
         width: 3,
         height: 2,
         cells: Z0,
+        row_masks: [0b110, 0b011, 0, 0],
     },
     Shape {
         rotation: 1,
         width: 2,
         height: 3,
         cells: Z1,
+        row_masks: [0b01, 0b11, 0b10, 0],
     },
     Shape {
         rotation: 2,
         width: 3,
         height: 2,
         cells: Z0,
+        row_masks: [0b110, 0b011, 0, 0],
     },
     Shape {
         rotation: 3,
         width: 2,
         height: 3,
         cells: Z1,
+        row_masks: [0b01, 0b11, 0b10, 0],
     },
 ];
 const J_SHAPES: &[Shape] = &[
@@ -341,24 +362,28 @@ const J_SHAPES: &[Shape] = &[
         width: 3,
         height: 2,
         cells: J0,
+        row_masks: [0b111, 0b001, 0, 0],
     },
     Shape {
         rotation: 1,
         width: 2,
         height: 3,
         cells: J1,
+        row_masks: [0b01, 0b01, 0b11, 0],
     },
     Shape {
         rotation: 2,
         width: 3,
         height: 2,
         cells: J2,
+        row_masks: [0b100, 0b111, 0, 0],
     },
     Shape {
         rotation: 3,
         width: 2,
         height: 3,
         cells: J3,
+        row_masks: [0b11, 0b10, 0b10, 0],
     },
 ];
 const L_SHAPES: &[Shape] = &[
@@ -367,24 +392,28 @@ const L_SHAPES: &[Shape] = &[
         width: 3,
         height: 2,
         cells: L0,
+        row_masks: [0b111, 0b100, 0, 0],
     },
     Shape {
         rotation: 1,
         width: 2,
         height: 3,
         cells: L1,
+        row_masks: [0b11, 0b01, 0b01, 0],
     },
     Shape {
         rotation: 2,
         width: 3,
         height: 2,
         cells: L2,
+        row_masks: [0b001, 0b111, 0, 0],
     },
     Shape {
         rotation: 3,
         width: 2,
         height: 3,
         cells: L3,
+        row_masks: [0b10, 0b10, 0b11, 0],
     },
 ];
 
@@ -405,5 +434,38 @@ pub(crate) fn placement_shape_indices(piece: Piece) -> &'static [usize] {
         Piece::I | Piece::S | Piece::Z => &[0, 1],
         Piece::O => &[0],
         Piece::T | Piece::J | Piece::L => &[0, 1, 2, 3],
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn shape_row_masks_match_declared_cells() {
+        for piece in [
+            Piece::I,
+            Piece::O,
+            Piece::T,
+            Piece::S,
+            Piece::Z,
+            Piece::J,
+            Piece::L,
+        ] {
+            for shape in piece_shapes(piece) {
+                let mut expected = [0_u16; 4];
+                for cell in shape.cells {
+                    expected[cell.y as usize] |= 1_u16 << cell.x;
+                }
+
+                assert_eq!(
+                    shape.row_masks,
+                    expected,
+                    "{} r{} row masks must match cells",
+                    piece_name(piece),
+                    shape.rotation
+                );
+            }
+        }
     }
 }
