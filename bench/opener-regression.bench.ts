@@ -70,6 +70,16 @@ const cases: OpenerRegressionCase[] = [
     minDepth: 5
   },
   {
+    name: "two-bag-tspin-quality",
+    input: { queue: "SZILOJTSTOZLJI", beamWidth: 512, hold: true, maxDepth: 14 },
+    iterations: 1,
+    minDepth: 13,
+    minQueueIndex: 14,
+    minAttack: 9,
+    minTSpinClears: 2,
+    minBackToBackChain: 2
+  },
+  {
     name: "three-bag-continuation",
     input: { queue: "JLSTZIOJLSTZIOTIJLOSZ", beamWidth: 256, hold: true, maxDepth: 21 },
     iterations: 1,

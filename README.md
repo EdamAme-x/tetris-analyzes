@@ -44,3 +44,4 @@ Executable examples live in `tests/`.
 - [x] Add a bench regression gate for three-bag B2B T-spin continuation quality
 - [x] Reduce two-bag experiment beam width while preserving top B2B T-spin firepower
 - [x] Add experiment quality gates for curated B2B T-spin opener presets
+- [x] Add a bench regression gate for two-bag B2B T-spin opener quality
