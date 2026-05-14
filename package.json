@@ -8,9 +8,12 @@
     "build:native:debug": "napi build --manifest-path native/Cargo.toml --package-json-path package.json --output-dir native --platform --js index.js --dts index.d.ts",
     "bench": "bun run bench/bitboard.bench.ts",
     "check": "tsc --noEmit",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "generate:tetrio-tables": "bun run scripts/generate-tetrio-tables.ts",
+    "lint": "eslint .",
     "test": "bun test",
-    "verify": "bun run build:native:debug && bun run check && bun test"
+    "verify": "bun run build:native:debug && bun run check && bun run lint && bun run format:check && bun test"
   },
   "napi": {
     "binaryName": "tetris_analyzes_native",
@@ -19,9 +22,13 @@
     ]
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@napi-rs/cli": "3.6.2",
     "@types/bun": "1.3.14",
-    "typescript": "6.0.3"
+    "eslint": "^10.3.0",
+    "prettier": "^3.8.3",
+    "typescript": "6.0.3",
+    "typescript-eslint": "^8.59.3"
   },
   "dependencies": {
     "tetris-fumen": "1.1.3"

@@ -1,9 +1,11 @@
 import { existsSync } from "node:fs";
+import { createRequire } from "node:module";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { NativeBinding } from "./binding-types";
 
 let cachedBinding: NativeBinding | undefined;
+const moduleRequire = createRequire(import.meta.url);
 
 export function nativeBindingPath(): string {
   return resolve(dirname(fileURLToPath(import.meta.url)), "../../../native/index.js");
@@ -19,7 +21,7 @@ export function loadNativeBinding(): NativeBinding {
     throw new Error(`Native binding is not built. Run \`bun run build:native:debug\` first. Missing: ${entry}`);
   }
 
-  const binding = require(entry) as Record<string, unknown>;
+  const binding = moduleRequire(entry) as Record<string, unknown>;
   const requiredExports = [
     "createEmptyBoard",
     "copyBoardRows",

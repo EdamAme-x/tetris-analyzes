@@ -1,3 +1,4 @@
+import { createRequire } from "node:module";
 import {
   CHEESE_LIMITS,
   COMBO_TABLE_OPTIONS,
@@ -8,16 +9,12 @@ import {
   SPIN_OPTIONS,
   STATIC_GRAVITY_LIMITS,
   type ComboTable,
-  type GarbageMode,
   type GarbageRules,
-  type GravityMode,
   type GravityRules,
   type HoldMode,
   type HoldRules,
-  type KickTable,
   type Ruleset,
   type RulesetInput,
-  type SpinMode,
   type TetrioConfig
 } from "../domain/rules";
 import { bitBoardFromRows, createEmptyBitBoard } from "../infrastructure/bitboard/native-bitboard";
@@ -25,6 +22,7 @@ import { bitBoardFromRows, createEmptyBitBoard } from "../infrastructure/bitboar
 type TetrioTables = typeof import("../domain/tetrio-tables");
 type TetrioComboTableKey = keyof TetrioTables["TETRIO_COMBO_ATTACK_TABLES"];
 
+const moduleRequire = createRequire(import.meta.url);
 const DEFAULT_HOLD: HoldRules = { mode: "ON", infinite: "OFF" };
 const DEFAULT_GRAVITY: GravityRules = {
   mode: "STATIC",
@@ -74,7 +72,12 @@ export function toTetrioConfig(ruleset: Ruleset): TetrioConfig {
   };
 }
 
-export function comboGarbageAttack(comboTable: ComboTable, baseAttack: number, tetrioCombo: number, rounding: "DOWN" | "RAW" = "DOWN"): number {
+export function comboGarbageAttack(
+  comboTable: ComboTable,
+  baseAttack: number,
+  tetrioCombo: number,
+  rounding: "DOWN" | "RAW" = "DOWN"
+): number {
   assertNonNegativeInteger(baseAttack, "baseAttack");
   assertNonNegativeInteger(tetrioCombo, "tetrioCombo");
 
@@ -108,10 +111,7 @@ export function multiplierComboAttack(baseAttack: number, tetrioCombo: number, r
     attack *= 1 + garbageAttackTable.COMBO_BONUS * (tetrioCombo - 1);
   }
   if (tetrioCombo > 2) {
-    attack = Math.max(
-      Math.log1p(garbageAttackTable.COMBO_MINIFIER * (tetrioCombo - 1) * garbageAttackTable.COMBO_MINIFIER_LOG),
-      attack
-    );
+    attack = Math.max(Math.log1p(garbageAttackTable.COMBO_MINIFIER * (tetrioCombo - 1) * garbageAttackTable.COMBO_MINIFIER_LOG), attack);
   }
 
   return roundAttack(attack, rounding);
@@ -135,7 +135,11 @@ function normalizeHoldMode(value: HoldMode | boolean, label: string): HoldMode {
   if (typeof value === "boolean") {
     return value ? "ON" : "OFF";
   }
-  return normalizeOption(value, HOLD_MODES.map((mode) => ({ value: mode, tetrioValue: toOnOffValue(mode) })), label);
+  return normalizeOption(
+    value,
+    HOLD_MODES.map((mode) => ({ value: mode, tetrioValue: toOnOffValue(mode) })),
+    label
+  );
 }
 
 function normalizeGravity(value: RulesetInput["gravity"]): GravityRules {
@@ -172,7 +176,12 @@ function normalizeGarbage(value: RulesetInput["garbage"]): GarbageRules {
   const cheeseMessinessPercent = value.cheeseMessinessPercent ?? DEFAULT_GARBAGE.cheeseMessinessPercent;
   assertInRange(cheeseLayerHeight, CHEESE_LIMITS.layerHeight.min, CHEESE_LIMITS.layerHeight.max, "garbage.cheeseLayerHeight");
   assertInRange(cheeseTimerInterval, CHEESE_LIMITS.timerInterval.min, CHEESE_LIMITS.timerInterval.max, "garbage.cheeseTimerInterval");
-  assertInRange(cheeseMessinessPercent, CHEESE_LIMITS.messinessPercent.min, CHEESE_LIMITS.messinessPercent.max, "garbage.cheeseMessinessPercent");
+  assertInRange(
+    cheeseMessinessPercent,
+    CHEESE_LIMITS.messinessPercent.min,
+    CHEESE_LIMITS.messinessPercent.max,
+    "garbage.cheeseMessinessPercent"
+  );
   return { mode, cheeseLayerHeight, cheeseTimerInterval, cheeseMessinessPercent };
 }
 
@@ -219,7 +228,7 @@ function toComboTableKey(comboTable: Exclude<ComboTable, "MULTIPLIER">): TetrioC
 }
 
 function loadTetrioTables(): TetrioTables {
-  cachedTetrioTables ??= require("../domain/tetrio-tables") as TetrioTables;
+  cachedTetrioTables ??= moduleRequire("../domain/tetrio-tables") as TetrioTables;
   return cachedTetrioTables;
 }
 

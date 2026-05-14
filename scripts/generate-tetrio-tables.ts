@@ -179,7 +179,7 @@ function extractObjectLiteralAfterKey(input: string, key: string): string {
       continue;
     }
 
-    if (char === "\"" || char === "'" || char === "`") {
+    if (char === '"' || char === "'" || char === "`") {
       quote = char;
       continue;
     }

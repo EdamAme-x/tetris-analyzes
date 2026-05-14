@@ -30,7 +30,8 @@ export const SPIN_OPTIONS = [
   {
     value: "ALL-MINI+",
     tetrioValue: "all-mini+",
-    title: "Receive bonuses for spinning T-pieces, receive Back-to-Back for spinning all other pieces. Allows immobile T-piece to count as a Mini.",
+    title:
+      "Receive bonuses for spinning T-pieces, receive Back-to-Back for spinning all other pieces. Allows immobile T-piece to count as a Mini.",
     rewards: "t-spins-with-non-t-b2b",
     immobileTMini: true
   },
@@ -100,9 +101,24 @@ export const GARBAGE_OPTIONS = [
   { value: "BACKFIRE 0.5X", tetrioValue: "backfire_half", title: "Half your attack power is sent back to you.", multiplier: 0.5 },
   { value: "BACKFIRE 1X", tetrioValue: "backfire_full", title: "All your attack power is sent back to you.", multiplier: 1 },
   { value: "BACKFIRE 2X", tetrioValue: "backfire_double", title: "Double your attack power is sent back to you.", multiplier: 2 },
-  { value: "UNCLEAR 0.5X", tetrioValue: "unclear_half", title: "Half your attack power is immediately pushed onto your board.", multiplier: 0.5 },
-  { value: "UNCLEAR 1X", tetrioValue: "unclear_full", title: "All your attack power is immediately pushed onto your board.", multiplier: 1 },
-  { value: "UNCLEAR 2X", tetrioValue: "unclear_double", title: "Double your attack power is immediately pushed onto your board.", multiplier: 2 },
+  {
+    value: "UNCLEAR 0.5X",
+    tetrioValue: "unclear_half",
+    title: "Half your attack power is immediately pushed onto your board.",
+    multiplier: 0.5
+  },
+  {
+    value: "UNCLEAR 1X",
+    tetrioValue: "unclear_full",
+    title: "All your attack power is immediately pushed onto your board.",
+    multiplier: 1
+  },
+  {
+    value: "UNCLEAR 2X",
+    tetrioValue: "unclear_double",
+    title: "Double your attack power is immediately pushed onto your board.",
+    multiplier: 2
+  },
   { value: "CHEESE LAYER", tetrioValue: "cheeselayer", title: "A static layer of cheese is added onto your board." },
   { value: "CHEESE TIMER", tetrioValue: "cheesetimer", title: "One line of cheese is sent periodically." }
 ] as const;

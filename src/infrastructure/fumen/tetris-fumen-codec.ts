@@ -198,10 +198,7 @@ export function normalizeFumenData(input: string): FumenData {
 
   const prefix = match[0];
   const payloadStart = match.index + prefix.length;
-  const payload = candidate
-    .slice(payloadStart)
-    .split("&", 1)[0]
-    ?.replace(/\s+/g, "");
+  const payload = candidate.slice(payloadStart).split("&", 1)[0]?.replace(/\s+/g, "");
 
   if (payload === undefined || payload.length === 0) {
     throw new Error("Fumen payload is empty.");
