@@ -760,6 +760,70 @@ describe("opener experiment runner", () => {
     });
   });
 
+  test("counts continuation phase replay from the fourteen-piece frontier", () => {
+    const targetRows = [7, 11, 13, ...new Array(17).fill(0)];
+    const missRows = [2, 4, 8, ...new Array(17).fill(0)];
+    let calls = 0;
+    const report = runOpenerExperiment({
+      scenarios: [
+        {
+          name: "source",
+          queue: "TIJLOSZTIJLOSZTIJLOSZ",
+          hold: true,
+          beamWidth: 4,
+          maxDepth: 21,
+          warmups: 0,
+          iterations: 1,
+          top: 1
+        }
+      ],
+      templateReplay: {
+        scenarios: [
+          {
+            name: "frontier-hit",
+            queue: "OJLZISTOJLZISTOJLZIST",
+            hold: true,
+            beamWidth: 4,
+            maxDepth: 21,
+            warmups: 0,
+            iterations: 1
+          }
+        ],
+        topTemplates: 1
+      },
+      clock: createClock("2026-05-14T00:00:00.000Z", [0, 2]),
+      fumenCodec: fakeCodec,
+      search: (input) => {
+        calls += 1;
+        if (input.queue === "TIJLOSZTIJLOSZTIJLOSZ") {
+          return [
+            {
+              ...candidateNode(`source-depth-${input.maxDepth}`),
+              rows: targetRows,
+              attack: 12,
+              difficultAttack: 12,
+              difficultClears: 3,
+              tSpinClears: 3,
+              tSpinAttack: 12,
+              backToBackChain: 3
+            }
+          ];
+        }
+        if (input.maxDepth === 14) {
+          return [{ ...candidateNode("frontier-hit"), rows: targetRows }];
+        }
+        return [{ ...candidateNode("final-miss"), rows: missRows }];
+      }
+    });
+
+    expect(calls).toBe(4);
+    expect(report.templateReplay?.templates[0]).toMatchObject({
+      replayHitCount: 0,
+      phaseReplayHitCount: 1,
+      phaseProfileReplayHitCount: 1
+    });
+  });
+
   test("counts quality replay hits separately from exact template matches", () => {
     const targetRows = [7, 11, 13, ...new Array(17).fill(0)];
     const hitRows = [3, 5, 9, ...new Array(17).fill(0)];

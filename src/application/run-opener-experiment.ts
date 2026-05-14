@@ -148,6 +148,7 @@ export interface OpenerExperimentScenarioResult {
   readonly searchesPerSecond: number;
   readonly reachableTemplates: readonly OpenerScenarioReachableTemplate[];
   readonly reachableTemplatePhases: readonly OpenerScenarioReachablePhase[];
+  readonly reachablePhaseFrontiers: readonly OpenerScenarioReachablePhaseFrontier[];
   readonly reachableQualities: readonly OpenerScenarioReachableQuality[];
   readonly top: readonly OpenerExperimentCandidate[];
   readonly tags: readonly string[];
@@ -160,6 +161,12 @@ export interface OpenerScenarioReachableTemplate {
 
 export interface OpenerScenarioReachablePhase {
   readonly key: string;
+  readonly phaseKey: string;
+  readonly phaseProfileKey: string;
+  readonly rank: number;
+}
+
+export interface OpenerScenarioReachablePhaseFrontier {
   readonly phaseKey: string;
   readonly phaseProfileKey: string;
   readonly rank: number;
@@ -698,6 +705,16 @@ export function replayOpenerTemplateSurvivability(
           scenarioPhaseProfileHits
         );
       }
+      for (const reachablePhase of cachedScenario.reachablePhaseFrontiers) {
+        addPhaseReplayHits(phaseHitsByTemplate, templateKeysByPhase, reachablePhase.phaseKey, scenario.name, scenarioPhaseHits);
+        addPhaseReplayHits(
+          phaseProfileHitsByTemplate,
+          templateKeysByPhaseProfile,
+          reachablePhase.phaseProfileKey,
+          scenario.name,
+          scenarioPhaseProfileHits
+        );
+      }
       for (const quality of cachedScenario.reachableQualities) {
         addQualityReplayHits(qualityHitsByTemplate, templates, quality, scenario.name, scenarioQualityHits);
       }
@@ -721,6 +738,16 @@ export function replayOpenerTemplateSurvivability(
     }
 
     const nodes = search(searchInput(scenario));
+    for (const reachablePhase of createReachablePhaseFrontiers(searchPhaseFrontierNodes(scenario, nodes, search), scenario)) {
+      addPhaseReplayHits(phaseHitsByTemplate, templateKeysByPhase, reachablePhase.phaseKey, scenario.name, scenarioPhaseHits);
+      addPhaseReplayHits(
+        phaseProfileHitsByTemplate,
+        templateKeysByPhaseProfile,
+        reachablePhase.phaseProfileKey,
+        scenario.name,
+        scenarioPhaseProfileHits
+      );
+    }
     for (const [index, node] of nodes.entries()) {
       addQualityReplayHits(qualityHitsByTemplate, templates, searchNodeQuality(node, index), scenario.name, scenarioQualityHits);
       addPhaseReplayHits(
@@ -825,6 +852,7 @@ function runScenario(
   const stats = summarizeTimings(timings);
   const rules = scenarioRules(scenario);
   const topCandidates = createTopCandidates(lastNodes, scenario, topOverride ?? scenario.top ?? 5, fumenCodec);
+  const phaseFrontierNodes = searchPhaseFrontierNodes(scenario, lastNodes, search);
   assertScenarioQualityGate(scenario, topCandidates[0]);
   return {
     name: scenario.name,
@@ -844,10 +872,23 @@ function runScenario(
     searchesPerSecond: stats.median === 0 ? 0 : 1_000 / stats.median,
     reachableTemplates: createReachableTemplates(lastNodes),
     reachableTemplatePhases: createReachableTemplatePhases(lastNodes, scenario),
+    reachablePhaseFrontiers: createReachablePhaseFrontiers(phaseFrontierNodes, scenario),
     reachableQualities: createReachableQualities(lastNodes),
     top: topCandidates,
     tags: scenario.tags ?? []
   };
+}
+
+function searchPhaseFrontierNodes(
+  scenario: OpenerExperimentScenario,
+  fallbackNodes: readonly SearchOpenerBeamNode[],
+  search: OpenerSearch
+): readonly SearchOpenerBeamNode[] {
+  const phaseDepth = templatePhaseDepth(scenario.maxDepth);
+  if (scenario.maxDepth < 21 || phaseDepth >= scenario.maxDepth) {
+    return fallbackNodes;
+  }
+  return search(searchInput({ ...scenario, maxDepth: phaseDepth }));
 }
 
 function searchInput(scenario: OpenerExperimentScenario): SearchOpenerBeamInput {
@@ -917,6 +958,22 @@ function createReachableTemplatePhases(
     }
   }
   return [...ranksByTemplatePhase.values()];
+}
+
+function createReachablePhaseFrontiers(
+  nodes: readonly SearchOpenerBeamNode[],
+  scenario: OpenerExperimentScenario
+): OpenerScenarioReachablePhaseFrontier[] {
+  const ranksByPhase = new Map<string, OpenerScenarioReachablePhaseFrontier>();
+  for (const [index, node] of nodes.entries()) {
+    const phaseKey = searchNodePhaseTemplateKey(node, scenario);
+    const phaseProfileKey = searchNodePhaseProfileKey(node, scenario);
+    const uniqueKey = `${phaseKey}\n${phaseProfileKey}`;
+    if (!ranksByPhase.has(uniqueKey)) {
+      ranksByPhase.set(uniqueKey, { phaseKey, phaseProfileKey, rank: index + 1 });
+    }
+  }
+  return [...ranksByPhase.values()];
 }
 
 function createReachableQualities(nodes: readonly SearchOpenerBeamNode[]): OpenerScenarioReachableQuality[] {
