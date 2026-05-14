@@ -82,3 +82,4 @@ Executable examples live in `tests/`.
 - [x] Use early-return native beam comparators on the search ranking hot path
 - [x] Use native difficult-attack totals for opener report ranking and replay
 - [x] Reuse native bag permutation buffers during sampled opener evaluation
+- [x] Key opener template replay by board, hold, queue progress, and B2B state

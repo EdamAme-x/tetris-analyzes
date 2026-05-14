@@ -546,7 +546,9 @@ describe("opener experiment runner", () => {
     });
 
     expect(calls).toBe(1);
-    expect(report.scenarios[0]?.reachableTemplates).toEqual([{ key: [384, 640, 128, ...new Array(17).fill(0)].join(","), rank: 1 }]);
+    expect(report.scenarios[0]?.reachableTemplates).toEqual([
+      { key: `${[384, 640, 128, ...new Array(17).fill(0)].join(",")}|hold=-|queue=1|b2b=0`, rank: 1 }
+    ]);
     expect(report.templateReplay?.templates[0]?.hits[0]).toMatchObject({
       scenario: "cached-replay",
       rank: 1,
@@ -586,6 +588,44 @@ describe("opener experiment runner", () => {
 
     expect(replay.templates[0]).toMatchObject({ replayHitCount: 1, replayHitRate: 1 });
     expect(() => replayOpenerTemplateSurvivability(report, { scenarios: [], topTemplates: 0 })).toThrow("Template replay topTemplates");
+  });
+
+  test("does not replay template hits across different hold or B2B state", () => {
+    const rows = [1, 2, 3, ...new Array(17).fill(0)];
+    const report = runOpenerExperiment({
+      scenarios: [
+        {
+          name: "source",
+          queue: "IO",
+          hold: true,
+          beamWidth: 4,
+          maxDepth: 1,
+          warmups: 0,
+          iterations: 1,
+          top: 1,
+          rules: { spinMode: "T-SPINS", comboTable: "MULTIPLIER", kickTable: "SRS+" }
+        }
+      ],
+      templateReplay: {
+        scenarios: [replayScenario("same-board-broken-state", "JO")],
+        topTemplates: 1
+      },
+      clock: createClock("2026-05-14T00:00:00.000Z", [0, 2]),
+      fumenCodec: fakeCodec,
+      search: (input) => {
+        if (input.queue === "IO") {
+          return [{ ...candidateNode("source"), rows, hold: "T", backToBackChain: 2 }];
+        }
+        return [{ ...candidateNode("same-board"), rows, hold: null, backToBackChain: 0 }];
+      }
+    });
+
+    expect(report.templateReplay?.templates[0]).toMatchObject({
+      replayScenarioCount: 1,
+      replayHitCount: 0,
+      replayHitRate: 0,
+      hits: []
+    });
   });
 
   test("keeps T-spin continuation potential before slicing scenario top candidates", () => {

@@ -622,7 +622,7 @@ export function replayOpenerTemplateSurvivability(
 
     const nodes = search(searchInput(scenario));
     for (const [index, node] of nodes.entries()) {
-      const key = rowsTemplateKey(node.rows);
+      const key = searchNodeTemplateKey(node);
       if (!templateKeys.has(key) || scenarioHits.has(key)) {
         continue;
       }
@@ -756,7 +756,7 @@ function scenarioResultSignature(scenario: OpenerExperimentScenarioResult): stri
 function createReachableTemplates(nodes: readonly SearchOpenerBeamNode[]): OpenerScenarioReachableTemplate[] {
   const ranksByTemplate = new Map<string, number>();
   for (const [index, node] of nodes.entries()) {
-    const key = rowsTemplateKey(node.rows);
+    const key = searchNodeTemplateKey(node);
     if (!ranksByTemplate.has(key)) {
       ranksByTemplate.set(key, index + 1);
     }
@@ -926,8 +926,16 @@ function countTemplateSurvivors(report: OpenerExperimentReport): Map<string, num
   return new Map([...sourcesByTemplate].map(([key, sources]) => [key, sources.size]));
 }
 
-function templateKey(candidate: Pick<OpenerExperimentCandidate, "finalRows">): string {
-  return rowsTemplateKey(candidate.finalRows);
+function templateKey(candidate: Pick<OpenerExperimentCandidate, "finalRows" | "hold" | "queueIndex" | "backToBackChain">): string {
+  return statefulTemplateKey(candidate.finalRows, candidate.hold, candidate.queueIndex, candidate.backToBackChain);
+}
+
+function searchNodeTemplateKey(node: Pick<SearchOpenerBeamNode, "rows" | "hold" | "queueIndex" | "backToBackChain">): string {
+  return statefulTemplateKey(node.rows, node.hold ?? null, node.queueIndex, node.backToBackChain);
+}
+
+function statefulTemplateKey(rows: readonly number[], hold: string | null, queueIndex: number, backToBackChain: number): string {
+  return `${rowsTemplateKey(rows)}|hold=${hold ?? "-"}|queue=${queueIndex}|b2b=${backToBackChain}`;
 }
 
 function rowsTemplateKey(rows: readonly number[]): string {
