@@ -970,6 +970,11 @@ fn score_t_spin_setup_potential(
     let mut potential_by_rows = FastHashMap::<BoardRows, u32>::default();
     let mut quad_well_by_rows = FastHashMap::<BoardRows, u32>::default();
     let allows_t_spin_potential = spin_mode_allows_t_spin_potential(spin_mode);
+    let pruning_baseline = if max_depth >= 21 {
+        setup_potential_pruning_baseline(beam)
+    } else {
+        SetupPotentialPruningBaseline::default()
+    };
     for state in beam {
         let future_pieces = future_pieces_by_queue_index
             .get(state.queue_index)
@@ -985,7 +990,9 @@ fn score_t_spin_setup_potential(
             continue;
         }
 
-        state.t_spin_potential = if has_future_t {
+        let should_score_t_spin_potential =
+            has_future_t && should_score_exact_t_spin_potential(state.firepower, pruning_baseline);
+        state.t_spin_potential = if should_score_t_spin_potential {
             *potential_by_rows
                 .entry(state.rows)
                 .or_insert_with(|| estimate_t_spin_potential(&state.rows, kick_table))
@@ -1002,6 +1009,40 @@ fn score_t_spin_setup_potential(
         state.score = score_state(state.metrics, state.firepower, state.t_spin_potential)
             + quad_well_continuation_score(quad_well_potential, state.firepower.back_to_back_chain);
     }
+}
+
+#[derive(Clone, Copy, Default)]
+struct SetupPotentialPruningBaseline {
+    t_spin_clears: u32,
+    t_spin_attack: u32,
+    difficult_attack: u32,
+    back_to_back_chain: u32,
+}
+
+fn setup_potential_pruning_baseline(beam: &[SearchState]) -> SetupPotentialPruningBaseline {
+    let mut baseline = SetupPotentialPruningBaseline::default();
+    for state in beam {
+        baseline.t_spin_clears = baseline.t_spin_clears.max(state.firepower.t_spin_clears);
+        baseline.t_spin_attack = baseline.t_spin_attack.max(state.firepower.t_spin_attack);
+        baseline.difficult_attack = baseline
+            .difficult_attack
+            .max(state.firepower.difficult_attack);
+        baseline.back_to_back_chain = baseline
+            .back_to_back_chain
+            .max(state.firepower.back_to_back_chain);
+    }
+    baseline
+}
+
+fn should_score_exact_t_spin_potential(
+    firepower: FirepowerState,
+    baseline: SetupPotentialPruningBaseline,
+) -> bool {
+    baseline.t_spin_clears == 0
+        || (firepower.t_spin_clears.saturating_add(1) >= baseline.t_spin_clears
+            && firepower.t_spin_attack.saturating_add(4) >= baseline.t_spin_attack
+            && firepower.difficult_attack.saturating_add(4) >= baseline.difficult_attack
+            && firepower.back_to_back_chain.saturating_add(1) >= baseline.back_to_back_chain)
 }
 
 fn build_future_pieces_by_queue_index(pieces: &[Piece]) -> Vec<FuturePieces> {
@@ -1587,5 +1628,32 @@ mod tests {
         );
 
         assert!(beam[0].score > base_score);
+    }
+
+    #[test]
+    fn setup_potential_pruning_keeps_nearby_b2b_t_spin_states() {
+        let baseline = SetupPotentialPruningBaseline {
+            t_spin_clears: 3,
+            t_spin_attack: 12,
+            difficult_attack: 12,
+            back_to_back_chain: 3,
+        };
+        let mut near = FirepowerState::empty();
+        near.t_spin_clears = 2;
+        near.t_spin_attack = 8;
+        near.difficult_attack = 8;
+        near.back_to_back_chain = 2;
+        let mut far = FirepowerState::empty();
+        far.t_spin_clears = 1;
+        far.t_spin_attack = 4;
+        far.difficult_attack = 4;
+        far.back_to_back_chain = 1;
+
+        assert!(should_score_exact_t_spin_potential(near, baseline));
+        assert!(!should_score_exact_t_spin_potential(far, baseline));
+        assert!(should_score_exact_t_spin_potential(
+            FirepowerState::empty(),
+            SetupPotentialPruningBaseline::default(),
+        ));
     }
 }
