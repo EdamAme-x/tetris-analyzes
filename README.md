@@ -51,3 +51,4 @@ Executable examples live in `tests/`.
 - [x] Pre-size native opener search maps to reduce rehashing during beam expansion
 - [x] Cache native reachability BFS only after direct-drop checks miss
 - [x] Reuse native reachability spawn checks across placement candidates
+- [x] Use a lightweight deterministic hasher for native opener search maps

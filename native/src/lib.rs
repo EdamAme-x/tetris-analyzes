@@ -1,6 +1,7 @@
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
 use std::collections::HashMap;
+use std::hash::{BuildHasherDefault, Hasher};
 
 mod bag;
 mod board;
@@ -31,6 +32,58 @@ use spin::{
     apply_spin_mode, detect_spin, parse_spin_mode, spin_kind_name, SpinDetection, SpinMode,
 };
 use tetrio_tables::{ComboTable, KickTable};
+
+type FastHashMap<K, V> = HashMap<K, V, BuildHasherDefault<FastHasher>>;
+
+#[derive(Default)]
+struct FastHasher {
+    hash: u64,
+}
+
+impl FastHasher {
+    fn write_word(&mut self, value: u64) {
+        self.hash ^= value;
+        self.hash = self.hash.rotate_left(5).wrapping_mul(0x517c_c1b7_2722_0a95);
+    }
+}
+
+impl Hasher for FastHasher {
+    fn finish(&self) -> u64 {
+        self.hash
+    }
+
+    fn write(&mut self, bytes: &[u8]) {
+        let mut chunks = bytes.chunks_exact(8);
+        for chunk in &mut chunks {
+            self.write_word(u64::from_ne_bytes(chunk.try_into().expect("chunk is 8 bytes")));
+        }
+        let mut tail = 0_u64;
+        for (index, byte) in chunks.remainder().iter().copied().enumerate() {
+            tail |= u64::from(byte) << (index * 8);
+        }
+        self.write_word(tail);
+    }
+
+    fn write_u8(&mut self, value: u8) {
+        self.write_word(u64::from(value));
+    }
+
+    fn write_u16(&mut self, value: u16) {
+        self.write_word(u64::from(value));
+    }
+
+    fn write_u32(&mut self, value: u32) {
+        self.write_word(u64::from(value));
+    }
+
+    fn write_u64(&mut self, value: u64) {
+        self.write_word(value);
+    }
+
+    fn write_usize(&mut self, value: usize) {
+        self.write_word(value as u64);
+    }
+}
 
 #[derive(Clone)]
 pub(crate) struct SearchState {
@@ -546,8 +599,9 @@ pub(crate) fn search_opener_states(
     }];
 
     for _depth in 0..max_depth {
-        let mut next_by_key = HashMap::<SearchKey, SearchState>::with_capacity(
+        let mut next_by_key = FastHashMap::<SearchKey, SearchState>::with_capacity_and_hasher(
             next_search_map_capacity(beam.len(), beam_width, hold_enabled),
+            BuildHasherDefault::<FastHasher>::default(),
         );
 
         for state in &beam {
@@ -698,7 +752,7 @@ fn score_t_spin_setup_potential(
     kick_table: KickTable,
     spin_mode: SpinMode,
 ) {
-    let mut potential_by_rows = HashMap::<BoardRows, u32>::new();
+    let mut potential_by_rows = FastHashMap::<BoardRows, u32>::default();
     let allows_t_spin_potential = spin_mode_allows_t_spin_potential(spin_mode);
     for state in beam {
         let future_pieces = future_pieces_by_queue_index
