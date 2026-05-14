@@ -211,6 +211,21 @@ export const SURVEY_OPENER_EXPERIMENT_SCENARIOS: readonly OpenerExperimentScenar
   tags: ["survey", "hold", "two-bag", "t-spin", "tetrio-tl"]
 }));
 
+export const CONTINUATION_OPENER_EXPERIMENT_SCENARIOS: readonly OpenerExperimentScenario[] = TWO_BAG_TL_SURVEY_QUEUES.map(
+  ([name, queue]) => ({
+    name: `continuation-${name}`,
+    queue: `${queue}${DISCOVERY_BAG}`,
+    hold: true,
+    beamWidth: 256,
+    maxDepth: 21,
+    rules: TETRIO_TL_OPENER_SEARCH_RULES,
+    warmups: 0,
+    iterations: 1,
+    top: 2,
+    tags: ["continuation", "hold", "three-bag", "t-spin", "tetrio-tl"]
+  })
+);
+
 export const DISCOVERY_OPENER_EXPERIMENT_SCENARIOS: readonly OpenerExperimentScenario[] = createDiscoveryTwoBagQueues(
   DISCOVERY_TWO_BAG_SAMPLE_SIZE
 ).map((queue, index) => ({

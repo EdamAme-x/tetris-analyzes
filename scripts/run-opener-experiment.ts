@@ -1,6 +1,7 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import {
+  CONTINUATION_OPENER_EXPERIMENT_SCENARIOS,
   DEFAULT_OPENER_EXPERIMENT_SCENARIOS,
   DISCOVERY_OPENER_EXPERIMENT_SCENARIOS,
   SURVEY_OPENER_EXPERIMENT_SCENARIOS,
@@ -10,10 +11,11 @@ import {
   runOpenerExperiment
 } from "../src/application/run-opener-experiment";
 
-const outDir = readOption("--out-dir") ?? "experiments/runs";
-const top = readNumberOption("--top");
-const preset = readOption("--preset") ?? "default";
-const survivabilityReplay = readNonNegativeNumberOption("--survivability-replay") ?? defaultSurvivabilityReplay(preset);
+const args = parseArgs(process.argv.slice(2));
+const outDir = args.get("--out-dir") ?? "experiments/runs";
+const top = readNumberOption(args, "--top");
+const preset = args.get("--preset") ?? "default";
+const survivabilityReplay = readNonNegativeNumberOption(args, "--survivability-replay") ?? defaultSurvivabilityReplay(preset);
 const report = runOpenerExperiment({
   scenarios: scenarioPreset(preset),
   environment: {
@@ -42,13 +44,40 @@ console.log("");
 console.log(`full report: ${join(outDir, `${filenameBase}.md`)}`);
 console.log(`json: ${join(outDir, `${filenameBase}.json`)}`);
 
-function readOption(name: string): string | undefined {
-  const prefix = `${name}=`;
-  return process.argv.find((arg) => arg.startsWith(prefix))?.slice(prefix.length);
+function parseArgs(argv: readonly string[]): Map<string, string> {
+  const allowed = new Set(["--out-dir", "--top", "--preset", "--survivability-replay"]);
+  const parsed = new Map<string, string>();
+  for (let index = 0; index < argv.length; index += 1) {
+    const arg = argv[index];
+    if (arg === undefined) {
+      break;
+    }
+    const [flag, inlineValue] = splitOption(arg);
+    if (!allowed.has(flag)) {
+      throw new Error(`Unknown option ${flag}.`);
+    }
+    const value = inlineValue ?? argv[index + 1];
+    if (value === undefined || value.startsWith("--")) {
+      throw new Error(`${flag} requires a value.`);
+    }
+    if (inlineValue === undefined) {
+      index += 1;
+    }
+    parsed.set(flag, value);
+  }
+  return parsed;
 }
 
-function readNumberOption(name: string): number | undefined {
-  const raw = readOption(name);
+function splitOption(arg: string): [string, string | undefined] {
+  const separator = arg.indexOf("=");
+  if (separator === -1) {
+    return [arg, undefined];
+  }
+  return [arg.slice(0, separator), arg.slice(separator + 1)];
+}
+
+function readNumberOption(args: ReadonlyMap<string, string>, name: string): number | undefined {
+  const raw = args.get(name);
   if (raw === undefined) {
     return undefined;
   }
@@ -59,8 +88,8 @@ function readNumberOption(name: string): number | undefined {
   return value;
 }
 
-function readNonNegativeNumberOption(name: string): number | undefined {
-  const raw = readOption(name);
+function readNonNegativeNumberOption(args: ReadonlyMap<string, string>, name: string): number | undefined {
+  const raw = args.get(name);
   if (raw === undefined) {
     return undefined;
   }
@@ -83,7 +112,9 @@ function scenarioPreset(name: string) {
       return SURVEY_OPENER_EXPERIMENT_SCENARIOS;
     case "discovery":
       return DISCOVERY_OPENER_EXPERIMENT_SCENARIOS;
+    case "continuation":
+      return CONTINUATION_OPENER_EXPERIMENT_SCENARIOS;
     default:
-      throw new Error(`Unknown opener experiment preset ${name}. Expected default, survey, or discovery.`);
+      throw new Error(`Unknown opener experiment preset ${name}. Expected default, survey, discovery, or continuation.`);
   }
 }

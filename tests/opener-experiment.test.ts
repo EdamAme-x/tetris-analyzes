@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import type { FumenCodec, FumenUrls } from "../src/domain/fumen";
 import type { NativeBeamPlacement, NativeClearName } from "../src/infrastructure/native/binding-types";
 import {
+  CONTINUATION_OPENER_EXPERIMENT_SCENARIOS,
   DEFAULT_OPENER_EXPERIMENT_SCENARIOS,
   DISCOVERY_OPENER_EXPERIMENT_SCENARIOS,
   SURVEY_OPENER_EXPERIMENT_SCENARIOS,
@@ -53,6 +54,15 @@ describe("opener experiment runner", () => {
     expect(DISCOVERY_OPENER_EXPERIMENT_SCENARIOS.every((scenario) => scenario.name.startsWith("discover-"))).toBe(true);
     expect(DISCOVERY_OPENER_EXPERIMENT_SCENARIOS.every((scenario) => scenario.queue.length === 14)).toBe(true);
     expect(DISCOVERY_OPENER_EXPERIMENT_SCENARIOS.every((scenario) => scenario.rules === TETRIO_TL_OPENER_SEARCH_RULES)).toBe(true);
+  });
+
+  test("provides a three-bag continuation preset for B2B T-spin chain experiments", () => {
+    expect(CONTINUATION_OPENER_EXPERIMENT_SCENARIOS).toHaveLength(SURVEY_OPENER_EXPERIMENT_SCENARIOS.length);
+    expect(CONTINUATION_OPENER_EXPERIMENT_SCENARIOS.every((scenario) => scenario.name.startsWith("continuation-"))).toBe(true);
+    expect(CONTINUATION_OPENER_EXPERIMENT_SCENARIOS.every((scenario) => isThreeBagQueue(scenario.queue))).toBe(true);
+    expect(CONTINUATION_OPENER_EXPERIMENT_SCENARIOS.every((scenario) => scenario.beamWidth === 256)).toBe(true);
+    expect(CONTINUATION_OPENER_EXPERIMENT_SCENARIOS.every((scenario) => scenario.maxDepth === 21)).toBe(true);
+    expect(CONTINUATION_OPENER_EXPERIMENT_SCENARIOS.every((scenario) => scenario.tags?.includes("three-bag"))).toBe(true);
   });
 
   test("measures native search scenarios and keeps top candidates linkable", () => {
@@ -755,6 +765,13 @@ function isTwoBagQueue(queue: string): boolean {
 
 function isSingleBag(queue: string): boolean {
   return queue.split("").sort().join("") === "IJLOSTZ";
+}
+
+function isThreeBagQueue(queue: string): boolean {
+  if (queue.length !== 21) {
+    return false;
+  }
+  return isSingleBag(queue.slice(0, 7)) && isSingleBag(queue.slice(7, 14)) && isSingleBag(queue.slice(14));
 }
 
 function replayScenario(name: string, queue: string) {

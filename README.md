@@ -39,3 +39,4 @@ Executable examples live in `tests/`.
 - [x] Native pruning rewards B2B-preserving quad wells when a future I piece exists
 - [x] Add opener-template survivability grouping across experiment queue permutations
 - [x] Expand survivability from top-candidate grouping to full template replay across wider queues
+- [x] Add a three-bag continuation preset for B2B T-spin chain experiments
