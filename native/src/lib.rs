@@ -447,6 +447,7 @@ pub fn evaluate_opener_firepower(events: Vec<BeamFirepowerInput>) -> Result<Beam
             cleared_lines,
             cleared_lines > 0 && event.all_clear.unwrap_or(false),
             combo_table,
+            false,
         );
         state = next_state;
         output_events.push(BeamFirepowerEvent::from(firepower_event));

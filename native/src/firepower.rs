@@ -199,6 +199,7 @@ pub(crate) fn advance_firepower_with_combo_table(
         spin.cleared_lines,
         all_clear,
         combo_table,
+        spin.force_back_to_back,
     )
 }
 
@@ -208,6 +209,7 @@ pub(crate) fn advance_firepower_for_clear_with_combo_table(
     cleared_lines: u32,
     all_clear: bool,
     combo_table: ComboTable,
+    force_back_to_back: bool,
 ) -> (FirepowerState, FirepowerEvent) {
     let base_attack = clear_kind_attack(clear_kind);
     let mut attack = base_attack as f64;
@@ -218,7 +220,7 @@ pub(crate) fn advance_firepower_for_clear_with_combo_table(
         0
     };
     let max_combo = previous.max_combo.max(combo);
-    let difficult = is_back_to_back_clear(clear_kind);
+    let difficult = force_back_to_back || is_back_to_back_clear(clear_kind);
     let back_to_back_chain = if difficult {
         previous.back_to_back_chain + 1
     } else if cleared_lines > 0 {
@@ -255,7 +257,7 @@ pub(crate) fn advance_firepower_for_clear_with_combo_table(
     let event_attack = attack.floor() as u32 + all_clear_bonus;
     let event_points = points + all_clear_points;
     let all_clears = previous.all_clears + u32::from(all_clear);
-    let difficult_clear = is_back_to_back_clear(clear_kind) && cleared_lines > 0;
+    let difficult_clear = difficult && cleared_lines > 0;
     let t_spin_clear = is_real_t_spin_line_clear(clear_kind);
 
     (
@@ -404,6 +406,18 @@ mod tests {
         [0, 0, 0, 0, 0]
     }
 
+    fn spin_detection(kind: SpinKind, cleared_lines: u32, force_back_to_back: bool) -> SpinDetection {
+        SpinDetection {
+            kind,
+            spin: kind != SpinKind::None,
+            mini: kind == SpinKind::TSpinMini,
+            immobile: kind == SpinKind::ImmobileSpin,
+            force_back_to_back,
+            occupied_corners: 0,
+            cleared_lines,
+        }
+    }
+
     #[test]
     fn tracks_difficult_attack_separately_from_plain_attack() {
         let (double_state, double_event) = advance_firepower_for_clear_with_combo_table(
@@ -412,6 +426,7 @@ mod tests {
             2,
             false,
             ComboTable::Multiplier,
+            false,
         );
         let (quad_state, quad_event) = advance_firepower_for_clear_with_combo_table(
             FirepowerState::empty(),
@@ -419,6 +434,7 @@ mod tests {
             4,
             false,
             ComboTable::Multiplier,
+            false,
         );
 
         assert_eq!(double_event.attack, 1);
@@ -426,6 +442,29 @@ mod tests {
         assert_eq!(quad_event.attack, 4);
         assert_eq!(quad_state.difficult_attack, 4);
         assert!(firepower_score(quad_state) > firepower_score(double_state) * 4.0);
+    }
+
+    #[test]
+    fn forced_b2b_spin_clears_start_and_continue_back_to_back() {
+        let (first_state, first_event) = advance_firepower_with_combo_table(
+            FirepowerState::empty(),
+            spin_detection(SpinKind::TSpinMini, 1, true),
+            &[1_u16; BOARD_HEIGHT],
+            ComboTable::Multiplier,
+        );
+        assert_eq!(first_state.back_to_back_chain, 1);
+        assert_eq!(first_state.difficult_clears, 1);
+        assert!(!first_event.back_to_back);
+
+        let (second_state, second_event) = advance_firepower_with_combo_table(
+            first_state,
+            spin_detection(SpinKind::TSpinMini, 1, true),
+            &[1_u16; BOARD_HEIGHT],
+            ComboTable::Multiplier,
+        );
+        assert_eq!(second_state.back_to_back_chain, 2);
+        assert_eq!(second_state.difficult_clears, 2);
+        assert!(second_event.back_to_back);
     }
 
     #[test]

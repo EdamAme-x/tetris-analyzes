@@ -10,6 +10,7 @@ pub(crate) struct SpinDetection {
     pub(crate) spin: bool,
     pub(crate) mini: bool,
     pub(crate) immobile: bool,
+    pub(crate) force_back_to_back: bool,
     pub(crate) occupied_corners: u32,
     pub(crate) cleared_lines: u32,
 }
@@ -59,6 +60,7 @@ pub(crate) fn detect_spin(
                 spin: true,
                 mini,
                 immobile,
+                force_back_to_back: false,
                 occupied_corners,
                 cleared_lines,
             };
@@ -69,6 +71,7 @@ pub(crate) fn detect_spin(
             spin: false,
             mini: false,
             immobile,
+            force_back_to_back: false,
             occupied_corners,
             cleared_lines,
         };
@@ -80,6 +83,7 @@ pub(crate) fn detect_spin(
             spin: true,
             mini: false,
             immobile,
+            force_back_to_back: false,
             occupied_corners: 0,
             cleared_lines,
         };
@@ -90,6 +94,7 @@ pub(crate) fn detect_spin(
         spin: false,
         mini: false,
         immobile,
+        force_back_to_back: false,
         occupied_corners: 0,
         cleared_lines,
     }
@@ -115,6 +120,7 @@ pub(crate) fn detect_spin_for_mode(
             spin: false,
             mini: false,
             immobile: false,
+            force_back_to_back: false,
             occupied_corners: 0,
             cleared_lines,
         };
@@ -159,7 +165,9 @@ pub(crate) fn apply_spin_mode(
             with_spin_kind(detection, SpinKind::TSpin, false)
         }
         SpinMode::AllMini | SpinMode::AllMiniPlus | SpinMode::MiniOnly => {
-            with_spin_kind(detection, SpinKind::TSpinMini, true)
+            let mut spin = with_spin_kind(detection, SpinKind::TSpinMini, true);
+            spin.force_back_to_back = true;
+            spin
         }
         SpinMode::TSpins | SpinMode::TSpinsPlus | SpinMode::None | SpinMode::Stupid => {
             without_spin(detection)
@@ -207,6 +215,7 @@ fn without_spin(detection: SpinDetection) -> SpinDetection {
         kind: SpinKind::None,
         spin: false,
         mini: false,
+        force_back_to_back: false,
         ..detection
     }
 }
@@ -342,5 +351,32 @@ pub(crate) fn spin_kind_name(kind: SpinKind) -> &'static str {
         SpinKind::TSpin => "T_SPIN",
         SpinKind::TSpinMini => "T_SPIN_MINI",
         SpinKind::ImmobileSpin => "IMMOBILE_SPIN",
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn all_mini_non_t_spins_force_back_to_back_without_full_spin_attack() {
+        let detection = SpinDetection {
+            kind: SpinKind::ImmobileSpin,
+            spin: true,
+            mini: false,
+            immobile: true,
+            force_back_to_back: false,
+            occupied_corners: 0,
+            cleared_lines: 1,
+        };
+
+        let all_mini = apply_spin_mode(detection, Piece::I, SpinMode::AllMini);
+        assert!(all_mini.kind == SpinKind::TSpinMini);
+        assert!(all_mini.mini);
+        assert!(all_mini.force_back_to_back);
+
+        let tl = apply_spin_mode(detection, Piece::I, SpinMode::TSpins);
+        assert!(tl.kind == SpinKind::None);
+        assert!(!tl.force_back_to_back);
     }
 }

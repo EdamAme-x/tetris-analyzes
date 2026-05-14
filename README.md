@@ -60,3 +60,4 @@ Executable examples live in `tests/`.
 - [x] Use static equivalent-rotation lookup for native reachability cache membership
 - [x] Pre-allocate accepted native child paths and placement histories during beam expansion
 - [x] Stop native T-spin potential scans once the maximum reachable continuation value is found
+- [x] Make native ALL-MINI and MINI-ONLY non-T spin clears advance Back-to-Back chains
