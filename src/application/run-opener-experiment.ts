@@ -23,10 +23,16 @@ export interface OpenerExperimentEnvironment {
 export interface OpenerExperimentCandidate {
   readonly rank: number;
   readonly score: number;
+  readonly firepowerScore: number;
   readonly path: readonly string[];
   readonly previewUrl: string;
   readonly hold: string | null;
   readonly queueIndex: number;
+  readonly attack: number;
+  readonly points: number;
+  readonly maxCombo: number;
+  readonly backToBackChain: number;
+  readonly allClears: number;
   readonly occupiedCells: number;
   readonly clearedLines: number;
   readonly aggregateHeight: number;
@@ -138,8 +144,8 @@ export function renderOpenerExperimentMarkdown(report: OpenerExperimentReport): 
     `Runtime: ${report.environment.runtime}`,
     `Native: ${report.environment.nativeProfile}`,
     "",
-    "| scenario | queue | hold | beam | depth | median ms | searches/s | result nodes | top score | holes | bumpiness | preview |",
-    "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |"
+    "| scenario | queue | hold | beam | depth | median ms | searches/s | result nodes | top attack | top score | holes | bumpiness | preview |",
+    "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |"
   ];
 
   for (const scenario of report.scenarios) {
@@ -154,6 +160,7 @@ export function renderOpenerExperimentMarkdown(report: OpenerExperimentReport): 
         scenario.medianMs.toFixed(3),
         scenario.searchesPerSecond.toFixed(1),
         String(scenario.resultCount),
+        String(top?.attack ?? ""),
         top?.score.toFixed(1) ?? "",
         String(top?.holes ?? ""),
         String(top?.bumpiness ?? ""),
@@ -170,10 +177,17 @@ export function renderOpenerExperimentMarkdown(report: OpenerExperimentReport): 
       continue;
     }
 
-    lines.push("| rank | score | path | preview URL |", "| ---: | ---: | --- | --- |");
+    lines.push("| rank | attack | points | score | path | preview URL |", "| ---: | ---: | ---: | ---: | --- | --- |");
     for (const candidate of scenario.top) {
       lines.push(
-        [String(candidate.rank), candidate.score.toFixed(1), candidate.path.join(" "), `[fumen](${candidate.previewUrl})`].join(" | ")
+        [
+          String(candidate.rank),
+          String(candidate.attack),
+          String(candidate.points),
+          candidate.score.toFixed(1),
+          candidate.path.join(" "),
+          `[fumen](${candidate.previewUrl})`
+        ].join(" | ")
       );
     }
     lines.push("");
@@ -251,10 +265,16 @@ function createTopCandidates(
     return {
       rank: index + 1,
       score: node.score,
+      firepowerScore: node.firepowerScore,
       path: node.path,
       previewUrl: urls.view,
       hold: node.hold ?? null,
       queueIndex: node.queueIndex,
+      attack: node.attack,
+      points: node.points,
+      maxCombo: node.maxCombo,
+      backToBackChain: node.backToBackChain,
+      allClears: node.allClears,
       occupiedCells: node.occupiedCells,
       clearedLines: node.clearedLines,
       aggregateHeight: node.aggregateHeight,

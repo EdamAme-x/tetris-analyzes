@@ -22,9 +22,13 @@ export const OPENER_ENGINE_TASKS = [
   {
     id: "firepower-evaluation",
     title: "Score line clears, B2B, combo, all clear, and spin bonuses as opener firepower.",
-    status: "pending",
+    status: "in-progress",
     implementation: "native-rust",
-    evidence: []
+    evidence: [
+      "searchOpenerBeam accumulates native TETR.IO-style attack, score points, combo, B2B chain, and all-clear counts.",
+      "searchOpenerBeamWithPlacements exposes per-placement clearName, attack, combo, B2B, and PC bonuses for fumen previews.",
+      "evaluateOpenerFirepower parity-checks the native clear table against src/generated/tetrio-tables.generated.ts."
+    ]
   },
   {
     id: "pc-continuation",

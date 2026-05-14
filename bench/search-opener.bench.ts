@@ -59,10 +59,12 @@ for (const bench of cases) {
   );
 }
 
-function checksum(nodes: readonly { readonly score: number; readonly occupiedCells: number; readonly path: readonly string[] }[]): number {
+function checksum(
+  nodes: readonly { readonly score: number; readonly attack: number; readonly occupiedCells: number; readonly path: readonly string[] }[]
+): number {
   let value = nodes.length;
   for (const node of nodes) {
-    value ^= Math.trunc(node.score) + node.occupiedCells + node.path.length;
+    value ^= Math.trunc(node.score) + node.attack + node.occupiedCells + node.path.length;
   }
   return value;
 }

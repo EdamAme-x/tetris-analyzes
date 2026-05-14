@@ -8,6 +8,15 @@ const BOARD_HEIGHT: usize = 20;
 const BOARD_EVALUATION_STRIDE: usize = 5;
 const FUMEN_FIELD_HEIGHT: usize = 23;
 const ROW_MASK: u16 = (1 << BOARD_WIDTH) - 1;
+const TETRIO_BACK_TO_BACK_SCORE_MULTIPLIER: f64 = 1.5;
+const TETRIO_BACK_TO_BACK_BONUS: f64 = 1.0;
+const TETRIO_BACK_TO_BACK_BONUS_LOG: f64 = 0.8;
+const TETRIO_COMBO_SCORE: u32 = 50;
+const TETRIO_COMBO_BONUS: f64 = 0.25;
+const TETRIO_COMBO_MINIFIER: f64 = 1.0;
+const TETRIO_COMBO_MINIFIER_LOG: f64 = 1.25;
+const TETRIO_ALL_CLEAR_ATTACK: u32 = 10;
+const TETRIO_ALL_CLEAR_POINTS: u32 = 3_500;
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 enum Piece {
@@ -50,6 +59,7 @@ struct SearchState {
     placements: Vec<Placement>,
     score: f64,
     metrics: [u32; BOARD_EVALUATION_STRIDE],
+    firepower: FirepowerState,
 }
 
 #[derive(Eq, Hash, PartialEq)]
@@ -57,17 +67,25 @@ struct SearchKey {
     rows: [u16; BOARD_HEIGHT],
     hold: Option<Piece>,
     queue_index: usize,
+    combo: u32,
+    back_to_back_chain: u32,
 }
 
 #[napi(object)]
 pub struct BeamSearchNode {
     pub score: f64,
+    pub firepower_score: f64,
     pub depth: u32,
     pub queue_index: u32,
     pub hold: Option<String>,
     pub rows: Vec<u16>,
     pub path: Vec<String>,
     pub placements: Vec<BeamPlacement>,
+    pub attack: u32,
+    pub points: u32,
+    pub max_combo: u32,
+    pub back_to_back_chain: u32,
+    pub all_clears: u32,
     pub occupied_cells: u32,
     pub cleared_lines: u32,
     pub aggregate_height: u32,
@@ -84,11 +102,13 @@ struct Placement {
     used_hold: bool,
     cells: Vec<Cell>,
     spin: SpinDetection,
+    firepower: FirepowerEvent,
 }
 
 struct PlacedBoard {
     rows: [u16; BOARD_HEIGHT],
     y: i8,
+    spin: SpinDetection,
     placement: Option<Placement>,
 }
 
@@ -113,6 +133,15 @@ pub struct BeamPlacement {
     pub immobile: bool,
     pub occupied_corners: u32,
     pub cleared_lines: u32,
+    pub clear_name: String,
+    pub attack: u32,
+    pub base_attack: u32,
+    pub points: u32,
+    pub combo: u32,
+    pub back_to_back: bool,
+    pub back_to_back_bonus: f64,
+    pub all_clear: bool,
+    pub all_clear_bonus: u32,
 }
 
 #[derive(Clone, Copy)]
@@ -133,6 +162,79 @@ enum SpinKind {
     ImmobileSpin,
 }
 
+#[derive(Clone, Copy)]
+struct FirepowerState {
+    attack: u32,
+    points: u32,
+    combo: u32,
+    max_combo: u32,
+    back_to_back_chain: u32,
+    all_clears: u32,
+}
+
+#[derive(Clone, Copy)]
+struct FirepowerEvent {
+    clear_kind: ClearKind,
+    attack: u32,
+    base_attack: u32,
+    points: u32,
+    combo: u32,
+    back_to_back: bool,
+    back_to_back_bonus: f64,
+    all_clear: bool,
+    all_clear_bonus: u32,
+}
+
+#[derive(Clone, Copy, Eq, PartialEq)]
+enum ClearKind {
+    None,
+    Single,
+    Double,
+    Triple,
+    Quad,
+    Penta,
+    TSpin,
+    TSpinMini,
+    TSpinMiniSingle,
+    TSpinSingle,
+    TSpinMiniDouble,
+    TSpinDouble,
+    TSpinMiniTriple,
+    TSpinTriple,
+    TSpinMiniQuad,
+    TSpinQuad,
+    TSpinPenta,
+}
+
+impl FirepowerState {
+    fn empty() -> Self {
+        Self {
+            attack: 0,
+            points: 0,
+            combo: 0,
+            max_combo: 0,
+            back_to_back_chain: 0,
+            all_clears: 0,
+        }
+    }
+}
+
+impl FirepowerEvent {
+    fn empty() -> Self {
+        Self {
+            clear_kind: ClearKind::None,
+            attack: 0,
+            base_attack: 0,
+            points: 0,
+            combo: 0,
+            back_to_back: false,
+            back_to_back_bonus: 0.0,
+            all_clear: false,
+            all_clear_bonus: 0,
+        }
+    }
+}
+
 #[napi(object)]
 pub struct BeamSpinDetection {
     pub kind: String,
@@ -141,6 +243,37 @@ pub struct BeamSpinDetection {
     pub immobile: bool,
     pub occupied_corners: u32,
     pub cleared_lines: u32,
+}
+
+#[napi(object)]
+pub struct BeamFirepowerInput {
+    pub clear_name: String,
+    pub all_clear: Option<bool>,
+}
+
+#[napi(object)]
+pub struct BeamFirepowerEvent {
+    pub clear_name: String,
+    pub attack: u32,
+    pub base_attack: u32,
+    pub points: u32,
+    pub combo: u32,
+    pub back_to_back: bool,
+    pub back_to_back_bonus: f64,
+    pub all_clear: bool,
+    pub all_clear_bonus: u32,
+}
+
+#[napi(object)]
+pub struct BeamFirepowerSummary {
+    pub attack: u32,
+    pub points: u32,
+    pub combo: u32,
+    pub max_combo: u32,
+    pub back_to_back_chain: u32,
+    pub all_clears: u32,
+    pub firepower_score: f64,
+    pub events: Vec<BeamFirepowerEvent>,
 }
 
 #[derive(Clone, Copy)]
@@ -393,6 +526,32 @@ pub fn detect_opener_spin(
     )))
 }
 
+#[napi(js_name = "evaluateOpenerFirepower")]
+pub fn evaluate_opener_firepower(events: Vec<BeamFirepowerInput>) -> Result<BeamFirepowerSummary> {
+    let mut state = FirepowerState::empty();
+    let mut output_events = Vec::with_capacity(events.len());
+
+    for event in events {
+        let clear_kind = parse_clear_kind(&event.clear_name)?;
+        let cleared_lines = clear_kind_cleared_lines(clear_kind);
+        let (next_state, firepower_event) =
+            advance_firepower_for_clear(state, clear_kind, cleared_lines, event.all_clear.unwrap_or(false));
+        state = next_state;
+        output_events.push(BeamFirepowerEvent::from(firepower_event));
+    }
+
+    Ok(BeamFirepowerSummary {
+        attack: state.attack,
+        points: state.points,
+        combo: state.combo,
+        max_combo: state.max_combo,
+        back_to_back_chain: state.back_to_back_chain,
+        all_clears: state.all_clears,
+        firepower_score: firepower_score(state),
+        events: output_events,
+    })
+}
+
 #[napi(js_name = "searchOpenerBeam")]
 pub fn search_opener_beam(
     queue: String,
@@ -431,14 +590,16 @@ fn search_opener_beam_internal(
 
     let empty_rows = [0_u16; BOARD_HEIGHT];
     let initial_metrics = evaluate_board_unchecked(&empty_rows);
+    let initial_firepower = FirepowerState::empty();
     let mut beam = vec![SearchState {
         rows: empty_rows,
         hold: None,
         queue_index: 0,
         path: Vec::new(),
         placements: Vec::new(),
-        score: score_metrics(initial_metrics),
+        score: score_state(initial_metrics, initial_firepower),
         metrics: initial_metrics,
+        firepower: initial_firepower,
     }];
 
     for _depth in 0..max_depth {
@@ -458,7 +619,9 @@ fn search_opener_beam_internal(
                         ) {
                             let rows = placed.rows;
                             let metrics = evaluate_board_unchecked(&rows);
-                            let score = score_metrics(metrics);
+                            let (firepower, firepower_event) =
+                                advance_firepower(state.firepower, placed.spin, &rows);
+                            let score = score_state(metrics, firepower);
                             let mut path = state.path.clone();
                             path.push(format_placement(
                                 choice.piece,
@@ -469,7 +632,8 @@ fn search_opener_beam_internal(
                             ));
                             let placements = if include_placements {
                                 let mut placements = state.placements.clone();
-                                if let Some(placement) = placed.placement {
+                                if let Some(mut placement) = placed.placement {
+                                    placement.firepower = firepower_event;
                                     placements.push(placement);
                                 }
                                 placements
@@ -484,11 +648,14 @@ fn search_opener_beam_internal(
                                 placements,
                                 score,
                                 metrics,
+                                firepower,
                             };
                             let key = SearchKey {
                                 rows,
                                 hold: choice.hold,
                                 queue_index: choice.queue_index,
+                                combo: firepower.combo,
+                                back_to_back_chain: firepower.back_to_back_chain,
                             };
                             match next_by_key.get(&key) {
                                 Some(existing) if existing.score >= next_state.score => {}
@@ -681,12 +848,253 @@ fn evaluate_board_unchecked(rows: &[u16; BOARD_HEIGHT]) -> [u32; BOARD_EVALUATIO
     ]
 }
 
-fn score_metrics(metrics: [u32; BOARD_EVALUATION_STRIDE]) -> f64 {
+fn score_state(metrics: [u32; BOARD_EVALUATION_STRIDE], firepower: FirepowerState) -> f64 {
+    firepower_score(firepower) + board_shape_score(metrics)
+}
+
+fn firepower_score(firepower: FirepowerState) -> f64 {
+    firepower.attack as f64 * 1_000.0
+        + firepower.points as f64 * 0.05
+        + firepower.max_combo as f64 * 20.0
+        + firepower.back_to_back_chain as f64 * 25.0
+        + firepower.all_clears as f64 * 500.0
+}
+
+fn board_shape_score(metrics: [u32; BOARD_EVALUATION_STRIDE]) -> f64 {
     let cleared_lines = metrics[1] as f64;
     let aggregate_height = metrics[2] as f64;
     let holes = metrics[3] as f64;
     let bumpiness = metrics[4] as f64;
     cleared_lines * 120.0 - holes * 90.0 - aggregate_height * 2.2 - bumpiness * 7.0
+}
+
+fn advance_firepower(
+    previous: FirepowerState,
+    spin: SpinDetection,
+    rows_after_clear: &[u16; BOARD_HEIGHT],
+) -> (FirepowerState, FirepowerEvent) {
+    let clear_kind = classify_clear(spin.kind, spin.cleared_lines);
+    let all_clear = spin.cleared_lines > 0 && is_empty_rows(rows_after_clear);
+    advance_firepower_for_clear(previous, clear_kind, spin.cleared_lines, all_clear)
+}
+
+fn advance_firepower_for_clear(
+    previous: FirepowerState,
+    clear_kind: ClearKind,
+    cleared_lines: u32,
+    all_clear: bool,
+) -> (FirepowerState, FirepowerEvent) {
+    let base_attack = clear_kind_attack(clear_kind);
+    let mut attack = base_attack as f64;
+    let mut points = clear_kind_points(clear_kind);
+    let combo = if cleared_lines > 0 {
+        previous.combo + 1
+    } else {
+        0
+    };
+    let max_combo = previous.max_combo.max(combo);
+    let difficult = is_back_to_back_clear(clear_kind);
+    let back_to_back_chain = if difficult {
+        previous.back_to_back_chain + 1
+    } else if cleared_lines > 0 {
+        0
+    } else {
+        previous.back_to_back_chain
+    };
+    let back_to_back = difficult && back_to_back_chain > 1;
+    let back_to_back_bonus = if back_to_back {
+        back_to_back_chain_bonus(back_to_back_chain)
+    } else {
+        0.0
+    };
+
+    if back_to_back {
+        attack += back_to_back_bonus;
+        points = (points as f64 * TETRIO_BACK_TO_BACK_SCORE_MULTIPLIER).floor() as u32;
+    }
+    if combo > 1 {
+        points += TETRIO_COMBO_SCORE * (combo - 1);
+        attack = multiplier_combo_attack(attack, combo);
+    }
+
+    let all_clear_bonus = if all_clear { TETRIO_ALL_CLEAR_ATTACK } else { 0 };
+    let all_clear_points = if all_clear { TETRIO_ALL_CLEAR_POINTS } else { 0 };
+    let event_attack = attack.floor() as u32 + all_clear_bonus;
+    let event_points = points + all_clear_points;
+    let all_clears = previous.all_clears + u32::from(all_clear);
+
+    (
+        FirepowerState {
+            attack: previous.attack + event_attack,
+            points: previous.points + event_points,
+            combo,
+            max_combo,
+            back_to_back_chain,
+            all_clears,
+        },
+        FirepowerEvent {
+            clear_kind,
+            attack: event_attack,
+            base_attack,
+            points: event_points,
+            combo,
+            back_to_back,
+            back_to_back_bonus,
+            all_clear,
+            all_clear_bonus,
+        },
+    )
+}
+
+fn classify_clear(spin_kind: SpinKind, cleared_lines: u32) -> ClearKind {
+    match (spin_kind, cleared_lines) {
+        (SpinKind::TSpinMini, 0) => ClearKind::TSpinMini,
+        (SpinKind::TSpin, 0) => ClearKind::TSpin,
+        (SpinKind::TSpinMini, 1) => ClearKind::TSpinMiniSingle,
+        (SpinKind::TSpin, 1) => ClearKind::TSpinSingle,
+        (SpinKind::TSpinMini, 2) => ClearKind::TSpinMiniDouble,
+        (SpinKind::TSpin, 2) => ClearKind::TSpinDouble,
+        (SpinKind::TSpinMini, 3) => ClearKind::TSpinMiniTriple,
+        (SpinKind::TSpin, 3) => ClearKind::TSpinTriple,
+        (SpinKind::TSpinMini, 4) => ClearKind::TSpinMiniQuad,
+        (SpinKind::TSpin, 4) => ClearKind::TSpinQuad,
+        (SpinKind::TSpin, _) if cleared_lines >= 5 => ClearKind::TSpinPenta,
+        (_, 0) => ClearKind::None,
+        (_, 1) => ClearKind::Single,
+        (_, 2) => ClearKind::Double,
+        (_, 3) => ClearKind::Triple,
+        (_, 4) => ClearKind::Quad,
+        _ => ClearKind::Penta,
+    }
+}
+
+fn parse_clear_kind(input: &str) -> Result<ClearKind> {
+    let normalized = input
+        .trim()
+        .to_ascii_uppercase()
+        .replace(['-', ' '], "_");
+    match normalized.as_str() {
+        "NONE" => Ok(ClearKind::None),
+        "SINGLE" => Ok(ClearKind::Single),
+        "DOUBLE" => Ok(ClearKind::Double),
+        "TRIPLE" => Ok(ClearKind::Triple),
+        "QUAD" => Ok(ClearKind::Quad),
+        "PENTA" => Ok(ClearKind::Penta),
+        "TSPIN" | "T_SPIN" => Ok(ClearKind::TSpin),
+        "TSPIN_MINI" | "T_SPIN_MINI" => Ok(ClearKind::TSpinMini),
+        "TSPIN_MINI_SINGLE" | "T_SPIN_MINI_SINGLE" => Ok(ClearKind::TSpinMiniSingle),
+        "TSPIN_SINGLE" | "T_SPIN_SINGLE" => Ok(ClearKind::TSpinSingle),
+        "TSPIN_MINI_DOUBLE" | "T_SPIN_MINI_DOUBLE" => Ok(ClearKind::TSpinMiniDouble),
+        "TSPIN_DOUBLE" | "T_SPIN_DOUBLE" => Ok(ClearKind::TSpinDouble),
+        "TSPIN_MINI_TRIPLE" | "T_SPIN_MINI_TRIPLE" => Ok(ClearKind::TSpinMiniTriple),
+        "TSPIN_TRIPLE" | "T_SPIN_TRIPLE" => Ok(ClearKind::TSpinTriple),
+        "TSPIN_MINI_QUAD" | "T_SPIN_MINI_QUAD" => Ok(ClearKind::TSpinMiniQuad),
+        "TSPIN_QUAD" | "T_SPIN_QUAD" => Ok(ClearKind::TSpinQuad),
+        "TSPIN_PENTA" | "T_SPIN_PENTA" => Ok(ClearKind::TSpinPenta),
+        _ => Err(Error::from_reason(format!(
+            "Unknown opener firepower clear name {input}."
+        ))),
+    }
+}
+
+fn clear_kind_cleared_lines(kind: ClearKind) -> u32 {
+    match kind {
+        ClearKind::None | ClearKind::TSpin | ClearKind::TSpinMini => 0,
+        ClearKind::Single | ClearKind::TSpinSingle | ClearKind::TSpinMiniSingle => 1,
+        ClearKind::Double | ClearKind::TSpinDouble | ClearKind::TSpinMiniDouble => 2,
+        ClearKind::Triple | ClearKind::TSpinTriple | ClearKind::TSpinMiniTriple => 3,
+        ClearKind::Quad | ClearKind::TSpinQuad | ClearKind::TSpinMiniQuad => 4,
+        ClearKind::Penta | ClearKind::TSpinPenta => 5,
+    }
+}
+
+fn clear_kind_attack(kind: ClearKind) -> u32 {
+    match kind {
+        ClearKind::None => 0,
+        ClearKind::Single => 0,
+        ClearKind::Double => 1,
+        ClearKind::Triple => 2,
+        ClearKind::Quad => 4,
+        ClearKind::Penta => 5,
+        ClearKind::TSpinMini => 0,
+        ClearKind::TSpin => 0,
+        ClearKind::TSpinMiniSingle => 0,
+        ClearKind::TSpinSingle => 2,
+        ClearKind::TSpinMiniDouble => 1,
+        ClearKind::TSpinDouble => 4,
+        ClearKind::TSpinMiniTriple => 2,
+        ClearKind::TSpinTriple => 6,
+        ClearKind::TSpinMiniQuad => 4,
+        ClearKind::TSpinQuad => 10,
+        ClearKind::TSpinPenta => 12,
+    }
+}
+
+fn clear_kind_points(kind: ClearKind) -> u32 {
+    match kind {
+        ClearKind::None => 0,
+        ClearKind::Single => 100,
+        ClearKind::Double => 300,
+        ClearKind::Triple => 500,
+        ClearKind::Quad => 800,
+        ClearKind::Penta => 1_200,
+        ClearKind::TSpinMini => 100,
+        ClearKind::TSpin => 400,
+        ClearKind::TSpinMiniSingle => 200,
+        ClearKind::TSpinSingle => 800,
+        ClearKind::TSpinMiniDouble => 400,
+        ClearKind::TSpinDouble => 1_200,
+        ClearKind::TSpinMiniTriple => 800,
+        ClearKind::TSpinTriple => 1_600,
+        ClearKind::TSpinMiniQuad => 1_600,
+        ClearKind::TSpinQuad => 2_600,
+        ClearKind::TSpinPenta => 3_200,
+    }
+}
+
+fn is_back_to_back_clear(kind: ClearKind) -> bool {
+    matches!(
+        kind,
+        ClearKind::Quad
+            | ClearKind::Penta
+            | ClearKind::TSpinSingle
+            | ClearKind::TSpinDouble
+            | ClearKind::TSpinTriple
+            | ClearKind::TSpinQuad
+            | ClearKind::TSpinPenta
+    )
+}
+
+fn back_to_back_chain_bonus(back_to_back_chain: u32) -> f64 {
+    if back_to_back_chain <= 1 {
+        return 0.0;
+    }
+    let chain = back_to_back_chain - 1;
+    let value = 1.0 + ((chain as f64) * TETRIO_BACK_TO_BACK_BONUS_LOG).ln_1p();
+    TETRIO_BACK_TO_BACK_BONUS
+        * (value.floor()
+            + if chain == 1 {
+                0.0
+            } else {
+                value.fract() / 3.0
+            })
+}
+
+fn multiplier_combo_attack(base_attack: f64, combo: u32) -> f64 {
+    if combo <= 1 {
+        return base_attack;
+    }
+    let combo_index = (combo - 1) as f64;
+    let multiplied = base_attack * (1.0 + TETRIO_COMBO_BONUS * combo_index);
+    if combo <= 2 {
+        return multiplied;
+    }
+    let minified = (TETRIO_COMBO_MINIFIER * combo_index * TETRIO_COMBO_MINIFIER_LOG).ln_1p();
+    multiplied.max(minified)
+}
+
+fn is_empty_rows(rows: &[u16; BOARD_HEIGHT]) -> bool {
+    rows.iter().all(|row| *row == 0)
 }
 
 fn compare_search_state(left: &SearchState, right: &SearchState) -> std::cmp::Ordering {
@@ -825,22 +1233,12 @@ fn place_and_clear(
                 }
             }
             let cleared_lines = count_full_lines_array(&placed);
-            let spin = if include_placement {
-                Some(detect_spin(
-                    &placed,
-                    choice.piece,
-                    shape,
-                    x,
-                    y,
-                    cleared_lines,
-                ))
-            } else {
-                None
-            };
+            let spin = detect_spin(&placed, choice.piece, shape, x, y, cleared_lines);
             return Some(PlacedBoard {
                 rows: clear_full_lines_array(placed),
                 y,
-                placement: cells.zip(spin).map(|(cells, spin)| Placement {
+                spin,
+                placement: cells.map(|cells| Placement {
                     piece: choice.piece,
                     rotation: shape.rotation,
                     x,
@@ -848,6 +1246,7 @@ fn place_and_clear(
                     used_hold: choice.used_hold,
                     cells,
                     spin,
+                    firepower: FirepowerEvent::empty(),
                 }),
             });
         }
@@ -1312,6 +1711,7 @@ impl From<SearchState> for BeamSearchNode {
     fn from(state: SearchState) -> Self {
         Self {
             score: state.score,
+            firepower_score: firepower_score(state.firepower),
             depth: state.path.len() as u32,
             queue_index: state.queue_index as u32,
             hold: state.hold.map(piece_name).map(String::from),
@@ -1322,6 +1722,11 @@ impl From<SearchState> for BeamSearchNode {
                 .into_iter()
                 .map(BeamPlacement::from)
                 .collect(),
+            attack: state.firepower.attack,
+            points: state.firepower.points,
+            max_combo: state.firepower.max_combo,
+            back_to_back_chain: state.firepower.back_to_back_chain,
+            all_clears: state.firepower.all_clears,
             occupied_cells: state.metrics[0],
             cleared_lines: state.metrics[1],
             aggregate_height: state.metrics[2],
@@ -1361,6 +1766,15 @@ impl From<Placement> for BeamPlacement {
             immobile: placement.spin.immobile,
             occupied_corners: placement.spin.occupied_corners,
             cleared_lines: placement.spin.cleared_lines,
+            clear_name: clear_kind_name(placement.firepower.clear_kind).to_string(),
+            attack: placement.firepower.attack,
+            base_attack: placement.firepower.base_attack,
+            points: placement.firepower.points,
+            combo: placement.firepower.combo,
+            back_to_back: placement.firepower.back_to_back,
+            back_to_back_bonus: placement.firepower.back_to_back_bonus,
+            all_clear: placement.firepower.all_clear,
+            all_clear_bonus: placement.firepower.all_clear_bonus,
         }
     }
 }
@@ -1378,12 +1792,50 @@ impl From<SpinDetection> for BeamSpinDetection {
     }
 }
 
+impl From<FirepowerEvent> for BeamFirepowerEvent {
+    fn from(event: FirepowerEvent) -> Self {
+        Self {
+            clear_name: clear_kind_name(event.clear_kind).to_string(),
+            attack: event.attack,
+            base_attack: event.base_attack,
+            points: event.points,
+            combo: event.combo,
+            back_to_back: event.back_to_back,
+            back_to_back_bonus: event.back_to_back_bonus,
+            all_clear: event.all_clear,
+            all_clear_bonus: event.all_clear_bonus,
+        }
+    }
+}
+
 fn spin_kind_name(kind: SpinKind) -> &'static str {
     match kind {
         SpinKind::None => "NONE",
         SpinKind::TSpin => "T_SPIN",
         SpinKind::TSpinMini => "T_SPIN_MINI",
         SpinKind::ImmobileSpin => "IMMOBILE_SPIN",
+    }
+}
+
+fn clear_kind_name(kind: ClearKind) -> &'static str {
+    match kind {
+        ClearKind::None => "NONE",
+        ClearKind::Single => "SINGLE",
+        ClearKind::Double => "DOUBLE",
+        ClearKind::Triple => "TRIPLE",
+        ClearKind::Quad => "QUAD",
+        ClearKind::Penta => "PENTA",
+        ClearKind::TSpin => "TSPIN",
+        ClearKind::TSpinMini => "TSPIN_MINI",
+        ClearKind::TSpinMiniSingle => "TSPIN_MINI_SINGLE",
+        ClearKind::TSpinSingle => "TSPIN_SINGLE",
+        ClearKind::TSpinMiniDouble => "TSPIN_MINI_DOUBLE",
+        ClearKind::TSpinDouble => "TSPIN_DOUBLE",
+        ClearKind::TSpinMiniTriple => "TSPIN_MINI_TRIPLE",
+        ClearKind::TSpinTriple => "TSPIN_TRIPLE",
+        ClearKind::TSpinMiniQuad => "TSPIN_MINI_QUAD",
+        ClearKind::TSpinQuad => "TSPIN_QUAD",
+        ClearKind::TSpinPenta => "TSPIN_PENTA",
     }
 }
 

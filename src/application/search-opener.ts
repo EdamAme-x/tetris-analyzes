@@ -1,5 +1,10 @@
 import { loadNativeBinding } from "../infrastructure/native/load-native-binding";
-import type { NativeBeamSearchNode, NativeSpinDetection } from "../infrastructure/native/binding-types";
+import type {
+  NativeBeamSearchNode,
+  NativeFirepowerInput,
+  NativeFirepowerSummary,
+  NativeSpinDetection
+} from "../infrastructure/native/binding-types";
 
 export type SearchPiece = "I" | "O" | "T" | "S" | "Z" | "J" | "L";
 
@@ -41,4 +46,8 @@ export function canReachOpenerPlacement(input: OpenerPlacementReachabilityInput)
 
 export function detectOpenerSpin(input: OpenerPlacementReachabilityInput): NativeSpinDetection {
   return loadNativeBinding().detectOpenerSpin(input.rows, input.piece, input.rotation, input.x, input.y);
+}
+
+export function evaluateOpenerFirepower(events: readonly NativeFirepowerInput[]): NativeFirepowerSummary {
+  return loadNativeBinding().evaluateOpenerFirepower([...events]);
 }

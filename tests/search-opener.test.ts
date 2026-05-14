@@ -2,11 +2,14 @@ import { describe, expect, test } from "bun:test";
 import {
   canReachOpenerPlacement,
   detectOpenerSpin,
+  evaluateOpenerFirepower,
   searchOpenerBeam,
   searchOpenerBeamWithPlacements
 } from "../src/application/search-opener";
 import { ROW_MASK } from "../src/domain/board";
+import { TETRIO_GARBAGE_ATTACK_TABLE, TETRIO_SCORING_TABLE } from "../src/domain/tetrio-tables";
 import { bitBoardFromRows } from "../src/infrastructure/bitboard/native-bitboard";
+import type { NativeClearName } from "../src/infrastructure/native/binding-types";
 
 describe("native opener beam search", () => {
   test("searches placements in native code and returns scored beam nodes without detail payload by default", () => {
@@ -18,6 +21,9 @@ describe("native opener beam search", () => {
     expect(nodes[0]?.rows).toHaveLength(20);
     expect(nodes[0]?.path).toHaveLength(4);
     expect(nodes[0]?.placements).toHaveLength(0);
+    expect(nodes[0]?.firepowerScore).toBeGreaterThanOrEqual(0);
+    expect(nodes[0]?.attack).toBeGreaterThanOrEqual(0);
+    expect(nodes[0]?.points).toBeGreaterThanOrEqual(0);
     expect(nodes[0]?.occupiedCells ?? 0).toBeGreaterThan(0);
     expect(nodes[0]?.occupiedCells ?? 0).toBeLessThanOrEqual(16);
     for (let index = 1; index < nodes.length; index += 1) {
@@ -32,6 +38,8 @@ describe("native opener beam search", () => {
     expect(nodes[0]?.placements[0]?.cells).toHaveLength(4);
     expect(nodes[0]?.placements[0]?.path).toContain(",y");
     expect(nodes[0]?.placements[0]?.spinKind).toBeDefined();
+    expect(nodes[0]?.placements[0]?.clearName).toBeDefined();
+    expect(nodes[0]?.placements[0]?.attack).toBeGreaterThanOrEqual(0);
     expect(nodes[0]?.placements[0]?.clearedLines).toBeGreaterThanOrEqual(0);
   });
 
@@ -77,6 +85,65 @@ describe("native opener beam search", () => {
       spin: true,
       immobile: true
     });
+  });
+
+  test("evaluates TETR.IO-style opener firepower in native code", () => {
+    expect(evaluateOpenerFirepower([{ clearName: "SINGLE", allClear: true }])).toMatchObject({
+      attack: 10,
+      points: 3600,
+      combo: 1,
+      allClears: 1
+    });
+
+    const b2b = evaluateOpenerFirepower([{ clearName: "QUAD" }, { clearName: "QUAD" }]);
+    expect(b2b.attack).toBe(10);
+    expect(b2b.points).toBe(2050);
+    expect(b2b.maxCombo).toBe(2);
+    expect(b2b.backToBackChain).toBe(2);
+    expect(b2b.events[1]).toMatchObject({
+      clearName: "QUAD",
+      baseAttack: 4,
+      attack: 6,
+      backToBack: true
+    });
+
+    expect(evaluateOpenerFirepower([{ clearName: "TSPIN_DOUBLE" }]).events[0]).toMatchObject({
+      clearName: "TSPIN_DOUBLE",
+      attack: 4,
+      points: 1200,
+      combo: 1
+    });
+  });
+
+  test("keeps native firepower clear tables aligned with extracted TETR.IO tables", () => {
+    const clearNames = [
+      "SINGLE",
+      "DOUBLE",
+      "TRIPLE",
+      "QUAD",
+      "PENTA",
+      "TSPIN_MINI",
+      "TSPIN",
+      "TSPIN_MINI_SINGLE",
+      "TSPIN_SINGLE",
+      "TSPIN_MINI_DOUBLE",
+      "TSPIN_DOUBLE",
+      "TSPIN_MINI_TRIPLE",
+      "TSPIN_TRIPLE",
+      "TSPIN_MINI_QUAD",
+      "TSPIN_QUAD",
+      "TSPIN_PENTA"
+    ] as const satisfies readonly NativeClearName[];
+
+    for (const clearName of clearNames) {
+      const [event] = evaluateOpenerFirepower([{ clearName }]).events;
+      expect(event?.baseAttack).toBe(TETRIO_GARBAGE_ATTACK_TABLE[clearName]);
+      expect(event?.points).toBe(TETRIO_SCORING_TABLE[clearName]);
+    }
+
+    const allClearSingle = evaluateOpenerFirepower([{ clearName: "SINGLE", allClear: true }]).events[0];
+    expect(allClearSingle?.attack).toBe(TETRIO_GARBAGE_ATTACK_TABLE.SINGLE + TETRIO_GARBAGE_ATTACK_TABLE.ALL_CLEAR);
+    expect(allClearSingle?.points).toBe(TETRIO_SCORING_TABLE.SINGLE + TETRIO_SCORING_TABLE.ALL_CLEAR);
   });
 
   test("rejects invalid queues before searching", () => {

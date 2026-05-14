@@ -17,9 +17,36 @@ export interface NativeBeamPlacement {
   immobile: boolean;
   occupiedCorners: number;
   clearedLines: number;
+  clearName: NativeClearName;
+  attack: number;
+  baseAttack: number;
+  points: number;
+  combo: number;
+  backToBack: boolean;
+  backToBackBonus: number;
+  allClear: boolean;
+  allClearBonus: number;
 }
 
 export type NativeSpinKind = "NONE" | "T_SPIN" | "T_SPIN_MINI" | "IMMOBILE_SPIN";
+export type NativeClearName =
+  | "NONE"
+  | "SINGLE"
+  | "DOUBLE"
+  | "TRIPLE"
+  | "QUAD"
+  | "PENTA"
+  | "TSPIN"
+  | "TSPIN_MINI"
+  | "TSPIN_MINI_SINGLE"
+  | "TSPIN_SINGLE"
+  | "TSPIN_MINI_DOUBLE"
+  | "TSPIN_DOUBLE"
+  | "TSPIN_MINI_TRIPLE"
+  | "TSPIN_TRIPLE"
+  | "TSPIN_MINI_QUAD"
+  | "TSPIN_QUAD"
+  | "TSPIN_PENTA";
 
 export interface NativeSpinDetection {
   kind: NativeSpinKind;
@@ -30,14 +57,48 @@ export interface NativeSpinDetection {
   clearedLines: number;
 }
 
+export interface NativeFirepowerInput {
+  clearName: NativeClearName;
+  allClear?: boolean | undefined;
+}
+
+export interface NativeFirepowerEvent {
+  clearName: NativeClearName;
+  attack: number;
+  baseAttack: number;
+  points: number;
+  combo: number;
+  backToBack: boolean;
+  backToBackBonus: number;
+  allClear: boolean;
+  allClearBonus: number;
+}
+
+export interface NativeFirepowerSummary {
+  attack: number;
+  points: number;
+  combo: number;
+  maxCombo: number;
+  backToBackChain: number;
+  allClears: number;
+  firepowerScore: number;
+  events: NativeFirepowerEvent[];
+}
+
 export interface NativeBeamSearchNode {
   score: number;
+  firepowerScore: number;
   depth: number;
   queueIndex: number;
   hold?: string | null;
   rows: number[];
   path: string[];
   placements: NativeBeamPlacement[];
+  attack: number;
+  points: number;
+  maxCombo: number;
+  backToBackChain: number;
+  allClears: number;
   occupiedCells: number;
   clearedLines: number;
   aggregateHeight: number;
@@ -60,6 +121,7 @@ export interface NativeBinding {
   batchRowsToFumenFields(rows: Uint16Array, boardCount: number): string[];
   canReachOpenerPlacement(rows: Uint16Array, piece: string, rotation: number, x: number, y: number): boolean;
   detectOpenerSpin(rows: Uint16Array, piece: string, rotation: number, x: number, y: number): NativeSpinDetection;
+  evaluateOpenerFirepower(events: NativeFirepowerInput[]): NativeFirepowerSummary;
   searchOpenerBeam(queue: string, beamWidth: number, holdEnabled: boolean, maxDepth: number): NativeBeamSearchNode[];
   searchOpenerBeamWithPlacements(queue: string, beamWidth: number, holdEnabled: boolean, maxDepth: number): NativeBeamSearchNode[];
 }

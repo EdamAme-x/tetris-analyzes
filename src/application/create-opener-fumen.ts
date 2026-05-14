@@ -86,7 +86,7 @@ export function createOpenerFumenPages(node: NativeBeamSearchNode, options: Open
 }
 
 function formatCandidateTitle(node: NativeBeamSearchNode, title: string | undefined): string {
-  return title ?? `score=${node.score.toFixed(1)} depth=${node.depth}`;
+  return title ?? `attack=${node.attack} score=${node.score.toFixed(1)} depth=${node.depth}`;
 }
 
 function createEmptyBoard(): ColoredBoard {
@@ -120,11 +120,20 @@ function boardToFieldRows(board: ColoredBoard): string[] {
 
 function formatPlacementSummary(placement: NativeBeamPlacement): string {
   const suffixes = [];
-  if (placement.spinKind !== "NONE") {
+  if (placement.clearName !== "NONE") {
+    suffixes.push(placement.clearName);
+  }
+  if (placement.clearName === "NONE" && placement.spinKind !== "NONE") {
     suffixes.push(placement.spinKind);
   }
   if (placement.clearedLines > 0) {
     suffixes.push(`${placement.clearedLines}L`);
+  }
+  if (placement.attack > 0) {
+    suffixes.push(`${placement.attack}A`);
+  }
+  if (placement.allClear) {
+    suffixes.push("PC");
   }
   return suffixes.length === 0 ? placement.path : `${placement.path} ${suffixes.join(" ")}`;
 }

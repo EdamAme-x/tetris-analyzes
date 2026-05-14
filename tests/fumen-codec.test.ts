@@ -109,6 +109,16 @@ describe("TetrisFumenCodec", () => {
       },
       canReachOpenerPlacement: () => false,
       detectOpenerSpin: () => ({ kind: "NONE", spin: false, mini: false, immobile: false, occupiedCorners: 0, clearedLines: 0 }),
+      evaluateOpenerFirepower: () => ({
+        attack: 0,
+        points: 0,
+        combo: 0,
+        maxCombo: 0,
+        backToBackChain: 0,
+        allClears: 0,
+        firepowerScore: 0,
+        events: []
+      }),
       searchOpenerBeam: () => [],
       searchOpenerBeamWithPlacements: () => []
     };
