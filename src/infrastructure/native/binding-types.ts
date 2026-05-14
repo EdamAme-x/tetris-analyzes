@@ -116,6 +116,7 @@ export interface NativeBeamSearchNode {
   difficultClears: number;
   tSpinClears: number;
   tSpinAttack: number;
+  tSpinPotential: number;
   occupiedCells: number;
   clearedLines: number;
   aggregateHeight: number;

@@ -65,8 +65,12 @@ impl FirepowerEvent {
     }
 }
 
-pub(crate) fn score_state(metrics: BoardEvaluation, firepower: FirepowerState) -> f64 {
-    firepower_score(firepower) + board_shape_score(metrics)
+pub(crate) fn score_state(
+    metrics: BoardEvaluation,
+    firepower: FirepowerState,
+    t_spin_potential: u32,
+) -> f64 {
+    firepower_score(firepower) + t_spin_setup_score(t_spin_potential) + board_shape_score(metrics)
 }
 
 pub(crate) fn firepower_score(firepower: FirepowerState) -> f64 {
@@ -86,6 +90,10 @@ pub(crate) fn board_shape_score(metrics: BoardEvaluation) -> f64 {
     let holes = metrics[3] as f64;
     let bumpiness = metrics[4] as f64;
     cleared_lines * 120.0 - holes * 90.0 - aggregate_height * 2.2 - bumpiness * 7.0
+}
+
+fn t_spin_setup_score(t_spin_potential: u32) -> f64 {
+    f64::from(t_spin_potential) * 2_200.0
 }
 
 pub(crate) fn estimate_t_spin_potential(rows: &BoardRows, kick_table: KickTable) -> u32 {
@@ -113,6 +121,36 @@ pub(crate) fn estimate_t_spin_potential(rows: &BoardRows, kick_table: KickTable)
                 };
                 best = best.max(value);
                 break;
+            }
+        }
+    }
+    best
+}
+
+pub(crate) fn estimate_t_spin_surface_potential(rows: &BoardRows) -> u32 {
+    let mut best = 0_u32;
+    let shapes = piece_shapes(Piece::T);
+    for shape_index in placement_shape_indices(Piece::T).iter().copied() {
+        let shape = shapes[shape_index];
+        for x in 0..=(BOARD_WIDTH as i8 - shape.width) {
+            let mut can_place_below = false;
+            for y in 0..=(BOARD_HEIGHT as i8 - shape.height) {
+                let can_place_here = can_place(rows, shape, x, y);
+                if can_place_here && !can_place_below {
+                    let Some(placed) = lock_shape(rows, shape, x, y) else {
+                        can_place_below = can_place_here;
+                        continue;
+                    };
+                    let cleared_lines = board::count_full_lines_array(&placed);
+                    let spin = detect_spin(&placed, Piece::T, shape, x, y, cleared_lines);
+                    let value = match spin.kind {
+                        SpinKind::TSpin => 1 + cleared_lines,
+                        SpinKind::TSpinMini if cleared_lines > 0 => 1,
+                        SpinKind::None | SpinKind::TSpinMini | SpinKind::ImmobileSpin => 0,
+                    };
+                    best = best.max(value);
+                }
+                can_place_below = can_place_here;
             }
         }
     }

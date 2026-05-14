@@ -15,8 +15,9 @@ use bag::{evaluate_opener_bag_internal, OpenerBagEvaluation};
 use board::{BoardEvaluation, BoardRows, BOARD_HEIGHT, BOARD_WIDTH};
 use firepower::{
     advance_firepower_for_clear_with_combo_table, advance_firepower_with_combo_table,
-    clear_kind_cleared_lines, clear_kind_name, estimate_t_spin_potential, firepower_score,
-    parse_clear_kind, parse_combo_table, score_state, FirepowerEvent, FirepowerState,
+    clear_kind_cleared_lines, clear_kind_name, estimate_t_spin_potential,
+    estimate_t_spin_surface_potential, firepower_score, parse_clear_kind, parse_combo_table,
+    score_state, FirepowerEvent, FirepowerState,
 };
 use movement::{can_place, is_reachable_placement, lock_shape, parse_kick_table};
 use pieces::{
@@ -38,6 +39,7 @@ pub(crate) struct SearchState {
     pub(crate) score: f64,
     pub(crate) metrics: BoardEvaluation,
     pub(crate) firepower: FirepowerState,
+    pub(crate) t_spin_potential: u32,
 }
 
 #[derive(Eq, Hash, PartialEq)]
@@ -94,6 +96,7 @@ pub struct BeamSearchNode {
     pub difficult_clears: u32,
     pub t_spin_clears: u32,
     pub t_spin_attack: u32,
+    pub t_spin_potential: u32,
     pub occupied_cells: u32,
     pub cleared_lines: u32,
     pub aggregate_height: u32,
@@ -481,15 +484,17 @@ pub(crate) fn search_opener_states(
     let empty_rows = [0_u16; BOARD_HEIGHT];
     let initial_metrics = board::evaluate_board_unchecked(&empty_rows);
     let initial_firepower = FirepowerState::empty();
+    let initial_t_spin_potential = 0;
     let mut beam = vec![SearchState {
         rows: empty_rows,
         hold: None,
         queue_index: 0,
         path: Vec::new(),
         placements: Vec::new(),
-        score: score_state(initial_metrics, initial_firepower),
+        score: score_state(initial_metrics, initial_firepower, initial_t_spin_potential),
         metrics: initial_metrics,
         firepower: initial_firepower,
+        t_spin_potential: initial_t_spin_potential,
     }];
 
     for _depth in 0..max_depth {
@@ -528,7 +533,8 @@ pub(crate) fn search_opener_states(
                                         &rows,
                                         combo_table,
                                     );
-                                let score = score_state(metrics, firepower);
+                                let t_spin_potential = 0;
+                                let score = score_state(metrics, firepower, t_spin_potential);
                                 let key = SearchKey {
                                     rows,
                                     hold: choice.hold,
@@ -576,6 +582,7 @@ pub(crate) fn search_opener_states(
                                         score,
                                         metrics,
                                         firepower,
+                                        t_spin_potential,
                                     };
                                     next_by_key.insert(key, next_state);
                                 }
@@ -592,6 +599,8 @@ pub(crate) fn search_opener_states(
         }
 
         beam = next_by_key.into_values().collect();
+        retain_best_search_states(&mut beam, setup_candidate_pool_width(beam_width));
+        score_t_spin_setup_potential(&mut beam);
         retain_best_search_states(&mut beam, beam_width);
     }
 
@@ -610,6 +619,17 @@ fn retain_best_search_states(beam: &mut Vec<SearchState>, beam_width: usize) {
         retained.sort_by(compare_search_state);
     }
     beam.truncate(beam_width);
+}
+
+fn setup_candidate_pool_width(beam_width: usize) -> usize {
+    beam_width.saturating_mul(16).max(beam_width)
+}
+
+fn score_t_spin_setup_potential(beam: &mut [SearchState]) {
+    for state in beam {
+        state.t_spin_potential = estimate_t_spin_surface_potential(&state.rows);
+        state.score = score_state(state.metrics, state.firepower, state.t_spin_potential);
+    }
 }
 
 fn piece_choices(pieces: &[Piece], state: &SearchState, hold_enabled: bool) -> Vec<PieceChoice> {
@@ -727,6 +747,7 @@ fn compare_search_state(left: &SearchState, right: &SearchState) -> std::cmp::Or
                 .back_to_back_chain
                 .cmp(&left.firepower.back_to_back_chain)
         })
+        .then_with(|| right.t_spin_potential.cmp(&left.t_spin_potential))
         .then_with(|| right.firepower.attack.cmp(&left.firepower.attack))
         .then_with(|| right.score.total_cmp(&left.score))
         .then_with(|| right.firepower.points.cmp(&left.firepower.points))
@@ -815,6 +836,7 @@ impl From<SearchState> for BeamSearchNode {
             difficult_clears: state.firepower.difficult_clears,
             t_spin_clears: state.firepower.t_spin_clears,
             t_spin_attack: state.firepower.t_spin_attack,
+            t_spin_potential: state.t_spin_potential,
             occupied_cells: state.metrics[0],
             cleared_lines: state.metrics[1],
             aggregate_height: state.metrics[2],

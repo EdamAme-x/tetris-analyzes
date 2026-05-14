@@ -183,6 +183,7 @@ function nodeWithPlacements(placements: readonly NativeBeamPlacement[]): NativeB
     difficultClears: 0,
     tSpinClears: 0,
     tSpinAttack: 0,
+    tSpinPotential: 0,
     occupiedCells: placements.length * 4,
     clearedLines: 0,
     aggregateHeight: 0,
