@@ -12,6 +12,7 @@ bun run bench:openers
 bun run experiment:opener
 bun run experiment:opener -- --preset=survey --top=5
 bun run experiment:opener -- --preset=discovery --top=5
+bun run experiment:opener -- --preset=continuation --top=3
 ```
 
 `experiment:opener` writes JSON/Markdown reports with fumen preview URLs under `experiments/runs/`.
