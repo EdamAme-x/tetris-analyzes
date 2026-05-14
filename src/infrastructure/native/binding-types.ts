@@ -114,6 +114,7 @@ export interface NativeBeamSearchNode {
   backToBackChain: number;
   allClears: number;
   difficultClears: number;
+  difficultAttack: number;
   tSpinClears: number;
   tSpinAttack: number;
   tSpinPotential: number;

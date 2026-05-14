@@ -635,7 +635,7 @@ export function replayOpenerTemplateSurvivability(
           rank: index + 1,
           score: node.score,
           attack: node.attack,
-          difficultAttack: difficultAttack(node),
+          difficultAttack: node.difficultAttack,
           tSpinClears: node.tSpinClears,
           tSpinAttack: node.tSpinAttack,
           backToBackChain: node.backToBackChain,
@@ -808,7 +808,7 @@ function createTopCandidates(
     .map(({ node, tSpinPotential }, index) => {
       const data = fumenCodec.encodePages(createOpenerFumenPages(node, { title: `${scenario.name} #${index + 1}` }));
       const urls = fumenCodec.createUrls(data);
-      const qualityAttack = difficultAttack(node);
+      const qualityAttack = node.difficultAttack;
       return {
         rank: index + 1,
         score: node.score,
@@ -857,16 +857,13 @@ function compareSearchNodesForOpener(left: SearchNodeWithReportPotential, right:
     rightNode.tSpinClears - leftNode.tSpinClears ||
     rightNode.tSpinAttack - leftNode.tSpinAttack ||
     rightNode.difficultClears - leftNode.difficultClears ||
+    rightNode.difficultAttack - leftNode.difficultAttack ||
     rightNode.backToBackChain - leftNode.backToBackChain ||
     right.tSpinPotential - left.tSpinPotential ||
-    difficultAttack(rightNode) - difficultAttack(leftNode) ||
     rightNode.attack - leftNode.attack ||
-    rightNode.firepowerScore - leftNode.firepowerScore ||
     rightNode.score - leftNode.score ||
-    leftNode.holes - rightNode.holes ||
-    leftNode.bumpiness - rightNode.bumpiness ||
     rightNode.points - leftNode.points ||
-    rightNode.depth - leftNode.depth ||
+    leftNode.path.length - rightNode.path.length ||
     leftNode.path.join(" ").localeCompare(rightNode.path.join(" "))
   );
 }
@@ -875,9 +872,9 @@ function compareRankedOpenerCandidates(left: RankedOpenerCandidate, right: Ranke
   return (
     right.tSpinClears - left.tSpinClears ||
     right.tSpinAttack - left.tSpinAttack ||
-    right.backToBackChain - left.backToBackChain ||
     right.difficultClears - left.difficultClears ||
     right.difficultAttack - left.difficultAttack ||
+    right.backToBackChain - left.backToBackChain ||
     right.attack - left.attack ||
     right.tSpinPotential - left.tSpinPotential ||
     right.survivalCount - left.survivalCount ||
@@ -906,29 +903,10 @@ function compareReplayTemplates(left: OpenerTemplateReplayEntry, right: OpenerTe
   );
 }
 
-function difficultAttack(node: SearchOpenerBeamNode): number {
-  return node.placements
-    .filter((placement) => placement.clearedLines > 0 && isDifficultClearName(placement.clearName))
-    .reduce((attack, placement) => attack + placement.attack, 0);
-}
-
 function clearSequence(node: SearchOpenerBeamNode): string[] {
   return node.placements
     .filter((placement) => placement.clearName !== "NONE" && placement.clearedLines > 0 && placement.attack > 0)
     .map((placement) => `${placement.clearName}:${placement.attack}`);
-}
-
-function isDifficultClearName(clearName: string): boolean {
-  return (
-    clearName === "QUAD" ||
-    clearName === "PENTA" ||
-    clearName === "TSPIN_SINGLE" ||
-    clearName === "TSPIN_DOUBLE" ||
-    clearName === "TSPIN_TRIPLE" ||
-    clearName === "TSPIN_QUAD" ||
-    clearName === "TSPIN_PENTA" ||
-    clearName === "TSPIN_MINI_QUAD"
-  );
 }
 
 function hasFutureT(node: SearchOpenerBeamNode, scenario: OpenerExperimentScenario): boolean {

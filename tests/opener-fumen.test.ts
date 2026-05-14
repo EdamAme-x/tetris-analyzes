@@ -218,6 +218,7 @@ function nodeWithPlacements(placements: readonly NativeBeamPlacement[]): NativeB
     backToBackChain: 0,
     allClears: 0,
     difficultClears: 0,
+    difficultAttack: 0,
     tSpinClears: 0,
     tSpinAttack: 0,
     tSpinPotential: 0,

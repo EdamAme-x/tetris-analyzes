@@ -80,3 +80,4 @@ Executable examples live in `tests/`.
 - [x] Stream native bag permutation evaluation without prebuilding queue vectors
 - [x] Compare native placement-step tie breakers with numeric piece ranks
 - [x] Use early-return native beam comparators on the search ranking hot path
+- [x] Use native difficult-attack totals for opener report ranking and replay

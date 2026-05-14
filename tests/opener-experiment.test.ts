@@ -120,6 +120,7 @@ describe("opener experiment runner", () => {
             backToBackChain: 0,
             allClears: 0,
             difficultClears: 0,
+            difficultAttack: 0,
             tSpinClears: 0,
             tSpinAttack: 0,
             tSpinPotential: 0,
@@ -171,6 +172,7 @@ describe("opener experiment runner", () => {
           backToBackChain: 0,
           allClears: 0,
           difficultClears: 0,
+          difficultAttack: 0,
           tSpinClears: 0,
           tSpinAttack: 0,
           tSpinPotential: 0,
@@ -676,6 +678,7 @@ describe("opener experiment runner", () => {
           backToBackChain: 0,
           allClears: 0,
           difficultClears: 0,
+          difficultAttack: 0,
           tSpinClears: 0,
           tSpinAttack: 0,
           tSpinPotential: 0,
@@ -699,6 +702,7 @@ describe("opener experiment runner", () => {
           backToBackChain: 0,
           allClears: 0,
           difficultClears: 0,
+          difficultAttack: 0,
           tSpinClears: 0,
           tSpinAttack: 0,
           tSpinPotential: 0,
@@ -745,6 +749,7 @@ describe("opener experiment runner", () => {
           backToBackChain: 0,
           allClears: 0,
           difficultClears: 0,
+          difficultAttack: 0,
           tSpinClears: 0,
           tSpinAttack: 0,
           tSpinPotential: 0,
@@ -768,6 +773,7 @@ describe("opener experiment runner", () => {
           backToBackChain: 1,
           allClears: 0,
           difficultClears: 1,
+          difficultAttack: 4,
           tSpinClears: 1,
           tSpinAttack: 4,
           tSpinPotential: 0,
@@ -803,6 +809,7 @@ describe("opener experiment runner", () => {
         {
           ...candidateNode("spin setup"),
           attack: 2,
+          difficultAttack: 2,
           placements: [placementEvent("TSPIN_MINI", 0, 0, "T", 0), placementEvent("TSPIN_SINGLE", 2, 1, "I", 4)]
         }
       ]
@@ -810,6 +817,39 @@ describe("opener experiment runner", () => {
 
     expect(report.scenarios[0]?.top[0]?.clearSequence).toEqual(["TSPIN_SINGLE:2"]);
     expect(report.scenarios[0]?.top[0]).toMatchObject({ difficultAttack: 2, nonDifficultAttack: 0 });
+  });
+
+  test("uses native difficult attack instead of report-side clear-name reconstruction", () => {
+    const report = runOpenerExperiment({
+      scenarios: [
+        {
+          name: "native-difficult-attack",
+          queue: "TT",
+          hold: false,
+          beamWidth: 4,
+          maxDepth: 2,
+          warmups: 0,
+          iterations: 1,
+          top: 1
+        }
+      ],
+      clock: createClock("2026-05-14T00:00:00.000Z", [0, 2]),
+      fumenCodec: fakeCodec,
+      search: () => [
+        {
+          ...candidateNode("forced mini"),
+          attack: 2,
+          difficultAttack: 2,
+          placements: [placementEvent("TSPIN_MINI", 2, 1, "T", 0)]
+        }
+      ]
+    });
+
+    expect(report.scenarios[0]?.top[0]).toMatchObject({
+      clearSequence: ["TSPIN_MINI:2"],
+      difficultAttack: 2,
+      nonDifficultAttack: 0
+    });
   });
 
   test("omits zero-attack line clears from candidate clear summaries", () => {
@@ -856,6 +896,7 @@ function candidateNode(path: string) {
     backToBackChain: 0,
     allClears: 0,
     difficultClears: 0,
+    difficultAttack: 0,
     tSpinClears: 0,
     tSpinAttack: 0,
     tSpinPotential: 0,
