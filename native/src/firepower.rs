@@ -70,10 +70,10 @@ pub(crate) fn firepower_score(firepower: FirepowerState) -> f64 {
     firepower.attack as f64 * 1_000.0
         + firepower.t_spin_attack as f64 * 1_500.0
         + firepower.t_spin_clears as f64 * 3_000.0
-        + firepower.difficult_clears as f64 * 1_000.0
+        + firepower.difficult_clears as f64 * 1_750.0
         + firepower.points as f64 * 0.05
         + firepower.max_combo as f64 * 20.0
-        + firepower.back_to_back_chain as f64 * 25.0
+        + b2b_chain_score(firepower.back_to_back_chain)
         + firepower.all_clears as f64 * 500.0
 }
 
@@ -277,6 +277,11 @@ fn back_to_back_chain_bonus(back_to_back_chain: u32) -> f64 {
     let value = 1.0 + ((chain as f64) * tetrio_tables::BACK_TO_BACK_BONUS_LOG).ln_1p();
     tetrio_tables::BACK_TO_BACK_BONUS
         * (value.floor() + if chain == 1 { 0.0 } else { value.fract() / 3.0 })
+}
+
+fn b2b_chain_score(back_to_back_chain: u32) -> f64 {
+    let continuations = back_to_back_chain.saturating_sub(1) as f64;
+    continuations * 900.0 + continuations * continuations * 100.0
 }
 
 fn normalize_table_key(input: &str) -> String {

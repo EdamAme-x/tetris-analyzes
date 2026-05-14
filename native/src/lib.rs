@@ -668,8 +668,30 @@ fn place_and_clear(
 
 fn compare_search_state(left: &SearchState, right: &SearchState) -> std::cmp::Ordering {
     right
-        .score
-        .total_cmp(&left.score)
+        .firepower
+        .t_spin_clears
+        .cmp(&left.firepower.t_spin_clears)
+        .then_with(|| {
+            right
+                .firepower
+                .t_spin_attack
+                .cmp(&left.firepower.t_spin_attack)
+        })
+        .then_with(|| {
+            right
+                .firepower
+                .difficult_clears
+                .cmp(&left.firepower.difficult_clears)
+        })
+        .then_with(|| {
+            right
+                .firepower
+                .back_to_back_chain
+                .cmp(&left.firepower.back_to_back_chain)
+        })
+        .then_with(|| right.firepower.attack.cmp(&left.firepower.attack))
+        .then_with(|| right.score.total_cmp(&left.score))
+        .then_with(|| right.firepower.points.cmp(&left.firepower.points))
         .then_with(|| left.path.len().cmp(&right.path.len()))
         .then_with(|| left.queue_index.cmp(&right.queue_index))
 }

@@ -173,6 +173,16 @@ describe("native opener beam search", () => {
     });
   });
 
+  test("weights B2B-capable T-spin and difficult clear chains above plain line clears", () => {
+    const tSpinSingle = evaluateOpenerFirepower([{ clearName: "TSPIN_SINGLE" }]);
+    const doubleChain = evaluateOpenerFirepower([{ clearName: "DOUBLE" }, { clearName: "DOUBLE" }]);
+    const quad = evaluateOpenerFirepower([{ clearName: "QUAD" }]);
+    const b2bQuads = evaluateOpenerFirepower([{ clearName: "QUAD" }, { clearName: "QUAD" }]);
+
+    expect(tSpinSingle.firepowerScore).toBeGreaterThan(doubleChain.firepowerScore * 3);
+    expect(b2bQuads.firepowerScore).toBeGreaterThan(quad.firepowerScore * 2);
+  });
+
   test("keeps native firepower clear tables aligned with extracted TETR.IO tables", () => {
     const clearNames = [
       "SINGLE",
@@ -276,6 +286,35 @@ describe("native opener beam search", () => {
     expect(() => evaluateOpenerBag({ bag: "TIO", comboTable: "BAD TABLE" as "MODERN GUIDELINE" })).toThrow(
       "Unknown opener firepower combo table"
     );
+  });
+
+  test("matches wide-beam spin objective under tight native pruning", () => {
+    const input = {
+      queue: "JLSTZIOT",
+      hold: true,
+      maxDepth: 5,
+      kickTable: "SRS-X",
+      spinMode: "ALL-SPINS",
+      comboTable: "MULTIPLIER"
+    } as const;
+    const [tightTop] = searchOpenerBeamWithPlacements({ ...input, beamWidth: 8 });
+    const [wideTop] = searchOpenerBeamWithPlacements({ ...input, beamWidth: 128 });
+
+    expect(tightTop).toMatchObject({
+      tSpinClears: 1,
+      tSpinAttack: 2,
+      difficultClears: 1,
+      backToBackChain: 1,
+      attack: 2
+    });
+    expect(wideTop).toMatchObject({
+      tSpinClears: tightTop?.tSpinClears,
+      tSpinAttack: tightTop?.tSpinAttack,
+      difficultClears: tightTop?.difficultClears,
+      backToBackChain: tightTop?.backToBackChain,
+      attack: tightTop?.attack
+    });
+    expect(tightTop?.placements.some((placement) => placement.clearName === "TSPIN_SINGLE")).toBe(true);
   });
 
   test("rejects invalid queues before searching", () => {

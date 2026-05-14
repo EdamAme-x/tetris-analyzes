@@ -11,6 +11,10 @@ interface OpenerRegressionResult {
   readonly name: string;
   readonly resultCount: number;
   readonly topAttack: number;
+  readonly topTSpinClears: number;
+  readonly topTSpinAttack: number;
+  readonly topDifficultClears: number;
+  readonly topBackToBackChain: number;
   readonly topScore: number;
   readonly topHoles: number;
   readonly topBumpiness: number;
@@ -77,8 +81,10 @@ for (const bench of rotateCases(cases, rounds)) {
 }
 
 console.log("");
-console.log("| opener seed | median ms | searches/s | nodes | attack | score | holes | bumpiness | checksum | top path |");
-console.log("| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |");
+console.log(
+  "| opener seed | median ms | searches/s | nodes | attack | tspin | tspin attack | difficult | b2b | score | holes | bumpiness | checksum | top path |"
+);
+console.log("| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |");
 for (const bench of cases) {
   const timings = samples.get(bench.name) ?? [];
   const summary = summarize(timings);
@@ -95,6 +101,10 @@ for (const bench of cases) {
       searchesPerSecond.toFixed(1),
       String(latestResult.resultCount),
       String(latestResult.topAttack),
+      String(latestResult.topTSpinClears),
+      String(latestResult.topTSpinAttack),
+      String(latestResult.topDifficultClears),
+      String(latestResult.topBackToBackChain),
       latestResult.topScore.toFixed(1),
       String(latestResult.topHoles),
       String(latestResult.topBumpiness),
@@ -123,6 +133,10 @@ function runCase(bench: OpenerRegressionCase): OpenerRegressionResult {
     name: bench.name,
     resultCount: nodes.length,
     topAttack: top.attack,
+    topTSpinClears: top.tSpinClears,
+    topTSpinAttack: top.tSpinAttack,
+    topDifficultClears: top.difficultClears,
+    topBackToBackChain: top.backToBackChain,
     topScore: top.score,
     topHoles: top.holes,
     topBumpiness: top.bumpiness,
