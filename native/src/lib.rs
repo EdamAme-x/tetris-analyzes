@@ -35,7 +35,7 @@ pub(crate) struct SearchState {
     rows: BoardRows,
     hold: Option<Piece>,
     queue_index: usize,
-    pub(crate) path: Vec<String>,
+    pub(crate) path: Vec<PlacementStep>,
     placements: Vec<Placement>,
     pub(crate) score: f64,
     pub(crate) metrics: BoardEvaluation,
@@ -50,6 +50,50 @@ struct SearchKey {
     queue_index: usize,
     combo: u32,
     back_to_back_chain: u32,
+}
+
+#[derive(Clone, Copy, Default)]
+struct FuturePieces {
+    has_i: bool,
+    has_t: bool,
+}
+
+#[derive(Clone, Copy, Eq, PartialEq)]
+pub(crate) struct PlacementStep {
+    piece: Piece,
+    rotation: u8,
+    x: i8,
+    y: i8,
+    used_hold: bool,
+}
+
+impl PlacementStep {
+    fn format(self) -> String {
+        format_placement(
+            self.piece,
+            self.rotation,
+            self.x,
+            self.y,
+            self.used_hold,
+        )
+    }
+}
+
+impl Ord for PlacementStep {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.used_hold
+            .cmp(&other.used_hold)
+            .then_with(|| piece_name(self.piece).cmp(piece_name(other.piece)))
+            .then_with(|| self.rotation.cmp(&other.rotation))
+            .then_with(|| self.x.cmp(&other.x))
+            .then_with(|| self.y.cmp(&other.y))
+    }
+}
+
+impl PartialOrd for PlacementStep {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
 }
 
 #[derive(Clone)]
@@ -482,6 +526,7 @@ pub(crate) fn search_opener_states(
     kick_table: KickTable,
     spin_mode: SpinMode,
 ) -> Vec<SearchState> {
+    let future_pieces_by_queue_index = build_future_pieces_by_queue_index(pieces);
     let empty_rows = [0_u16; BOARD_HEIGHT];
     let initial_metrics = board::evaluate_board_unchecked(&empty_rows);
     let initial_firepower = FirepowerState::empty();
@@ -557,13 +602,13 @@ pub(crate) fn search_opener_states(
 
                                 if should_insert {
                                     let mut path = state.path.clone();
-                                    path.push(format_placement(
-                                        choice.piece,
-                                        shape.rotation,
+                                    path.push(PlacementStep {
+                                        piece: choice.piece,
+                                        rotation: shape.rotation,
                                         x,
-                                        placed.y,
-                                        choice.used_hold,
-                                    ));
+                                        y: placed.y,
+                                        used_hold: choice.used_hold,
+                                    });
                                     let placements = if include_placements {
                                         let mut placements = state.placements.clone();
                                         if let Some(mut placement) = placed.placement {
@@ -601,7 +646,12 @@ pub(crate) fn search_opener_states(
 
         beam = next_by_key.into_values().collect();
         retain_best_search_states(&mut beam, setup_candidate_pool_width(beam_width));
-        score_t_spin_setup_potential(&mut beam, pieces, kick_table, spin_mode);
+        score_t_spin_setup_potential(
+            &mut beam,
+            &future_pieces_by_queue_index,
+            kick_table,
+            spin_mode,
+        );
         retain_best_search_states(&mut beam, beam_width);
     }
 
@@ -628,51 +678,60 @@ fn setup_candidate_pool_width(beam_width: usize) -> usize {
 
 fn score_t_spin_setup_potential(
     beam: &mut [SearchState],
-    pieces: &[Piece],
+    future_pieces_by_queue_index: &[FuturePieces],
     kick_table: KickTable,
     spin_mode: SpinMode,
 ) {
     let mut potential_by_rows = HashMap::<BoardRows, u32>::new();
+    let allows_t_spin_potential = spin_mode_allows_t_spin_potential(spin_mode);
     for state in beam {
-        state.t_spin_potential =
-            if spin_mode_allows_t_spin_potential(spin_mode) && has_future_t_piece(state, pieces) {
-                *potential_by_rows.entry(state.rows).or_insert_with(|| {
-                    if estimate_t_spin_surface_potential(&state.rows) > 0 {
-                        estimate_t_spin_potential(&state.rows, kick_table)
-                    } else {
-                        0
-                    }
-                })
-            } else {
-                0
-            };
-        let quad_well_potential = if state.firepower.back_to_back_chain > 0
-            && has_future_i_piece(state, pieces)
-        {
-            estimate_quad_well_potential(&state.rows)
+        let future_pieces = future_pieces_by_queue_index
+            .get(state.queue_index)
+            .copied()
+            .unwrap_or_default();
+        let has_future_t = allows_t_spin_potential
+            && (state.hold == Some(Piece::T) || future_pieces.has_t);
+        let has_b2b_i_continuation = state.firepower.back_to_back_chain > 0
+            && (state.hold == Some(Piece::I) || future_pieces.has_i);
+        if !has_future_t && !has_b2b_i_continuation {
+            state.t_spin_potential = 0;
+            continue;
+        }
+
+        state.t_spin_potential = if has_future_t {
+            *potential_by_rows.entry(state.rows).or_insert_with(|| {
+                if estimate_t_spin_surface_potential(&state.rows) > 0 {
+                    estimate_t_spin_potential(&state.rows, kick_table)
+                } else {
+                    0
+                }
+            })
         } else {
             0
         };
+        let quad_well_potential =
+            if has_b2b_i_continuation {
+                estimate_quad_well_potential(&state.rows)
+            } else {
+                0
+            };
         state.score = score_state(state.metrics, state.firepower, state.t_spin_potential)
-            + quad_well_continuation_score(
-                quad_well_potential,
-                state.firepower.back_to_back_chain,
-            );
+            + quad_well_continuation_score(quad_well_potential, state.firepower.back_to_back_chain);
     }
 }
 
-fn has_future_t_piece(state: &SearchState, pieces: &[Piece]) -> bool {
-    state.hold == Some(Piece::T)
-        || pieces
-            .get(state.queue_index..)
-            .is_some_and(|remaining| remaining.contains(&Piece::T))
-}
-
-fn has_future_i_piece(state: &SearchState, pieces: &[Piece]) -> bool {
-    state.hold == Some(Piece::I)
-        || pieces
-            .get(state.queue_index..)
-            .is_some_and(|remaining| remaining.contains(&Piece::I))
+fn build_future_pieces_by_queue_index(pieces: &[Piece]) -> Vec<FuturePieces> {
+    let mut output = vec![FuturePieces::default(); pieces.len() + 1];
+    let mut future = FuturePieces::default();
+    for (index, piece) in pieces.iter().enumerate().rev() {
+        match piece {
+            Piece::I => future.has_i = true,
+            Piece::T => future.has_t = true,
+            _ => {}
+        }
+        output[index] = future;
+    }
+    output
 }
 
 fn spin_mode_allows_t_spin_potential(spin_mode: SpinMode) -> bool {
@@ -880,7 +939,7 @@ impl From<SearchState> for BeamSearchNode {
             queue_index: state.queue_index as u32,
             hold: state.hold.map(piece_name).map(String::from),
             rows: state.rows.to_vec(),
-            path: state.path,
+            path: state.path.into_iter().map(PlacementStep::format).collect(),
             placements: state
                 .placements
                 .into_iter()
@@ -973,5 +1032,67 @@ impl From<FirepowerEvent> for BeamFirepowerEvent {
             all_clear: event.all_clear,
             all_clear_bonus: event.all_clear_bonus,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn search_state_with_rows(
+        queue_index: usize,
+        hold: Option<Piece>,
+        rows: BoardRows,
+        firepower: FirepowerState,
+    ) -> SearchState {
+        let metrics = board::evaluate_board_unchecked(&rows);
+        SearchState {
+            rows,
+            hold,
+            queue_index,
+            path: Vec::new(),
+            placements: Vec::new(),
+            score: score_state(metrics, firepower, 0),
+            metrics,
+            firepower,
+            t_spin_potential: 0,
+        }
+    }
+
+    #[test]
+    fn future_piece_table_tracks_remaining_t_and_i_access() {
+        let future_by_index =
+            build_future_pieces_by_queue_index(&[Piece::S, Piece::Z, Piece::I, Piece::T, Piece::O]);
+
+        assert!(future_by_index[0].has_i);
+        assert!(future_by_index[0].has_t);
+        assert!(future_by_index[2].has_i);
+        assert!(future_by_index[2].has_t);
+        assert!(!future_by_index[3].has_i);
+        assert!(future_by_index[3].has_t);
+        assert!(!future_by_index[4].has_i);
+        assert!(!future_by_index[4].has_t);
+    }
+
+    #[test]
+    fn setup_scoring_keeps_hold_available_after_queue_end() {
+        let future_by_index = build_future_pieces_by_queue_index(&[Piece::S, Piece::Z]);
+        let mut rows = [0_u16; BOARD_HEIGHT];
+        for row in rows.iter_mut().take(4) {
+            *row = 0b1111111111 ^ (1 << 9);
+        }
+        let mut firepower = FirepowerState::empty();
+        firepower.back_to_back_chain = 2;
+        let base_score = score_state(board::evaluate_board_unchecked(&rows), firepower, 0);
+        let mut beam = vec![search_state_with_rows(2, Some(Piece::I), rows, firepower)];
+
+        score_t_spin_setup_potential(
+            &mut beam,
+            &future_by_index,
+            KickTable::SrsPlus,
+            SpinMode::TSpins,
+        );
+
+        assert!(beam[0].score > base_score);
     }
 }
