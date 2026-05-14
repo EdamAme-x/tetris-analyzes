@@ -16,9 +16,8 @@ use board::{BoardEvaluation, BoardRows, BOARD_HEIGHT, BOARD_WIDTH};
 use firepower::{
     advance_firepower_for_clear_with_combo_table, advance_firepower_with_combo_table,
     clear_kind_cleared_lines, clear_kind_name, estimate_quad_well_potential,
-    estimate_t_spin_potential, estimate_t_spin_surface_potential, firepower_score,
-    parse_clear_kind, parse_combo_table, quad_well_continuation_score, score_state,
-    FirepowerEvent, FirepowerState,
+    estimate_t_spin_potential, firepower_score, parse_clear_kind, parse_combo_table,
+    quad_well_continuation_score, score_state, FirepowerEvent, FirepowerState,
 };
 use movement::{can_place, is_reachable_placement, lock_shape, parse_kick_table};
 use pieces::{
@@ -699,13 +698,9 @@ fn score_t_spin_setup_potential(
         }
 
         state.t_spin_potential = if has_future_t {
-            *potential_by_rows.entry(state.rows).or_insert_with(|| {
-                if estimate_t_spin_surface_potential(&state.rows) > 0 {
-                    estimate_t_spin_potential(&state.rows, kick_table)
-                } else {
-                    0
-                }
-            })
+            *potential_by_rows
+                .entry(state.rows)
+                .or_insert_with(|| estimate_t_spin_potential(&state.rows, kick_table))
         } else {
             0
         };

@@ -171,36 +171,6 @@ pub(crate) fn estimate_quad_well_potential(rows: &BoardRows) -> u32 {
     best
 }
 
-pub(crate) fn estimate_t_spin_surface_potential(rows: &BoardRows) -> u32 {
-    let mut best = 0_u32;
-    let shapes = piece_shapes(Piece::T);
-    for shape_index in placement_shape_indices(Piece::T).iter().copied() {
-        let shape = shapes[shape_index];
-        for x in 0..=(BOARD_WIDTH as i8 - shape.width) {
-            let mut can_place_below = false;
-            for y in 0..=(BOARD_HEIGHT as i8 - shape.height) {
-                let can_place_here = can_place(rows, shape, x, y);
-                if can_place_here && !can_place_below {
-                    let Some(placed) = lock_shape(rows, shape, x, y) else {
-                        can_place_below = can_place_here;
-                        continue;
-                    };
-                    let cleared_lines = board::count_full_lines_array(&placed);
-                    let spin = detect_spin(&placed, Piece::T, shape, x, y, cleared_lines);
-                    let value = match spin.kind {
-                        SpinKind::TSpin => 1 + cleared_lines,
-                        SpinKind::TSpinMini if cleared_lines > 0 => 1,
-                        SpinKind::None | SpinKind::TSpinMini | SpinKind::ImmobileSpin => 0,
-                    };
-                    best = best.max(value);
-                }
-                can_place_below = can_place_here;
-            }
-        }
-    }
-    best
-}
-
 pub(crate) fn advance_firepower_with_combo_table(
     previous: FirepowerState,
     spin: SpinDetection,

@@ -46,3 +46,4 @@ Executable examples live in `tests/`.
 - [x] Add experiment quality gates for curated B2B T-spin opener presets
 - [x] Add a bench regression gate for two-bag B2B T-spin opener quality
 - [x] Reduce native opener search path cloning while preserving B2B T-spin quality gates
+- [x] Remove duplicate native T-spin continuation scans from opener pruning
