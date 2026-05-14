@@ -13,6 +13,7 @@ import {
   SURVEY_OPENER_EXPERIMENT_SCENARIOS,
   TETRIO_TL_OPENER_SEARCH_RULES,
   createTemplateReplayScenarios,
+  rankOpenerCandidates,
   rankOpenerTemplates,
   replayOpenerTemplateSurvivability,
   renderOpenerExperimentConsoleSummary,
@@ -273,6 +274,111 @@ describe("opener experiment runner", () => {
         search: () => [{ ...candidateNode("weak"), queueIndex: 1, holes: 1 }]
       })
     ).toThrow("Scenario weak quality gate failed: attack 0 < 1; tSpinClears 0 < 1; holes 1 > 0.");
+  });
+
+  test("excludes lower-ranked candidates that miss the scenario quality gate from template replay", () => {
+    const report = runOpenerExperiment({
+      scenarios: [
+        {
+          name: "gated",
+          queue: "TT",
+          hold: false,
+          beamWidth: 4,
+          maxDepth: 2,
+          warmups: 0,
+          iterations: 1,
+          top: 2,
+          qualityGate: {
+            minQueueIndex: 1,
+            minAttack: 12,
+            minDifficultAttack: 12,
+            minTSpinClears: 3,
+            minTSpinAttack: 12,
+            minBackToBackChain: 3,
+            maxHoles: 0
+          }
+        }
+      ],
+      clock: createClock("2026-05-14T00:00:00.000Z", [0, 2]),
+      fumenCodec: fakeCodec,
+      search: () => [
+        {
+          ...candidateNode("hole-score"),
+          score: 20_000,
+          firepowerScore: 20_000,
+          attack: 12,
+          difficultAttack: 12,
+          difficultClears: 3,
+          tSpinClears: 3,
+          tSpinAttack: 12,
+          backToBackChain: 3,
+          holes: 1
+        },
+        {
+          ...candidateNode("holeless"),
+          score: 10_000,
+          firepowerScore: 10_000,
+          attack: 12,
+          difficultAttack: 12,
+          difficultClears: 3,
+          tSpinClears: 3,
+          tSpinAttack: 12,
+          backToBackChain: 3,
+          holes: 0
+        }
+      ]
+    });
+
+    expect(report.scenarios[0]?.top.map((candidate) => candidate.path[0])).toEqual(["holeless", "hole-score"]);
+    expect(rankOpenerTemplates(report, 2).map((template) => template.best.path[0])).toEqual(["holeless"]);
+  });
+
+  test("excludes quality-gate failures from template survival counts", () => {
+    const sharedRows = [7, 11, 13, ...new Array(17).fill(0)];
+    const alternateRows = [1, 2, 4, ...new Array(17).fill(0)];
+    const gate = { maxHoles: 0 };
+    const report = runOpenerExperiment({
+      scenarios: [
+        {
+          name: "shared-pass",
+          queue: "TI",
+          hold: false,
+          beamWidth: 4,
+          maxDepth: 2,
+          warmups: 0,
+          iterations: 1,
+          top: 2,
+          qualityGate: gate
+        },
+        {
+          name: "shared-fail",
+          queue: "JO",
+          hold: false,
+          beamWidth: 4,
+          maxDepth: 2,
+          warmups: 0,
+          iterations: 1,
+          top: 2,
+          qualityGate: gate
+        }
+      ],
+      clock: createClock("2026-05-14T00:00:00.000Z", [0, 2, 10, 12]),
+      fumenCodec: fakeCodec,
+      search: (input) => {
+        if (input.queue === "TI") {
+          return [{ ...candidateNode("shared-pass"), rows: sharedRows, attack: 12 }];
+        }
+        return [
+          { ...candidateNode("alternate-pass"), rows: alternateRows, attack: 13 },
+          { ...candidateNode("shared-fail"), rows: sharedRows, attack: 12, holes: 1 }
+        ];
+      }
+    });
+
+    const shared = rankOpenerCandidates(report, 10).find((candidate) => candidate.path[0] === "shared-pass");
+
+    expect(report.scenarios[1]?.top.map((candidate) => candidate.path[0])).toEqual(["alternate-pass", "shared-fail"]);
+    expect(shared).toMatchObject({ survivalCount: 1, survivalRate: 0.5 });
   });
 
   test("renders a deduplicated best-template console summary instead of scenario noise", () => {
@@ -1238,6 +1344,53 @@ describe("opener experiment runner", () => {
     });
 
     expect(report.scenarios[0]?.top.map((candidate) => candidate.path[0])).toEqual(["attack", "quiet"]);
+  });
+
+  test("ranks holeless equivalent-firepower candidates before higher board score", () => {
+    const report = runOpenerExperiment({
+      scenarios: [
+        {
+          name: "hole-ranking",
+          queue: "TT",
+          hold: false,
+          beamWidth: 4,
+          maxDepth: 2,
+          warmups: 0,
+          iterations: 1,
+          top: 2
+        }
+      ],
+      clock: createClock("2026-05-14T00:00:00.000Z", [0, 2]),
+      fumenCodec: fakeCodec,
+      search: () => [
+        {
+          ...candidateNode("hole-score"),
+          score: 20_000,
+          firepowerScore: 20_000,
+          attack: 12,
+          difficultAttack: 12,
+          difficultClears: 3,
+          tSpinClears: 3,
+          tSpinAttack: 12,
+          backToBackChain: 3,
+          holes: 1
+        },
+        {
+          ...candidateNode("holeless"),
+          score: 10_000,
+          firepowerScore: 10_000,
+          attack: 12,
+          difficultAttack: 12,
+          difficultClears: 3,
+          tSpinClears: 3,
+          tSpinAttack: 12,
+          backToBackChain: 3,
+          holes: 0
+        }
+      ]
+    });
+
+    expect(report.scenarios[0]?.top.map((candidate) => candidate.path[0])).toEqual(["holeless", "hole-score"]);
   });
 
   test("ranks real T-spin line clears before combo-only attack", () => {

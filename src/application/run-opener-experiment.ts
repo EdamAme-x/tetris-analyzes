@@ -604,12 +604,14 @@ export function rankOpenerCandidates(report: OpenerExperimentReport, topCount: n
   const survivalByTemplate = countTemplateSurvivors(report);
   return report.scenarios
     .flatMap((scenario) =>
-      scenario.top.map((candidate) => ({
-        ...candidate,
-        sourceScenario: scenario.name,
-        survivalCount: survivalByTemplate.get(templateKey(candidate)) ?? 1,
-        survivalRate: (survivalByTemplate.get(templateKey(candidate)) ?? 1) / report.scenarios.length
-      }))
+      scenario.top
+        .filter((candidate) => candidateMeetsQualityGate(candidate, scenario.qualityGate))
+        .map((candidate) => ({
+          ...candidate,
+          sourceScenario: scenario.name,
+          survivalCount: survivalByTemplate.get(templateKey(candidate)) ?? 1,
+          survivalRate: (survivalByTemplate.get(templateKey(candidate)) ?? 1) / report.scenarios.length
+        }))
     )
     .sort(compareRankedOpenerCandidates)
     .slice(0, topCount)
@@ -1030,6 +1032,21 @@ function maxGateFailure(name: string, actual: number, expected: number | undefin
   return expected === undefined || actual <= expected ? undefined : `${name} ${actual} > ${expected}`;
 }
 
+function candidateMeetsQualityGate(candidate: OpenerExperimentCandidate, gate: OpenerExperimentQualityGate | undefined): boolean {
+  if (gate === undefined) {
+    return true;
+  }
+  return (
+    candidate.queueIndex >= (gate.minQueueIndex ?? Number.NEGATIVE_INFINITY) &&
+    candidate.attack >= (gate.minAttack ?? Number.NEGATIVE_INFINITY) &&
+    candidate.difficultAttack >= (gate.minDifficultAttack ?? Number.NEGATIVE_INFINITY) &&
+    candidate.tSpinClears >= (gate.minTSpinClears ?? Number.NEGATIVE_INFINITY) &&
+    candidate.tSpinAttack >= (gate.minTSpinAttack ?? Number.NEGATIVE_INFINITY) &&
+    candidate.backToBackChain >= (gate.minBackToBackChain ?? Number.NEGATIVE_INFINITY) &&
+    candidate.holes <= (gate.maxHoles ?? Number.POSITIVE_INFINITY)
+  );
+}
+
 function createTopCandidates(
   nodes: readonly SearchOpenerBeamNode[],
   scenario: OpenerExperimentScenario,
@@ -1096,6 +1113,7 @@ function compareSearchNodesForOpener(left: SearchNodeWithReportPotential, right:
     rightNode.backToBackChain - leftNode.backToBackChain ||
     right.tSpinPotential - left.tSpinPotential ||
     rightNode.attack - leftNode.attack ||
+    leftNode.holes - rightNode.holes ||
     rightNode.score - leftNode.score ||
     rightNode.points - leftNode.points ||
     leftNode.path.length - rightNode.path.length ||
@@ -1113,9 +1131,9 @@ function compareRankedOpenerCandidates(left: RankedOpenerCandidate, right: Ranke
     right.attack - left.attack ||
     right.tSpinPotential - left.tSpinPotential ||
     right.survivalCount - left.survivalCount ||
+    left.holes - right.holes ||
     right.firepowerScore - left.firepowerScore ||
     right.score - left.score ||
-    left.holes - right.holes ||
     left.bumpiness - right.bumpiness ||
     right.points - left.points ||
     right.path.length - left.path.length ||
@@ -1208,6 +1226,9 @@ function countTemplateSurvivors(report: OpenerExperimentReport): Map<string, num
   const sourcesByTemplate = new Map<string, Set<string>>();
   for (const scenario of report.scenarios) {
     for (const candidate of scenario.top) {
+      if (!candidateMeetsQualityGate(candidate, scenario.qualityGate)) {
+        continue;
+      }
       const key = templateKey(candidate);
       const sources = sourcesByTemplate.get(key) ?? new Set<string>();
       sources.add(scenario.name);

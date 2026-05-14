@@ -103,3 +103,5 @@ Executable examples live in `tests/`.
 - [x] Preserve native continuation phase diversity by hold and B2B state
 - [x] Compute continuation phase frontiers lazily during replay instead of every source search
 - [x] Promote measured high-firepower 3T-spin/3B2B continuation queues into discovery
+- [x] Prefer holeless candidates when B2B/T-spin firepower is equivalent in reports
+- [x] Exclude quality-gate failures from opener template replay pools
