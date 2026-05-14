@@ -189,7 +189,7 @@ export const DEFAULT_OPENER_EXPERIMENT_SCENARIOS: readonly OpenerExperimentScena
     name: "best-two-bag-tspin-openers",
     queue: "SZILOJTSTOZLJI",
     hold: true,
-    beamWidth: 1024,
+    beamWidth: 512,
     maxDepth: 14,
     rules: TETRIO_TL_OPENER_SEARCH_RULES,
     iterations: 1,
@@ -202,7 +202,7 @@ export const SURVEY_OPENER_EXPERIMENT_SCENARIOS: readonly OpenerExperimentScenar
   name,
   queue,
   hold: true,
-  beamWidth: 1024,
+  beamWidth: 512,
   maxDepth: 14,
   rules: TETRIO_TL_OPENER_SEARCH_RULES,
   warmups: 0,
@@ -232,7 +232,7 @@ export const DISCOVERY_OPENER_EXPERIMENT_SCENARIOS: readonly OpenerExperimentSce
   name: `discover-${String(index + 1).padStart(2, "0")}`,
   queue,
   hold: true,
-  beamWidth: 1024,
+  beamWidth: 512,
   maxDepth: 14,
   rules: TETRIO_TL_OPENER_SEARCH_RULES,
   warmups: 0,
@@ -249,7 +249,7 @@ export function createTemplateReplayScenarios(sampleSize: number): OpenerExperim
     name: `replay-${String(index + 1).padStart(2, "0")}`,
     queue,
     hold: true,
-    beamWidth: 1024,
+    beamWidth: 512,
     maxDepth: 14,
     rules: TETRIO_TL_OPENER_SEARCH_RULES,
     warmups: 0,
@@ -781,14 +781,14 @@ function compareSearchNodesForOpener(left: SearchNodeWithReportPotential, right:
 
 function compareRankedOpenerCandidates(left: RankedOpenerCandidate, right: RankedOpenerCandidate): number {
   return (
-    right.survivalCount - left.survivalCount ||
     right.tSpinClears - left.tSpinClears ||
     right.tSpinAttack - left.tSpinAttack ||
     right.backToBackChain - left.backToBackChain ||
     right.difficultClears - left.difficultClears ||
     right.difficultAttack - left.difficultAttack ||
-    right.tSpinPotential - left.tSpinPotential ||
     right.attack - left.attack ||
+    right.tSpinPotential - left.tSpinPotential ||
+    right.survivalCount - left.survivalCount ||
     right.firepowerScore - left.firepowerScore ||
     right.score - left.score ||
     left.holes - right.holes ||
@@ -801,15 +801,15 @@ function compareRankedOpenerCandidates(left: RankedOpenerCandidate, right: Ranke
 
 function compareRankedOpenerTemplates(left: RankedOpenerTemplate, right: RankedOpenerTemplate): number {
   return (
-    right.survivalCount - left.survivalCount || compareRankedOpenerCandidates(left.best, right.best) || left.key.localeCompare(right.key)
+    compareRankedOpenerCandidates(left.best, right.best) || right.survivalCount - left.survivalCount || left.key.localeCompare(right.key)
   );
 }
 
 function compareReplayTemplates(left: OpenerTemplateReplayEntry, right: OpenerTemplateReplayEntry): number {
   return (
+    compareRankedOpenerCandidates(left.best, right.best) ||
     right.replayHitCount - left.replayHitCount ||
     right.groupedSurvivalCount - left.groupedSurvivalCount ||
-    compareRankedOpenerCandidates(left.best, right.best) ||
     left.key.localeCompare(right.key)
   );
 }

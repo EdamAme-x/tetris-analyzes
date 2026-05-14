@@ -41,3 +41,4 @@ Executable examples live in `tests/`.
 - [x] Expand survivability from top-candidate grouping to full template replay across wider queues
 - [x] Add a three-bag continuation preset for B2B T-spin chain experiments
 - [x] Add a bench regression gate for three-bag B2B T-spin continuation quality
+- [x] Reduce two-bag experiment beam width while preserving top B2B T-spin firepower

@@ -29,7 +29,7 @@ describe("opener experiment runner", () => {
       name: "best-two-bag-tspin-openers",
       queue: "SZILOJTSTOZLJI",
       hold: true,
-      beamWidth: 1024,
+      beamWidth: 512,
       maxDepth: 14,
       rules: TETRIO_TL_OPENER_SEARCH_RULES
     });
@@ -42,7 +42,7 @@ describe("opener experiment runner", () => {
       SURVEY_OPENER_EXPERIMENT_SCENARIOS.length
     );
     expect(SURVEY_OPENER_EXPERIMENT_SCENARIOS.every((scenario) => isTwoBagQueue(scenario.queue))).toBe(true);
-    expect(SURVEY_OPENER_EXPERIMENT_SCENARIOS.every((scenario) => scenario.beamWidth === 1024)).toBe(true);
+    expect(SURVEY_OPENER_EXPERIMENT_SCENARIOS.every((scenario) => scenario.beamWidth === 512)).toBe(true);
     expect(SURVEY_OPENER_EXPERIMENT_SCENARIOS.every((scenario) => scenario.tags?.includes("survey"))).toBe(true);
   });
 
@@ -303,6 +303,48 @@ describe("opener experiment runner", () => {
       sources: ["left", "right"]
     });
     expect(renderOpenerExperimentMarkdown(report)).toContain("2 (100.0%) | left right");
+  });
+
+  test("ranks stronger T-spin firepower ahead of broader template survival", () => {
+    const strongRows = [7, 7, 7, ...new Array(17).fill(0)];
+    const commonRows = [3, 3, 3, ...new Array(17).fill(0)];
+    const report = runOpenerExperiment({
+      scenarios: [rankingScenario("strong", "HI"), rankingScenario("common-left", "LO"), rankingScenario("common-right", "OL")],
+      clock: createClock("2026-05-14T00:00:00.000Z", [0, 1, 2, 3, 4, 5]),
+      fumenCodec: fakeCodec,
+      search: (input) => {
+        if (input.queue === "HI") {
+          return [
+            {
+              ...candidateNode("strong-template"),
+              rows: strongRows,
+              attack: 9,
+              difficultClears: 2,
+              tSpinClears: 2,
+              tSpinAttack: 9,
+              backToBackChain: 2
+            }
+          ];
+        }
+        return [
+          {
+            ...candidateNode("common-template"),
+            rows: commonRows,
+            attack: 7,
+            difficultClears: 2,
+            tSpinClears: 2,
+            tSpinAttack: 7,
+            backToBackChain: 2
+          }
+        ];
+      }
+    });
+
+    const [topTemplate] = rankOpenerTemplates(report, 2);
+    expect(topTemplate).toMatchObject({
+      sources: ["strong"],
+      best: { path: ["strong-template"], attack: 9, tSpinAttack: 9 }
+    });
   });
 
   test("creates deterministic replay scenarios for wider template survivability checks", () => {
@@ -785,6 +827,13 @@ function replayScenario(name: string, queue: string) {
     iterations: 1,
     top: 1,
     rules: { spinMode: "NONE", comboTable: "MULTIPLIER", kickTable: "SRS+" } as const
+  };
+}
+
+function rankingScenario(name: string, queue: string) {
+  return {
+    ...replayScenario(name, queue),
+    iterations: 1
   };
 }
 
