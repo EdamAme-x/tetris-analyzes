@@ -18,8 +18,14 @@ pub struct OpenerQueueEvaluation {
     pub top_score: f64,
     pub firepower_score: f64,
     pub attack: u32,
+    pub difficult_attack: u32,
     pub points: u32,
     pub all_clears: u32,
+    pub difficult_clears: u32,
+    pub t_spin_clears: u32,
+    pub t_spin_attack: u32,
+    pub back_to_back_chain: u32,
+    pub t_spin_potential: u32,
     pub depth: u32,
     pub holes: u32,
     pub bumpiness: u32,
@@ -240,8 +246,14 @@ fn evaluate_queue(
             top_score: f64::NEG_INFINITY,
             firepower_score: 0.0,
             attack: 0,
+            difficult_attack: 0,
             points: 0,
             all_clears: 0,
+            difficult_clears: 0,
+            t_spin_clears: 0,
+            t_spin_attack: 0,
+            back_to_back_chain: 0,
+            t_spin_potential: 0,
             depth: 0,
             holes: u32::MAX,
             bumpiness: u32::MAX,
@@ -261,8 +273,14 @@ fn evaluate_queue(
         top_score: state.score,
         firepower_score,
         attack: state.firepower.attack,
+        difficult_attack: state.firepower.difficult_attack,
         points: state.firepower.points,
         all_clears: state.firepower.all_clears,
+        difficult_clears: state.firepower.difficult_clears,
+        t_spin_clears: state.firepower.t_spin_clears,
+        t_spin_attack: state.firepower.t_spin_attack,
+        back_to_back_chain: state.firepower.back_to_back_chain,
+        t_spin_potential: state.t_spin_potential,
         depth,
         holes: state.metrics[3],
         bumpiness: state.metrics[4],
@@ -273,8 +291,12 @@ fn opener_weighted_score(state: &SearchState, buildable: bool) -> f64 {
     let buildable_bonus = if buildable { 10_000.0 } else { 0.0 };
     buildable_bonus
         + state.score
-        + f64::from(state.firepower.attack) * 500.0
-        + f64::from(state.firepower.all_clears) * 1_000.0
+        + f64::from(state.firepower.difficult_attack) * 900.0
+        + f64::from(state.firepower.t_spin_attack) * 1_200.0
+        + f64::from(state.firepower.t_spin_clears) * 2_500.0
+        + f64::from(state.firepower.difficult_clears) * 1_200.0
+        + f64::from(state.firepower.back_to_back_chain) * 1_000.0
+        + f64::from(state.t_spin_potential) * 800.0
         + state.path.len() as f64 * 250.0
         - f64::from(state.metrics[3]) * 120.0
         - f64::from(state.metrics[4]) * 20.0
@@ -296,15 +318,25 @@ fn mark_pareto_fronts(evaluations: &mut [OpenerQueueEvaluation]) {
 fn dominates(left: &OpenerQueueEvaluation, right: &OpenerQueueEvaluation) -> bool {
     let no_worse = u8::from(left.buildable) >= u8::from(right.buildable)
         && left.depth >= right.depth
+        && left.t_spin_clears >= right.t_spin_clears
+        && left.t_spin_attack >= right.t_spin_attack
+        && left.back_to_back_chain >= right.back_to_back_chain
+        && left.difficult_clears >= right.difficult_clears
+        && left.difficult_attack >= right.difficult_attack
+        && left.t_spin_potential >= right.t_spin_potential
         && left.attack >= right.attack
-        && left.all_clears >= right.all_clears
         && left.top_score >= right.top_score
         && left.holes <= right.holes
         && left.bumpiness <= right.bumpiness;
     let strictly_better = u8::from(left.buildable) > u8::from(right.buildable)
         || left.depth > right.depth
+        || left.t_spin_clears > right.t_spin_clears
+        || left.t_spin_attack > right.t_spin_attack
+        || left.back_to_back_chain > right.back_to_back_chain
+        || left.difficult_clears > right.difficult_clears
+        || left.difficult_attack > right.difficult_attack
+        || left.t_spin_potential > right.t_spin_potential
         || left.attack > right.attack
-        || left.all_clears > right.all_clears
         || left.top_score > right.top_score
         || left.holes < right.holes
         || left.bumpiness < right.bumpiness;
@@ -320,6 +352,11 @@ fn compare_queue_evaluation(
         .cmp(&left.pareto_front)
         .then_with(|| left.dominated_by.cmp(&right.dominated_by))
         .then_with(|| right.weighted_score.total_cmp(&left.weighted_score))
+        .then_with(|| right.t_spin_clears.cmp(&left.t_spin_clears))
+        .then_with(|| right.t_spin_attack.cmp(&left.t_spin_attack))
+        .then_with(|| right.back_to_back_chain.cmp(&left.back_to_back_chain))
+        .then_with(|| right.difficult_attack.cmp(&left.difficult_attack))
+        .then_with(|| right.t_spin_potential.cmp(&left.t_spin_potential))
         .then_with(|| right.top_score.total_cmp(&left.top_score))
         .then_with(|| left.queue.cmp(&right.queue))
 }

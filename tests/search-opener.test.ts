@@ -291,6 +291,12 @@ describe("native opener beam search", () => {
     expect(evaluation.paretoFront.length).toBeGreaterThan(0);
     expect(evaluation.topQueues[0]?.paretoFront).toBe(true);
     expect(evaluation.topQueues[0]?.dominatedBy).toBe(0);
+    expect(typeof evaluation.topQueues[0]?.difficultAttack).toBe("number");
+    expect(typeof evaluation.topQueues[0]?.difficultClears).toBe("number");
+    expect(typeof evaluation.topQueues[0]?.tSpinClears).toBe("number");
+    expect(typeof evaluation.topQueues[0]?.tSpinAttack).toBe("number");
+    expect(typeof evaluation.topQueues[0]?.backToBackChain).toBe("number");
+    expect(typeof evaluation.topQueues[0]?.tSpinPotential).toBe("number");
   });
 
   test("can sample a capped number of 7-bag queue branches", () => {

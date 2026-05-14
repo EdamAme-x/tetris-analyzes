@@ -35,4 +35,5 @@ Executable examples live in `tests/`.
 - [x] Opener reports show B2B chain, difficult attack, and fumen preview URLs
 - [x] Broaden deterministic two-bag queue discovery beyond the current survey seeds
 - [x] Keep survey/discovery queues to valid two-bag inputs
+- [x] Native bag ranking exposes and prefers TL B2B/T-spin continuation metrics over perfect-clear bias
 - [ ] Add deeper opener-template survivability scoring across many queue permutations

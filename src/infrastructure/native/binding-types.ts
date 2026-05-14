@@ -133,8 +133,14 @@ export interface NativeOpenerQueueEvaluation {
   topScore: number;
   firepowerScore: number;
   attack: number;
+  difficultAttack: number;
   points: number;
   allClears: number;
+  difficultClears: number;
+  tSpinClears: number;
+  tSpinAttack: number;
+  backToBackChain: number;
+  tSpinPotential: number;
   depth: number;
   holes: number;
   bumpiness: number;
