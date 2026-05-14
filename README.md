@@ -54,3 +54,4 @@ Executable examples live in `tests/`.
 - [x] Use a lightweight deterministic hasher for native opener search maps
 - [x] Reuse native reachability cache while estimating T-spin continuation potential
 - [x] Skip non-T immobility spin detection on the TETR.IO TL T-spin path
+- [x] Limit native continuation potential credit to T/I pieces reachable within remaining search depth

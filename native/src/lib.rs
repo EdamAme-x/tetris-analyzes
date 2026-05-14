@@ -110,8 +110,8 @@ struct SearchKey {
 
 #[derive(Clone, Copy, Default)]
 struct FuturePieces {
-    has_i: bool,
-    has_t: bool,
+    next_i_offset: Option<u16>,
+    next_t_offset: Option<u16>,
 }
 
 #[derive(Clone, Copy, Eq, PartialEq)]
@@ -713,6 +713,7 @@ pub(crate) fn search_opener_states(
         score_t_spin_setup_potential(
             &mut beam,
             &future_pieces_by_queue_index,
+            max_depth,
             kick_table,
             spin_mode,
         );
@@ -750,6 +751,7 @@ fn next_search_map_capacity(active_states: usize, beam_width: usize, hold_enable
 fn score_t_spin_setup_potential(
     beam: &mut [SearchState],
     future_pieces_by_queue_index: &[FuturePieces],
+    max_depth: usize,
     kick_table: KickTable,
     spin_mode: SpinMode,
 ) {
@@ -760,10 +762,11 @@ fn score_t_spin_setup_potential(
             .get(state.queue_index)
             .copied()
             .unwrap_or_default();
+        let remaining_depth = max_depth.saturating_sub(state.path.len());
         let has_future_t = allows_t_spin_potential
-            && (state.hold == Some(Piece::T) || future_pieces.has_t);
+            && can_access_future_piece(state, future_pieces, Piece::T, remaining_depth);
         let has_b2b_i_continuation = state.firepower.back_to_back_chain > 0
-            && (state.hold == Some(Piece::I) || future_pieces.has_i);
+            && can_access_future_piece(state, future_pieces, Piece::I, remaining_depth);
         if !has_future_t && !has_b2b_i_continuation {
             state.t_spin_potential = 0;
             continue;
@@ -789,16 +792,53 @@ fn score_t_spin_setup_potential(
 
 fn build_future_pieces_by_queue_index(pieces: &[Piece]) -> Vec<FuturePieces> {
     let mut output = vec![FuturePieces::default(); pieces.len() + 1];
-    let mut future = FuturePieces::default();
-    for (index, piece) in pieces.iter().enumerate().rev() {
+    let mut next_i_offset = None;
+    let mut next_t_offset = None;
+    for (index, piece) in pieces.iter().copied().enumerate().rev() {
+        next_i_offset = next_i_offset.map(|offset: u16| offset.saturating_add(1));
+        next_t_offset = next_t_offset.map(|offset: u16| offset.saturating_add(1));
         match piece {
-            Piece::I => future.has_i = true,
-            Piece::T => future.has_t = true,
+            Piece::I => next_i_offset = Some(0),
+            Piece::T => next_t_offset = Some(0),
             _ => {}
         }
-        output[index] = future;
+        output[index] = FuturePieces {
+            next_i_offset,
+            next_t_offset,
+        };
     }
     output
+}
+
+fn can_access_future_piece(
+    state: &SearchState,
+    future_pieces: FuturePieces,
+    piece: Piece,
+    remaining_depth: usize,
+) -> bool {
+    if remaining_depth == 0 {
+        return false;
+    }
+    if state.hold == Some(piece) {
+        return true;
+    }
+
+    let offset = match piece {
+        Piece::I => future_pieces.next_i_offset,
+        Piece::T => future_pieces.next_t_offset,
+        Piece::O | Piece::S | Piece::Z | Piece::J | Piece::L => None,
+    };
+    let Some(offset) = offset.map(usize::from) else {
+        return false;
+    };
+    let placements_to_access = if offset == 0 {
+        1
+    } else if state.hold.is_none() {
+        offset
+    } else {
+        offset + 1
+    };
+    placements_to_access <= remaining_depth
 }
 
 fn spin_mode_allows_t_spin_potential(spin_mode: SpinMode) -> bool {
@@ -1140,14 +1180,24 @@ mod tests {
         let future_by_index =
             build_future_pieces_by_queue_index(&[Piece::S, Piece::Z, Piece::I, Piece::T, Piece::O]);
 
-        assert!(future_by_index[0].has_i);
-        assert!(future_by_index[0].has_t);
-        assert!(future_by_index[2].has_i);
-        assert!(future_by_index[2].has_t);
-        assert!(!future_by_index[3].has_i);
-        assert!(future_by_index[3].has_t);
-        assert!(!future_by_index[4].has_i);
-        assert!(!future_by_index[4].has_t);
+        assert_eq!(future_by_index[0].next_i_offset, Some(2));
+        assert_eq!(future_by_index[0].next_t_offset, Some(3));
+        assert_eq!(future_by_index[2].next_i_offset, Some(0));
+        assert_eq!(future_by_index[2].next_t_offset, Some(1));
+        assert_eq!(future_by_index[3].next_i_offset, None);
+        assert_eq!(future_by_index[3].next_t_offset, Some(0));
+        assert_eq!(future_by_index[4].next_i_offset, None);
+        assert_eq!(future_by_index[4].next_t_offset, None);
+    }
+
+    #[test]
+    fn future_piece_access_is_limited_by_remaining_depth() {
+        let future_by_index =
+            build_future_pieces_by_queue_index(&[Piece::S, Piece::Z, Piece::I, Piece::T, Piece::O]);
+        let state = search_state_with_rows(0, Some(Piece::O), [0_u16; BOARD_HEIGHT], FirepowerState::empty());
+
+        assert!(!can_access_future_piece(&state, future_by_index[0], Piece::I, 2));
+        assert!(can_access_future_piece(&state, future_by_index[0], Piece::I, 3));
     }
 
     #[test]
@@ -1165,6 +1215,7 @@ mod tests {
         score_t_spin_setup_potential(
             &mut beam,
             &future_by_index,
+            1,
             KickTable::SrsPlus,
             SpinMode::TSpins,
         );
