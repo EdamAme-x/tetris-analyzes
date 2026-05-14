@@ -652,6 +652,7 @@ pub(crate) fn search_opener_states(
     }];
 
     let phase_diversity_start_depth = phase_diversity_start_depth(max_depth);
+    let holeless_diversity_start_depth = holeless_diversity_start_depth(max_depth);
     for depth in 0..max_depth {
         let mut next_by_key = FastHashMap::<SearchKey, SearchState>::with_capacity_and_hasher(
             next_search_map_capacity(beam.len(), beam_width, hold_enabled, setup_pool_multiplier),
@@ -774,10 +775,15 @@ pub(crate) fn search_opener_states(
             kick_table,
             spin_mode,
         );
+        let preserve_holeless = matches!(
+            holeless_diversity_start_depth,
+            Some(start_depth) if depth + 1 >= start_depth
+        );
         match phase_diversity_start_depth {
             Some(start_depth) if depth + 1 >= start_depth => {
-                retain_phase_diverse_search_states(&mut beam, beam_width);
+                retain_phase_diverse_search_states(&mut beam, beam_width, preserve_holeless);
             }
+            _ if preserve_holeless => retain_holeless_diverse_search_states(&mut beam, beam_width),
             _ => {
                 retain_best_search_states(&mut beam, beam_width);
             }
@@ -849,9 +855,35 @@ fn setup_candidate_pool_width(beam_width: usize, multiplier: usize) -> usize {
     beam_width.saturating_mul(multiplier).max(beam_width)
 }
 
-fn retain_phase_diverse_search_states(beam: &mut Vec<SearchState>, beam_width: usize) {
-    let reserve_width = phase_diversity_reserve_width(beam_width);
-    if reserve_width == 0 || beam.len() <= beam_width {
+fn retain_phase_diverse_search_states(
+    beam: &mut Vec<SearchState>,
+    beam_width: usize,
+    preserve_holeless_diversity: bool,
+) {
+    retain_diverse_search_states(beam, beam_width, true, preserve_holeless_diversity);
+}
+
+fn retain_holeless_diverse_search_states(beam: &mut Vec<SearchState>, beam_width: usize) {
+    if !should_reserve_holeless_search_states(beam, beam_width) {
+        retain_best_search_states(beam, beam_width);
+        return;
+    }
+    retain_diverse_search_states(beam, beam_width, false, true);
+}
+
+fn retain_diverse_search_states(
+    beam: &mut Vec<SearchState>,
+    beam_width: usize,
+    preserve_phase_diversity: bool,
+    preserve_holeless_diversity: bool,
+) {
+    let phase_reserve_width = phase_diversity_reserve_width(beam_width);
+    let holeless_reserve_width = holeless_diversity_reserve_width(beam_width);
+    let reserve_holeless =
+        preserve_holeless_diversity && should_reserve_holeless_search_states(beam, beam_width);
+    if ((phase_reserve_width == 0 || !preserve_phase_diversity) && !reserve_holeless)
+        || beam.len() <= beam_width
+    {
         retain_best_search_states(beam, beam_width);
         return;
     }
@@ -861,24 +893,50 @@ fn retain_phase_diverse_search_states(beam: &mut Vec<SearchState>, beam_width: u
     let mut selected_flags = vec![false; sorted.len()];
     let best_state = &sorted[0];
     let mut seen_phase_keys = FastHashMap::<u64, ()>::with_capacity_and_hasher(
-        reserve_width,
+        phase_reserve_width,
         BuildHasherDefault::<FastHasher>::default(),
     );
     let mut reserved = 0;
-    for (index, state) in sorted.iter().enumerate() {
-        if reserved >= reserve_width {
-            break;
-        }
-        if state.phase_family_key == 0 || !is_phase_diversity_candidate(state, best_state) {
-            continue;
-        }
-        if seen_phase_keys.insert(state.phase_family_key, ()).is_none() {
-            selected_flags[index] = true;
-            reserved += 1;
+    if preserve_phase_diversity {
+        for (index, state) in sorted.iter().enumerate() {
+            if reserved >= phase_reserve_width {
+                break;
+            }
+            if state.phase_family_key == 0 || !is_phase_diversity_candidate(state, best_state) {
+                continue;
+            }
+            if seen_phase_keys.insert(state.phase_family_key, ()).is_none() {
+                selected_flags[index] = true;
+                reserved += 1;
+            }
         }
     }
 
-    let mut remaining_global = beam_width.saturating_sub(reserved);
+    let mut seen_holeless_keys = FastHashMap::<u64, ()>::with_capacity_and_hasher(
+        holeless_reserve_width,
+        BuildHasherDefault::<FastHasher>::default(),
+    );
+    let mut holeless_reserved = 0;
+    if reserve_holeless {
+        for (index, state) in sorted.iter().enumerate() {
+            if holeless_reserved >= holeless_reserve_width {
+                break;
+            }
+            if selected_flags[index] || !is_holeless_diversity_candidate(state, best_state) {
+                continue;
+            }
+            if seen_holeless_keys
+                .insert(holeless_diversity_key(state), ())
+                .is_none()
+            {
+                selected_flags[index] = true;
+                holeless_reserved += 1;
+            }
+        }
+    }
+
+    let total_reserved = reserved + holeless_reserved;
+    let mut remaining_global = beam_width.saturating_sub(total_reserved);
     beam.reserve(beam_width);
     for (index, state) in sorted.into_iter().enumerate() {
         if selected_flags[index] {
@@ -890,11 +948,35 @@ fn retain_phase_diverse_search_states(beam: &mut Vec<SearchState>, beam_width: u
     }
 }
 
+fn should_reserve_holeless_search_states(beam: &[SearchState], beam_width: usize) -> bool {
+    if holeless_diversity_reserve_width(beam_width) == 0 || beam.len() <= beam_width {
+        return false;
+    }
+    let Some(best_state) = beam
+        .iter()
+        .min_by(|left, right| compare_search_state(left, right))
+    else {
+        return false;
+    };
+    best_state.metrics[3] > 0
+        && beam
+            .iter()
+            .any(|state| is_holeless_diversity_candidate(state, best_state))
+}
+
 fn phase_diversity_reserve_width(beam_width: usize) -> usize {
     if beam_width < 32 {
         0
     } else {
         (beam_width / 8).clamp(4, 32).min(beam_width)
+    }
+}
+
+fn holeless_diversity_reserve_width(beam_width: usize) -> usize {
+    if beam_width < 32 {
+        0
+    } else {
+        (beam_width / 64).clamp(1, 4).min(beam_width)
     }
 }
 
@@ -906,11 +988,39 @@ fn phase_diversity_start_depth(max_depth: usize) -> Option<usize> {
     }
 }
 
+fn holeless_diversity_start_depth(max_depth: usize) -> Option<usize> {
+    if max_depth < 14 {
+        None
+    } else {
+        Some(((max_depth - 1) / 7) * 7)
+    }
+}
+
 fn is_phase_diversity_candidate(state: &SearchState, best: &SearchState) -> bool {
     state.firepower.t_spin_clears.saturating_add(1) >= best.firepower.t_spin_clears
         && state.firepower.t_spin_attack.saturating_add(4) >= best.firepower.t_spin_attack
         && state.firepower.difficult_attack.saturating_add(4) >= best.firepower.difficult_attack
         && state.firepower.back_to_back_chain.saturating_add(1) >= best.firepower.back_to_back_chain
+}
+
+fn is_holeless_diversity_candidate(state: &SearchState, best: &SearchState) -> bool {
+    state.metrics[3] == 0
+        && state.firepower.t_spin_clears == best.firepower.t_spin_clears
+        && state.firepower.t_spin_attack == best.firepower.t_spin_attack
+        && state.firepower.difficult_clears == best.firepower.difficult_clears
+        && state.firepower.difficult_attack == best.firepower.difficult_attack
+        && state.firepower.back_to_back_chain == best.firepower.back_to_back_chain
+        && state.firepower.attack == best.firepower.attack
+}
+
+fn holeless_diversity_key(state: &SearchState) -> u64 {
+    let mut hasher = FastHasher::default();
+    hasher.write_u64(state.phase_family_key);
+    hasher.write_u8(state.hold.map(piece_hash_code).unwrap_or(7));
+    hasher.write_usize(state.queue_index);
+    hasher.write_u32(state.firepower.back_to_back_chain);
+    hash_canonical_rows(&state.rows, &mut hasher);
+    hasher.finish()
 }
 
 fn next_phase_family_key(
@@ -1580,12 +1690,45 @@ mod tests {
             beam.push(state);
         }
 
-        retain_phase_diverse_search_states(&mut beam, 32);
+        retain_phase_diverse_search_states(&mut beam, 32, true);
 
         assert_eq!(beam.len(), 32);
         assert!(beam.iter().any(|state| state.phase_family_key == 1));
         assert!(beam.iter().any(|state| state.phase_family_key == 10));
         assert!(beam.iter().any(|state| state.phase_family_key == 11));
+    }
+
+    #[test]
+    fn holeless_retention_keeps_equivalent_firepower_candidates() {
+        let mut holey_rows = [0_u16; BOARD_HEIGHT];
+        holey_rows[1] = 1;
+        let mut holeless_rows = [0_u16; BOARD_HEIGHT];
+        holeless_rows[0] = 1;
+        let mut firepower = FirepowerState::empty();
+        firepower.attack = 14;
+        firepower.difficult_attack = 14;
+        firepower.difficult_clears = 3;
+        firepower.t_spin_attack = 14;
+        firepower.t_spin_clears = 3;
+        firepower.back_to_back_chain = 3;
+        let mut beam = Vec::new();
+        for index in 0..40 {
+            let mut state = search_state_with_rows(21, Some(Piece::I), holey_rows, firepower);
+            state.score = 20_000.0 - index as f64;
+            beam.push(state);
+        }
+        for index in 0..4 {
+            let mut rows = holeless_rows;
+            rows[0] |= 1 << (index + 1);
+            let mut state = search_state_with_rows(21, Some(Piece::I), rows, firepower);
+            state.score = 1_000.0 - index as f64;
+            beam.push(state);
+        }
+
+        retain_holeless_diverse_search_states(&mut beam, 32);
+
+        assert_eq!(beam.len(), 32);
+        assert!(beam.iter().any(|state| state.metrics[3] == 0));
     }
 
     #[test]
