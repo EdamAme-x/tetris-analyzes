@@ -1,0 +1,28 @@
+{
+  "name": "tetris-analyzes",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Bun workspace for Tetris fumen tooling with native bitboard helpers.",
+  "scripts": {
+    "build:native": "napi build --manifest-path native/Cargo.toml --package-json-path package.json --output-dir native --platform --js index.js --dts index.d.ts --release",
+    "build:native:debug": "napi build --manifest-path native/Cargo.toml --package-json-path package.json --output-dir native --platform --js index.js --dts index.d.ts",
+    "bench": "bun run bench/bitboard.bench.ts",
+    "check": "tsc --noEmit",
+    "test": "bun test",
+    "verify": "bun run build:native:debug && bun run check && bun test"
+  },
+  "napi": {
+    "binaryName": "tetris_analyzes_native",
+    "targets": [
+      "x86_64-unknown-linux-gnu"
+    ]
+  },
+  "devDependencies": {
+    "@napi-rs/cli": "3.6.2",
+    "@types/bun": "1.3.14",
+    "typescript": "6.0.3"
+  },
+  "dependencies": {
+    "tetris-fumen": "1.1.3"
+  }
+}
