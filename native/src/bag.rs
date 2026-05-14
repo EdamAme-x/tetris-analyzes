@@ -77,10 +77,13 @@ pub(crate) fn evaluate_opener_bag_internal(
     };
     let beam_width = validate_beam_width(beam_width)?;
     let max_depth = usize::min(max_depth as usize, pieces.len());
-    let queues = generate_piece_permutations(&pieces, max_queues);
 
-    let mut evaluations = Vec::with_capacity(queues.len());
-    for queue in queues {
+    let mut evaluations = Vec::with_capacity(max_queues);
+    for sample in 0..max_queues {
+        let queue = nth_piece_permutation(
+            &pieces,
+            sampled_piece_permutation_index(sample, max_queues, total_queues),
+        );
         let states = search_opener_states(
             &queue,
             beam_width,
@@ -195,23 +198,12 @@ fn factorial(value: usize) -> usize {
     (1..=value).product::<usize>().max(1)
 }
 
-fn generate_piece_permutations(pieces: &[Piece], max_queues: usize) -> Vec<Vec<Piece>> {
-    let total_queues = factorial(pieces.len());
-    let queue_count = usize::min(max_queues, total_queues);
-    let mut output = Vec::with_capacity(queue_count);
+fn sampled_piece_permutation_index(sample: usize, queue_count: usize, total_queues: usize) -> usize {
     if queue_count == total_queues {
-        for index in 0..total_queues {
-            output.push(nth_piece_permutation(pieces, index));
-        }
+        sample
     } else {
-        for sample in 0..queue_count {
-            output.push(nth_piece_permutation(
-                pieces,
-                (sample * BAG_SAMPLE_MULTIPLIER) % total_queues,
-            ));
-        }
+        (sample * BAG_SAMPLE_MULTIPLIER) % total_queues
     }
-    output
 }
 
 fn nth_piece_permutation(pieces: &[Piece], index: usize) -> Vec<Piece> {
@@ -368,7 +360,7 @@ mod tests {
     #[test]
     fn exact_piece_permutations_keep_factorial_coverage() {
         let pieces = vec![Piece::T, Piece::I, Piece::O];
-        let permutations = generate_piece_permutations(&pieces, 6);
+        let permutations = sampled_piece_permutations(&pieces, 6);
         let queues = permutations
             .iter()
             .map(|queue| queue_to_string(queue))
@@ -392,7 +384,7 @@ mod tests {
             Piece::S,
             Piece::Z,
         ];
-        let permutations = generate_piece_permutations(&pieces, 12);
+        let permutations = sampled_piece_permutations(&pieces, 12);
         let mut first_pieces = permutations
             .iter()
             .map(|queue| piece_name(queue[0]))
@@ -405,5 +397,17 @@ mod tests {
             first_pieces.len() > 1,
             "capped sampling should not stay in the first DFS prefix"
         );
+    }
+
+    fn sampled_piece_permutations(pieces: &[Piece], queue_count: usize) -> Vec<Vec<Piece>> {
+        let total_queues = factorial(pieces.len());
+        (0..queue_count)
+            .map(|sample| {
+                nth_piece_permutation(
+                    pieces,
+                    sampled_piece_permutation_index(sample, queue_count, total_queues),
+                )
+            })
+            .collect()
     }
 }
