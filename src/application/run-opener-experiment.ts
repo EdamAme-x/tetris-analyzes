@@ -4,6 +4,7 @@ import type { FumenCodec, FumenUrls } from "../domain/fumen";
 import type { NativeComboTable, NativeKickTable, NativeSpinMode } from "../infrastructure/native/binding-types";
 import { createOpenerFumenPages } from "./create-opener-fumen";
 import {
+  searchOpenerBeam,
   searchOpenerBeamCompact,
   searchOpenerBeamWithPlacements,
   type SearchOpenerBeamInput,
@@ -235,6 +236,7 @@ export interface RunOpenerExperimentInput {
   readonly environment?: OpenerExperimentEnvironment;
   readonly clock?: OpenerExperimentClock;
   readonly search?: OpenerSearch;
+  readonly detailSearch?: OpenerSearch;
   readonly replaySearch?: OpenerSearch;
   readonly fumenCodec?: FumenCodec;
   readonly top?: number;
@@ -413,11 +415,12 @@ export function runOpenerExperiment(input: RunOpenerExperimentInput): OpenerExpe
   }
 
   const clock = input.clock ?? systemClock;
-  const search = input.search ?? searchOpenerBeamWithPlacements;
+  const search = input.search ?? searchOpenerBeam;
+  const detailSearch = input.detailSearch ?? (input.search === undefined ? searchOpenerBeamWithPlacements : undefined);
   const replaySearch = input.replaySearch ?? (input.search === undefined ? searchOpenerBeamCompact : search);
   const fumenCodec = input.fumenCodec ?? createFumenCodec();
   const environment = input.environment ?? { runtime: "bun", nativeProfile: "release" };
-  const scenarios = input.scenarios.map((scenario) => runScenario(scenario, input.top, search, fumenCodec, clock));
+  const scenarios = input.scenarios.map((scenario) => runScenario(scenario, input.top, search, detailSearch, fumenCodec, clock));
   const reportWithoutReplay: OpenerExperimentReport = {
     generatedAt: clock.isoNow(),
     engine: "native-rust-beam",
@@ -876,6 +879,7 @@ function runScenario(
   scenario: OpenerExperimentScenario,
   topOverride: number | undefined,
   search: OpenerSearch,
+  detailSearch: OpenerSearch | undefined,
   fumenCodec: FumenCodec,
   clock: OpenerExperimentClock
 ): OpenerExperimentScenarioResult {
@@ -902,7 +906,8 @@ function runScenario(
 
   const stats = summarizeTimings(timings);
   const rules = scenarioRules(scenario);
-  const topCandidates = createTopCandidates(lastNodes, scenario, topOverride ?? scenario.top ?? 5, fumenCodec);
+  const detailedNodes = detailSearch === undefined ? lastNodes : detailSearch(searchInput(scenario));
+  const topCandidates = createTopCandidates(detailedNodes, scenario, topOverride ?? scenario.top ?? 5, fumenCodec);
   assertScenarioQualityGate(scenario, topCandidates[0]);
   return {
     name: scenario.name,

@@ -167,6 +167,40 @@ describe("opener experiment runner", () => {
     expect(report.scenarios[0]?.top[0]?.urls.view).toBe(urls.view);
   });
 
+  test("can measure placement-light search and render detailed fumen candidates separately", () => {
+    let searchCalls = 0;
+    let detailCalls = 0;
+    const report = runOpenerExperiment({
+      scenarios: [
+        {
+          name: "split-detail",
+          queue: "TI",
+          hold: true,
+          beamWidth: 4,
+          maxDepth: 1,
+          warmups: 0,
+          iterations: 1,
+          top: 1
+        }
+      ],
+      clock: createClock("2026-05-14T00:00:00.000Z", [0, 2]),
+      fumenCodec: fakeCodec,
+      search: () => {
+        searchCalls += 1;
+        return [{ ...candidateNode("light-search"), placements: [] }];
+      },
+      detailSearch: () => {
+        detailCalls += 1;
+        return [{ ...candidateNode("detailed-search"), placements: [placementEvent("TSPIN_SINGLE", 2, 1, "T", 4)] }];
+      }
+    });
+
+    expect(searchCalls).toBe(1);
+    expect(detailCalls).toBe(1);
+    expect(report.scenarios[0]?.top[0]?.path).toEqual(["detailed-search"]);
+    expect(report.scenarios[0]?.top[0]?.clearSequence).toEqual(["TSPIN_SINGLE:2"]);
+  });
+
   test("renders a compact markdown report", () => {
     const report = runOpenerExperiment({
       scenarios: [

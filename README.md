@@ -102,6 +102,7 @@ Executable examples live in `tests/`.
 - [x] Curate continuation source queues to TL-gated three-bag B2B/T-spin lines
 - [x] Rank replay reports by reproducible B2B/T-spin firepower instead of brittle peak firepower
 - [x] Use compact native replay search to skip path and placement conversion during survivability checks
+- [x] Measure opener experiments with placement-light native search and fetch detailed fumen candidates once
 - [x] Include active combo state in TL template identity, phase replay, and replay-quality checks
 - [x] Rebuild replay phase prefix rows in place instead of allocating filtered row arrays
 - [x] Promote additional measured TL-gated three-bag queues into continuation discovery
