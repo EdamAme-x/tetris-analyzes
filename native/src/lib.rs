@@ -702,6 +702,8 @@ pub(crate) fn search_opener_states(
                                     state.phase_family_key,
                                     &rows,
                                     state.path.len() + 1,
+                                    choice.hold,
+                                    firepower.back_to_back_chain,
                                 );
                                 let key = SearchKey {
                                     rows,
@@ -911,7 +913,13 @@ fn is_phase_diversity_candidate(state: &SearchState, best: &SearchState) -> bool
         && state.firepower.back_to_back_chain.saturating_add(1) >= best.firepower.back_to_back_chain
 }
 
-fn next_phase_family_key(previous_key: u64, rows: &BoardRows, depth: usize) -> u64 {
+fn next_phase_family_key(
+    previous_key: u64,
+    rows: &BoardRows,
+    depth: usize,
+    hold: Option<Piece>,
+    back_to_back_chain: u32,
+) -> u64 {
     if depth == 0 || depth % 7 != 0 {
         return previous_key;
     }
@@ -919,12 +927,17 @@ fn next_phase_family_key(previous_key: u64, rows: &BoardRows, depth: usize) -> u
     let mut hasher = FastHasher::default();
     hasher.write_u64(previous_key);
     hasher.write_usize(depth);
+    hasher.write_u8(hold.map(piece_hash_code).unwrap_or(7));
+    hasher.write_u32(back_to_back_chain.min(4));
     hash_canonical_rows(rows, &mut hasher);
     hasher.finish()
 }
 
 fn hash_canonical_rows(rows: &BoardRows, hasher: &mut FastHasher) {
-    let use_direct = rows.iter().copied().cmp(rows.iter().copied().map(mirror_row_mask))
+    let use_direct = rows
+        .iter()
+        .copied()
+        .cmp(rows.iter().copied().map(mirror_row_mask))
         != std::cmp::Ordering::Greater;
     if use_direct {
         for row in rows {
@@ -1513,10 +1526,7 @@ mod tests {
             }),
             base_hash
         );
-        assert_ne!(
-            hash_search_key(&SearchKey { combo: 1, ..base }),
-            base_hash
-        );
+        assert_ne!(hash_search_key(&SearchKey { combo: 1, ..base }), base_hash);
         assert_ne!(
             hash_search_key(&SearchKey {
                 back_to_back_chain: 1,
@@ -1532,13 +1542,24 @@ mod tests {
         rows[0] = 0b1110000000;
         let mut mirrored_rows = [0_u16; BOARD_HEIGHT];
         mirrored_rows[0] = 0b0000000111;
-        let mirror_key = next_phase_family_key(0, &mirrored_rows, 7);
-        let direct_key = next_phase_family_key(0, &rows, 7);
+        let mirror_key = next_phase_family_key(0, &mirrored_rows, 7, Some(Piece::T), 2);
+        let direct_key = next_phase_family_key(0, &rows, 7, Some(Piece::T), 2);
 
-        assert_eq!(next_phase_family_key(0, &rows, 6), 0);
+        assert_eq!(next_phase_family_key(0, &rows, 6, Some(Piece::T), 2), 0);
         assert_ne!(direct_key, 0);
         assert_eq!(direct_key, mirror_key);
-        assert_ne!(next_phase_family_key(direct_key, &rows, 14), direct_key);
+        assert_ne!(
+            next_phase_family_key(direct_key, &rows, 14, Some(Piece::T), 2),
+            direct_key
+        );
+        assert_ne!(
+            next_phase_family_key(0, &rows, 7, Some(Piece::I), 2),
+            direct_key
+        );
+        assert_ne!(
+            next_phase_family_key(0, &rows, 7, Some(Piece::T), 0),
+            direct_key
+        );
     }
 
     #[test]

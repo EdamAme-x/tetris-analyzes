@@ -100,3 +100,4 @@ Executable examples live in `tests/`.
 - [x] Rank replay reports by reproducible B2B/T-spin firepower instead of brittle peak firepower
 - [x] Promote additional measured TL-gated three-bag queues into continuation discovery
 - [x] Replay continuation phase survivability against the native fourteen-piece frontier
+- [x] Preserve native continuation phase diversity by hold and B2B state
