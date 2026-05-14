@@ -1009,40 +1009,62 @@ fn place_grounded_at_y(
 }
 
 fn compare_search_state(left: &SearchState, right: &SearchState) -> std::cmp::Ordering {
-    right
+    let ordering = right
         .firepower
         .t_spin_clears
-        .cmp(&left.firepower.t_spin_clears)
-        .then_with(|| {
-            right
-                .firepower
-                .t_spin_attack
-                .cmp(&left.firepower.t_spin_attack)
-        })
-        .then_with(|| {
-            right
-                .firepower
-                .difficult_clears
-                .cmp(&left.firepower.difficult_clears)
-        })
-        .then_with(|| {
-            right
-                .firepower
-                .difficult_attack
-                .cmp(&left.firepower.difficult_attack)
-        })
-        .then_with(|| {
-            right
-                .firepower
-                .back_to_back_chain
-                .cmp(&left.firepower.back_to_back_chain)
-        })
-        .then_with(|| right.t_spin_potential.cmp(&left.t_spin_potential))
-        .then_with(|| right.firepower.attack.cmp(&left.firepower.attack))
-        .then_with(|| right.score.total_cmp(&left.score))
-        .then_with(|| right.firepower.points.cmp(&left.firepower.points))
-        .then_with(|| left.path.len().cmp(&right.path.len()))
-        .then_with(|| left.path.cmp(&right.path))
+        .cmp(&left.firepower.t_spin_clears);
+    if ordering != std::cmp::Ordering::Equal {
+        return ordering;
+    }
+    let ordering = right
+        .firepower
+        .t_spin_attack
+        .cmp(&left.firepower.t_spin_attack);
+    if ordering != std::cmp::Ordering::Equal {
+        return ordering;
+    }
+    let ordering = right
+        .firepower
+        .difficult_clears
+        .cmp(&left.firepower.difficult_clears);
+    if ordering != std::cmp::Ordering::Equal {
+        return ordering;
+    }
+    let ordering = right
+        .firepower
+        .difficult_attack
+        .cmp(&left.firepower.difficult_attack);
+    if ordering != std::cmp::Ordering::Equal {
+        return ordering;
+    }
+    let ordering = right
+        .firepower
+        .back_to_back_chain
+        .cmp(&left.firepower.back_to_back_chain);
+    if ordering != std::cmp::Ordering::Equal {
+        return ordering;
+    }
+    let ordering = right.t_spin_potential.cmp(&left.t_spin_potential);
+    if ordering != std::cmp::Ordering::Equal {
+        return ordering;
+    }
+    let ordering = right.firepower.attack.cmp(&left.firepower.attack);
+    if ordering != std::cmp::Ordering::Equal {
+        return ordering;
+    }
+    let ordering = right.score.total_cmp(&left.score);
+    if ordering != std::cmp::Ordering::Equal {
+        return ordering;
+    }
+    let ordering = right.firepower.points.cmp(&left.firepower.points);
+    if ordering != std::cmp::Ordering::Equal {
+        return ordering;
+    }
+    let ordering = left.path.len().cmp(&right.path.len());
+    if ordering != std::cmp::Ordering::Equal {
+        return ordering;
+    }
+    left.path.cmp(&right.path)
 }
 
 fn compare_search_state_to_candidate(
@@ -1051,33 +1073,49 @@ fn compare_search_state_to_candidate(
     right_firepower: FirepowerState,
     right_path_len: usize,
 ) -> std::cmp::Ordering {
-    right_firepower
+    let ordering = right_firepower
         .t_spin_clears
-        .cmp(&left.firepower.t_spin_clears)
-        .then_with(|| {
-            right_firepower
-                .t_spin_attack
-                .cmp(&left.firepower.t_spin_attack)
-        })
-        .then_with(|| {
-            right_firepower
-                .difficult_clears
-                .cmp(&left.firepower.difficult_clears)
-        })
-        .then_with(|| {
-            right_firepower
-                .difficult_attack
-                .cmp(&left.firepower.difficult_attack)
-        })
-        .then_with(|| {
-            right_firepower
-                .back_to_back_chain
-                .cmp(&left.firepower.back_to_back_chain)
-        })
-        .then_with(|| right_firepower.attack.cmp(&left.firepower.attack))
-        .then_with(|| right_score.total_cmp(&left.score))
-        .then_with(|| right_firepower.points.cmp(&left.firepower.points))
-        .then_with(|| left.path.len().cmp(&right_path_len))
+        .cmp(&left.firepower.t_spin_clears);
+    if ordering != std::cmp::Ordering::Equal {
+        return ordering;
+    }
+    let ordering = right_firepower
+        .t_spin_attack
+        .cmp(&left.firepower.t_spin_attack);
+    if ordering != std::cmp::Ordering::Equal {
+        return ordering;
+    }
+    let ordering = right_firepower
+        .difficult_clears
+        .cmp(&left.firepower.difficult_clears);
+    if ordering != std::cmp::Ordering::Equal {
+        return ordering;
+    }
+    let ordering = right_firepower
+        .difficult_attack
+        .cmp(&left.firepower.difficult_attack);
+    if ordering != std::cmp::Ordering::Equal {
+        return ordering;
+    }
+    let ordering = right_firepower
+        .back_to_back_chain
+        .cmp(&left.firepower.back_to_back_chain);
+    if ordering != std::cmp::Ordering::Equal {
+        return ordering;
+    }
+    let ordering = right_firepower.attack.cmp(&left.firepower.attack);
+    if ordering != std::cmp::Ordering::Equal {
+        return ordering;
+    }
+    let ordering = right_score.total_cmp(&left.score);
+    if ordering != std::cmp::Ordering::Equal {
+        return ordering;
+    }
+    let ordering = right_firepower.points.cmp(&left.firepower.points);
+    if ordering != std::cmp::Ordering::Equal {
+        return ordering;
+    }
+    left.path.len().cmp(&right_path_len)
 }
 
 pub(crate) fn validate_beam_width(beam_width: u32) -> Result<usize> {
