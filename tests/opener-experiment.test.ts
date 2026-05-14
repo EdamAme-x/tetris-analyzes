@@ -205,7 +205,9 @@ describe("opener experiment runner", () => {
 
     const summary = renderOpenerExperimentConsoleSummary(report, 1);
     expect(summary).toContain("Best opener candidates");
-    expect(summary).toContain("#1 attack=0 difficultAttack=0 otherAttack=0 tspin=0 tspinAttack=0 tspinPotential=0 points=0 score=10.0");
+    expect(summary).toContain(
+      "#1 attack=0 difficultAttack=0 otherAttack=0 tspin=0 tspinAttack=0 b2b=0 tspinPotential=0 points=0 score=10.0"
+    );
     expect(summary).toContain("path: T@r0,x3");
     expect(summary).not.toContain("fake-scenario | TI");
   });

@@ -180,8 +180,8 @@ export function renderOpenerExperimentMarkdown(report: OpenerExperimentReport): 
     "",
     "## Best openers",
     "",
-    "| rank | attack | difficult attack | other attack | tspin | tspin attack | tspin potential | points | score | holes | bumpiness | clears | path | preview |",
-    "| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- | --- |"
+    "| rank | attack | difficult attack | other attack | tspin | tspin attack | b2b | tspin potential | points | score | holes | bumpiness | clears | path | preview |",
+    "| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- | --- |"
   ];
 
   for (const candidate of bestCandidates) {
@@ -193,6 +193,7 @@ export function renderOpenerExperimentMarkdown(report: OpenerExperimentReport): 
         String(candidate.nonDifficultAttack),
         String(candidate.tSpinClears),
         String(candidate.tSpinAttack),
+        String(candidate.backToBackChain),
         String(candidate.tSpinPotential),
         String(candidate.points),
         candidate.score.toFixed(1),
@@ -240,8 +241,8 @@ export function renderOpenerExperimentMarkdown(report: OpenerExperimentReport): 
     }
 
     lines.push(
-      "| rank | attack | difficult attack | other attack | tspin | tspin attack | tspin potential | points | score | holes | bumpiness | clears | path | preview |",
-      "| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- | --- |"
+      "| rank | attack | difficult attack | other attack | tspin | tspin attack | b2b | tspin potential | points | score | holes | bumpiness | clears | path | preview |",
+      "| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- | --- |"
     );
     for (const candidate of scenario.top) {
       lines.push(
@@ -252,6 +253,7 @@ export function renderOpenerExperimentMarkdown(report: OpenerExperimentReport): 
           String(candidate.nonDifficultAttack),
           String(candidate.tSpinClears),
           String(candidate.tSpinAttack),
+          String(candidate.backToBackChain),
           String(candidate.tSpinPotential),
           String(candidate.points),
           candidate.score.toFixed(1),
@@ -274,7 +276,7 @@ export function renderOpenerExperimentConsoleSummary(report: OpenerExperimentRep
   const lines = ["Best opener candidates", ""];
   for (const candidate of rankOpenerCandidates(report, topCount)) {
     lines.push(
-      `#${candidate.rank} attack=${candidate.attack} difficultAttack=${candidate.difficultAttack} otherAttack=${candidate.nonDifficultAttack} tspin=${candidate.tSpinClears} tspinAttack=${candidate.tSpinAttack} tspinPotential=${candidate.tSpinPotential} points=${candidate.points} score=${candidate.score.toFixed(1)} holes=${candidate.holes} bump=${candidate.bumpiness}`,
+      `#${candidate.rank} attack=${candidate.attack} difficultAttack=${candidate.difficultAttack} otherAttack=${candidate.nonDifficultAttack} tspin=${candidate.tSpinClears} tspinAttack=${candidate.tSpinAttack} b2b=${candidate.backToBackChain} tspinPotential=${candidate.tSpinPotential} points=${candidate.points} score=${candidate.score.toFixed(1)} holes=${candidate.holes} bump=${candidate.bumpiness}`,
       `clears: ${formatClearSequence(candidate.clearSequence)}`,
       `path: ${candidate.path.join(" ")}`,
       `view: ${candidate.previewUrl}`,
@@ -409,6 +411,7 @@ function compareSearchNodesForOpener(left: SearchOpenerBeamNode, right: SearchOp
     right.tSpinClears - left.tSpinClears ||
     right.tSpinAttack - left.tSpinAttack ||
     right.difficultClears - left.difficultClears ||
+    right.backToBackChain - left.backToBackChain ||
     difficultAttack(right) - difficultAttack(left) ||
     right.attack - left.attack ||
     right.firepowerScore - left.firepowerScore ||
@@ -425,6 +428,7 @@ function compareRankedOpenerCandidates(left: RankedOpenerCandidate, right: Ranke
   return (
     right.tSpinClears - left.tSpinClears ||
     right.tSpinAttack - left.tSpinAttack ||
+    right.backToBackChain - left.backToBackChain ||
     right.difficultClears - left.difficultClears ||
     right.difficultAttack - left.difficultAttack ||
     right.tSpinPotential - left.tSpinPotential ||
