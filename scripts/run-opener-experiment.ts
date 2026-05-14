@@ -15,9 +15,10 @@ const args = parseArgs(process.argv.slice(2));
 const outDir = args.get("--out-dir") ?? "experiments/runs";
 const top = readNumberOption(args, "--top");
 const preset = args.get("--preset") ?? "default";
+const scenarios = scenarioPreset(preset);
 const survivabilityReplay = readNonNegativeNumberOption(args, "--survivability-replay") ?? defaultSurvivabilityReplay(preset);
 const report = runOpenerExperiment({
-  scenarios: scenarioPreset(preset),
+  scenarios,
   environment: {
     runtime: `bun ${Bun.version}`,
     nativeProfile: "release"
@@ -27,7 +28,7 @@ const report = runOpenerExperiment({
     ? {}
     : {
         templateReplay: {
-          scenarios: createTemplateReplayScenarios(survivabilityReplay),
+          scenarios: createTemplateReplayScenarios(survivabilityReplay, templateReplayOptions(scenarios)),
           topTemplates: top ?? 5
         }
       })
@@ -117,4 +118,16 @@ function scenarioPreset(name: string) {
     default:
       throw new Error(`Unknown opener experiment preset ${name}. Expected default, survey, discovery, or continuation.`);
   }
+}
+
+function templateReplayOptions(scenarios: readonly ReturnType<typeof scenarioPreset>[number][]) {
+  const first = scenarios[0];
+  if (first === undefined) {
+    return {};
+  }
+  return {
+    bagCount: Math.max(1, Math.round(first.queue.length / 7)),
+    beamWidth: first.beamWidth,
+    maxDepth: first.maxDepth
+  };
 }

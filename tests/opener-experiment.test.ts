@@ -421,6 +421,20 @@ describe("opener experiment runner", () => {
     expect(() => createTemplateReplayScenarios(-1)).toThrow("Template replay sample size");
   });
 
+  test("creates three-bag replay scenarios for continuation template survivability", () => {
+    const scenarios = createTemplateReplayScenarios(2, { bagCount: 3, beamWidth: 256, maxDepth: 21 });
+
+    expect(scenarios).toHaveLength(2);
+    expect(scenarios.every((scenario) => isThreeBagQueue(scenario.queue))).toBe(true);
+    expect(scenarios.every((scenario) => scenario.beamWidth === 256)).toBe(true);
+    expect(scenarios.every((scenario) => scenario.maxDepth === 21)).toBe(true);
+    expect(scenarios.every((scenario) => scenario.tags?.includes("three-bag"))).toBe(true);
+    expect(scenarios.map((scenario) => scenario.queue.slice(0, 14))).toEqual(
+      createTemplateReplayScenarios(2).map((scenario) => scenario.queue)
+    );
+    expect(() => createTemplateReplayScenarios(1, { bagCount: 0 })).toThrow("Template replay bagCount");
+  });
+
   test("replays templates against full search results instead of only scenario top candidates", () => {
     const targetRows = [1, 2, 3, ...new Array(17).fill(0)];
     const missRows = [9, 8, 7, ...new Array(17).fill(0)];

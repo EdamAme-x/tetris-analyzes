@@ -69,3 +69,4 @@ Executable examples live in `tests/`.
 - [x] Combine native line-clear counting and clearing during placement evaluation
 - [x] Show native candidate queue index and hold state in opener Markdown reports
 - [x] Pack native search-key board rows before hashing opener beam states
+- [x] Match template survivability replay bag count and depth to the selected opener preset

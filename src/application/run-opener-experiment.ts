@@ -178,6 +178,12 @@ export interface OpenerTemplateReplayInput {
   readonly topTemplates?: number;
 }
 
+export interface TemplateReplayScenarioOptions {
+  readonly bagCount?: number;
+  readonly beamWidth?: number;
+  readonly maxDepth?: number;
+}
+
 const TWO_BAG_TL_SURVEY_QUEUES = [
   ["seed-szilojt", "SZILOJTSTOZLJI"],
   ["seed-tiljszo", "TILJSZOTILJSZO"],
@@ -282,21 +288,28 @@ export const DISCOVERY_OPENER_EXPERIMENT_SCENARIOS: readonly OpenerExperimentSce
   tags: ["discovery", "hold", "two-bag", "t-spin", "tetrio-tl"]
 }));
 
-export function createTemplateReplayScenarios(sampleSize: number): OpenerExperimentScenario[] {
+export function createTemplateReplayScenarios(sampleSize: number, options: TemplateReplayScenarioOptions = {}): OpenerExperimentScenario[] {
   if (!Number.isInteger(sampleSize) || sampleSize < 0) {
     throw new Error("Template replay sample size must be a non-negative integer.");
   }
-  return createDiscoveryTwoBagQueues(sampleSize).map((queue, index) => ({
+  const bagCount = options.bagCount ?? 2;
+  if (!Number.isInteger(bagCount) || bagCount <= 0) {
+    throw new Error("Template replay bagCount must be a positive integer.");
+  }
+  const maxDepth = options.maxDepth ?? bagCount * DISCOVERY_BAG.length;
+  const beamWidth = options.beamWidth ?? (bagCount >= 3 ? 256 : 512);
+  const bagTag = bagCountTag(bagCount);
+  return createDiscoveryBagQueues(sampleSize, bagCount).map((queue, index) => ({
     name: `replay-${String(index + 1).padStart(2, "0")}`,
     queue,
     hold: true,
-    beamWidth: 512,
-    maxDepth: 14,
+    beamWidth,
+    maxDepth,
     rules: TETRIO_TL_OPENER_SEARCH_RULES,
     warmups: 0,
     iterations: 1,
     top: 1,
-    tags: ["replay", "hold", "two-bag", "t-spin", "tetrio-tl"]
+    tags: ["replay", "hold", bagTag, "t-spin", "tetrio-tl"]
   }));
 }
 
@@ -1018,14 +1031,39 @@ function rulesEqual(left: OpenerExperimentSearchRules, right: OpenerExperimentSe
 }
 
 function createDiscoveryTwoBagQueues(sampleSize: number): string[] {
+  return createDiscoveryBagQueues(sampleSize, 2);
+}
+
+function createDiscoveryBagQueues(sampleSize: number, bagCount: number): string[] {
   const permutationCount = factorial(DISCOVERY_BAG.length);
   const queues = new Set<string>();
   for (let sample = 0; queues.size < sampleSize && sample < permutationCount * 2; sample += 1) {
-    const first = nthPermutation(DISCOVERY_BAG, (sample * 197) % permutationCount);
-    const second = nthPermutation(DISCOVERY_BAG, (sample * 389 + 97) % permutationCount);
-    queues.add(`${first}${second}`);
+    let queue = "";
+    for (let bagIndex = 0; bagIndex < bagCount; bagIndex += 1) {
+      queue += nthPermutation(DISCOVERY_BAG, permutationIndex(sample, bagIndex, permutationCount));
+    }
+    queues.add(queue);
   }
   return [...queues];
+}
+
+function permutationIndex(sample: number, bagIndex: number, permutationCount: number): number {
+  const multiplier = [197, 389, 593, 787, 991][bagIndex] ?? 197 + bagIndex * 211;
+  const offset = [0, 97, 211, 353, 557][bagIndex] ?? bagIndex * 131;
+  return (sample * multiplier + offset) % permutationCount;
+}
+
+function bagCountTag(bagCount: number): string {
+  if (bagCount === 1) {
+    return "one-bag";
+  }
+  if (bagCount === 2) {
+    return "two-bag";
+  }
+  if (bagCount === 3) {
+    return "three-bag";
+  }
+  return `${bagCount}-bag`;
 }
 
 function nthPermutation(input: string, index: number): string {
