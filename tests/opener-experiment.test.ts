@@ -368,6 +368,23 @@ describe("opener experiment runner", () => {
     expect(renderOpenerExperimentMarkdown(report)).toContain("2 (100.0%) | left right");
   });
 
+  test("groups mirrored final boards as the same opener template", () => {
+    const leftRows = [0b0000000001, 0b0000000011, ...new Array(18).fill(0)];
+    const rightRows = [0b1000000000, 0b1100000000, ...new Array(18).fill(0)];
+    const report = runOpenerExperiment({
+      scenarios: [rankingScenario("left", "IO"), rankingScenario("right", "OI")],
+      clock: createClock("2026-05-14T00:00:00.000Z", [0, 1, 2, 3]),
+      fumenCodec: fakeCodec,
+      search: (input) => [{ ...candidateNode(`${input.queue}-template`), rows: input.queue === "IO" ? leftRows : rightRows }]
+    });
+
+    expect(rankOpenerTemplates(report, 1)[0]).toMatchObject({
+      survivalCount: 2,
+      survivalRate: 1,
+      sources: ["left", "right"]
+    });
+  });
+
   test("ranks stronger T-spin firepower ahead of broader template survival", () => {
     const strongRows = [7, 7, 7, ...new Array(17).fill(0)];
     const commonRows = [3, 3, 3, ...new Array(17).fill(0)];
@@ -527,7 +544,7 @@ describe("opener experiment runner", () => {
     });
 
     expect(calls).toBe(1);
-    expect(report.scenarios[0]?.reachableTemplates).toEqual([{ key: rows.join(","), rank: 1 }]);
+    expect(report.scenarios[0]?.reachableTemplates).toEqual([{ key: [384, 640, 128, ...new Array(17).fill(0)].join(","), rank: 1 }]);
     expect(report.templateReplay?.templates[0]?.hits[0]).toMatchObject({
       scenario: "cached-replay",
       rank: 1,

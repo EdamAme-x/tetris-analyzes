@@ -953,7 +953,19 @@ function templateKey(candidate: Pick<OpenerExperimentCandidate, "finalRows">): s
 }
 
 function rowsTemplateKey(rows: readonly number[]): string {
-  return rows.join(",");
+  const direct = rows.join(",");
+  const mirrored = rows.map(mirrorRow).join(",");
+  return direct <= mirrored ? direct : mirrored;
+}
+
+function mirrorRow(row: number): number {
+  let mirrored = 0;
+  for (let x = 0; x < 10; x += 1) {
+    if ((row & (1 << x)) !== 0) {
+      mirrored |= 1 << (9 - x);
+    }
+  }
+  return mirrored;
 }
 
 function formatSurvival(candidate: Pick<RankedOpenerCandidate, "survivalCount" | "survivalRate">): string {

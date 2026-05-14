@@ -70,3 +70,4 @@ Executable examples live in `tests/`.
 - [x] Show native candidate queue index and hold state in opener Markdown reports
 - [x] Pack native search-key board rows before hashing opener beam states
 - [x] Match template survivability replay bag count and depth to the selected opener preset
+- [x] Group mirrored final boards as the same opener template for survivability reports
