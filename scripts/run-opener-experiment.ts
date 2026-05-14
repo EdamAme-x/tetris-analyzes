@@ -49,6 +49,6 @@ function templateReplayOptions(scenarios: readonly OpenerExperimentScenario[]) {
     bagCount: Math.max(1, Math.round(first.queue.length / 7)),
     beamWidth: first.beamWidth,
     maxDepth: first.maxDepth,
-    sampleOffset: scenarios.some((scenario) => scenario.tags?.includes("continuation")) ? Math.max(64, scenarios.length) : 0
+    sampleOffset: scenarios.some((scenario) => scenario.tags?.includes("continuation")) ? Math.max(128, scenarios.length) : 0
   };
 }

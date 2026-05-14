@@ -102,3 +102,4 @@ Executable examples live in `tests/`.
 - [x] Replay continuation phase survivability against the native fourteen-piece frontier
 - [x] Preserve native continuation phase diversity by hold and B2B state
 - [x] Compute continuation phase frontiers lazily during replay instead of every source search
+- [x] Promote measured high-firepower 3T-spin/3B2B continuation queues into discovery
