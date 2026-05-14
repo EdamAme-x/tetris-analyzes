@@ -203,7 +203,7 @@ describe("opener experiment runner", () => {
 
     const summary = renderOpenerExperimentConsoleSummary(report, 1);
     expect(summary).toContain("Best opener candidates");
-    expect(summary).toContain("#1 attack=0 tspin=0 tspinAttack=0 points=0 score=10.0");
+    expect(summary).toContain("#1 attack=0 difficultAttack=0 otherAttack=0 tspin=0 tspinAttack=0 points=0 score=10.0");
     expect(summary).toContain("path: T@r0,x3");
     expect(summary).not.toContain("fake-scenario | TI");
   });
@@ -361,12 +361,14 @@ describe("opener experiment runner", () => {
       search: () => [
         {
           ...candidateNode("spin setup"),
+          attack: 2,
           placements: [placementEvent("TSPIN_MINI", 0, 0, "T", 0), placementEvent("TSPIN_SINGLE", 2, 1, "I", 4)]
         }
       ]
     });
 
     expect(report.scenarios[0]?.top[0]?.clearSequence).toEqual(["TSPIN_SINGLE:2"]);
+    expect(report.scenarios[0]?.top[0]).toMatchObject({ difficultAttack: 2, nonDifficultAttack: 0 });
   });
 });
 

@@ -37,6 +37,8 @@ export interface OpenerExperimentCandidate {
   readonly hold: string | null;
   readonly queueIndex: number;
   readonly attack: number;
+  readonly difficultAttack: number;
+  readonly nonDifficultAttack: number;
   readonly points: number;
   readonly maxCombo: number;
   readonly backToBackChain: number;
@@ -172,8 +174,8 @@ export function renderOpenerExperimentMarkdown(report: OpenerExperimentReport): 
     "",
     "## Best openers",
     "",
-    "| rank | attack | tspin | tspin attack | points | score | holes | bumpiness | clears | path | preview |",
-    "| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- | --- |"
+    "| rank | attack | difficult attack | other attack | tspin | tspin attack | points | score | holes | bumpiness | clears | path | preview |",
+    "| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- | --- |"
   ];
 
   for (const candidate of bestCandidates) {
@@ -181,6 +183,8 @@ export function renderOpenerExperimentMarkdown(report: OpenerExperimentReport): 
       [
         String(candidate.rank),
         String(candidate.attack),
+        String(candidate.difficultAttack),
+        String(candidate.nonDifficultAttack),
         String(candidate.tSpinClears),
         String(candidate.tSpinAttack),
         String(candidate.points),
@@ -229,14 +233,16 @@ export function renderOpenerExperimentMarkdown(report: OpenerExperimentReport): 
     }
 
     lines.push(
-      "| rank | attack | tspin | tspin attack | points | score | holes | bumpiness | clears | path | preview |",
-      "| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- | --- |"
+      "| rank | attack | difficult attack | other attack | tspin | tspin attack | points | score | holes | bumpiness | clears | path | preview |",
+      "| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- | --- |"
     );
     for (const candidate of scenario.top) {
       lines.push(
         [
           String(candidate.rank),
           String(candidate.attack),
+          String(candidate.difficultAttack),
+          String(candidate.nonDifficultAttack),
           String(candidate.tSpinClears),
           String(candidate.tSpinAttack),
           String(candidate.points),
@@ -260,7 +266,7 @@ export function renderOpenerExperimentConsoleSummary(report: OpenerExperimentRep
   const lines = ["Best opener candidates", ""];
   for (const candidate of rankOpenerCandidates(report, topCount)) {
     lines.push(
-      `#${candidate.rank} attack=${candidate.attack} tspin=${candidate.tSpinClears} tspinAttack=${candidate.tSpinAttack} points=${candidate.points} score=${candidate.score.toFixed(1)} holes=${candidate.holes} bump=${candidate.bumpiness}`,
+      `#${candidate.rank} attack=${candidate.attack} difficultAttack=${candidate.difficultAttack} otherAttack=${candidate.nonDifficultAttack} tspin=${candidate.tSpinClears} tspinAttack=${candidate.tSpinAttack} points=${candidate.points} score=${candidate.score.toFixed(1)} holes=${candidate.holes} bump=${candidate.bumpiness}`,
       `clears: ${formatClearSequence(candidate.clearSequence)}`,
       `path: ${candidate.path.join(" ")}`,
       `view: ${candidate.previewUrl}`,
@@ -356,6 +362,7 @@ function createTopCandidates(
     .map((node, index) => {
       const data = fumenCodec.encodePages(createOpenerFumenPages(node, { title: `${scenario.name} #${index + 1}` }));
       const urls = fumenCodec.createUrls(data);
+      const qualityAttack = difficultAttack(node);
       return {
         rank: index + 1,
         score: node.score,
@@ -365,6 +372,8 @@ function createTopCandidates(
         hold: node.hold ?? null,
         queueIndex: node.queueIndex,
         attack: node.attack,
+        difficultAttack: qualityAttack,
+        nonDifficultAttack: node.attack - qualityAttack,
         points: node.points,
         maxCombo: node.maxCombo,
         backToBackChain: node.backToBackChain,
@@ -390,6 +399,7 @@ function compareSearchNodesForOpener(left: SearchOpenerBeamNode, right: SearchOp
     right.tSpinClears - left.tSpinClears ||
     right.tSpinAttack - left.tSpinAttack ||
     right.difficultClears - left.difficultClears ||
+    difficultAttack(right) - difficultAttack(left) ||
     right.attack - left.attack ||
     right.firepowerScore - left.firepowerScore ||
     right.score - left.score ||
@@ -406,6 +416,7 @@ function compareRankedOpenerCandidates(left: RankedOpenerCandidate, right: Ranke
     right.tSpinClears - left.tSpinClears ||
     right.tSpinAttack - left.tSpinAttack ||
     right.difficultClears - left.difficultClears ||
+    right.difficultAttack - left.difficultAttack ||
     right.attack - left.attack ||
     right.firepowerScore - left.firepowerScore ||
     right.score - left.score ||
@@ -414,6 +425,25 @@ function compareRankedOpenerCandidates(left: RankedOpenerCandidate, right: Ranke
     right.points - left.points ||
     right.path.length - left.path.length ||
     left.path.join(" ").localeCompare(right.path.join(" "))
+  );
+}
+
+function difficultAttack(node: SearchOpenerBeamNode): number {
+  return node.placements
+    .filter((placement) => placement.clearedLines > 0 && isDifficultClearName(placement.clearName))
+    .reduce((attack, placement) => attack + placement.attack, 0);
+}
+
+function isDifficultClearName(clearName: string): boolean {
+  return (
+    clearName === "QUAD" ||
+    clearName === "PENTA" ||
+    clearName === "TSPIN_SINGLE" ||
+    clearName === "TSPIN_DOUBLE" ||
+    clearName === "TSPIN_TRIPLE" ||
+    clearName === "TSPIN_QUAD" ||
+    clearName === "TSPIN_PENTA" ||
+    clearName === "TSPIN_MINI_QUAD"
   );
 }
 
