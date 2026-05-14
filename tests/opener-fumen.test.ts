@@ -51,6 +51,34 @@ describe("opener fumen preview pages", () => {
     expect(lockedPage?.operation).toBeUndefined();
   });
 
+  test("preserves every mino color in locked fumen pages", () => {
+    const placements = [
+      placementFromOperation({ type: "L", rotation: "spawn", x: 1, y: 0 }),
+      placementFromOperation({ type: "J", rotation: "spawn", x: 5, y: 0 }),
+      placementFromOperation({ type: "S", rotation: "spawn", x: 1, y: 3 }),
+      placementFromOperation({ type: "Z", rotation: "spawn", x: 5, y: 3 }),
+      placementFromOperation({ type: "T", rotation: "spawn", x: 1, y: 6 }),
+      placementFromOperation({ type: "I", rotation: "spawn", x: 4, y: 6 }),
+      placementFromOperation({ type: "O", rotation: "spawn", x: 8, y: 6 })
+    ];
+    const codec = new TetrisFumenCodec();
+
+    const pages = createOpenerFumenPages(nodeWithPlacements(placements), {
+      title: "locked colors",
+      includeOperations: false
+    });
+    const decoded = codec.decode(codec.encodePages(pages));
+    const finalCells = decoded.at(-1)?.fieldRows.join("") ?? "";
+
+    expect(countCells(finalCells, "L")).toBe(4);
+    expect(countCells(finalCells, "J")).toBe(4);
+    expect(countCells(finalCells, "S")).toBe(4);
+    expect(countCells(finalCells, "Z")).toBe(4);
+    expect(countCells(finalCells, "T")).toBe(4);
+    expect(countCells(finalCells, "I")).toBe(4);
+    expect(countCells(finalCells, "O")).toBe(4);
+  });
+
   test("carries line clears into the next operation page without double-locking", () => {
     const node = nodeWithPlacements([
       placementFromOperation({ type: "O", rotation: "spawn", x: 0, y: 0 }),
@@ -256,6 +284,10 @@ function canonicalCells(cells: readonly NativePlacementCell[]): string {
 function bottomRow(page: { readonly fieldRows?: readonly FumenCellRow[] } | undefined): string | undefined {
   const row = page?.fieldRows?.at(-1);
   return typeof row === "string" || row === undefined ? row : row.join("");
+}
+
+function countCells(field: string, mino: FumenMino): number {
+  return [...field].filter((cell) => cell === mino).length;
 }
 
 function fieldRowsToBitRows(fieldRows: readonly string[]): number[] {

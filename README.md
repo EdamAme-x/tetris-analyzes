@@ -29,6 +29,7 @@ Executable examples live in `tests/`.
 - [x] Native spin mode selection for T-SPINS, all-spin, mini-only, handheld, stupid, and none variants
 - [x] Known opener benchmark set and regression report
 - [x] Fumen preview operation parity tests for native SRS piece geometry
+- [x] Fumen locked-page color parity covers L/J/S/Z/T/I/O identity
 - [x] Native beam pruning prefers T-spin, difficult clear, and B2B chain branches
 - [x] Native scoring separates B2B-capable difficult attack from ordinary line-clear attack
 - [x] Native full grounded placement enumeration with reachable-history regression tests
