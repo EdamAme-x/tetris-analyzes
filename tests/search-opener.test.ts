@@ -364,13 +364,15 @@ describe("native opener beam search", () => {
   });
 
   test("can sample a capped number of 7-bag queue branches", () => {
-    const evaluation = evaluateOpenerBag({ bag: "TIJLOSZ", beamWidth: 8, hold: true, maxDepth: 3, maxQueues: 12, topQueueCount: 3 });
+    const evaluation = evaluateOpenerBag({ bag: "TIJLOSZ", beamWidth: 8, hold: true, maxDepth: 3, maxQueues: 12, topQueueCount: 12 });
+    const sampledFirstPieces = new Set(evaluation.topQueues.map((queue) => queue.queue[0]));
 
     expect(evaluation.totalQueues).toBe(5040);
     expect(evaluation.searchedQueues).toBe(12);
     expect(evaluation.exact).toBe(false);
     expect(evaluation.buildableQueues).toBeGreaterThan(0);
-    expect(evaluation.topQueues).toHaveLength(3);
+    expect(evaluation.topQueues).toHaveLength(12);
+    expect(sampledFirstPieces.size).toBeGreaterThan(1);
   });
 
   test("passes combo table rules into native search and bag evaluation", () => {

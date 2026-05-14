@@ -75,3 +75,4 @@ Executable examples live in `tests/`.
 - [x] Skip duplicate placement boundary checks inside native opener search scans
 - [x] Skip duplicate native reachability collision checks for already-visited BFS states
 - [x] Deduplicate native beam states with single-entry hash map lookups
+- [x] Sample capped native bag queues across deterministic permutation positions instead of DFS prefixes

@@ -7,6 +7,8 @@ use crate::spin::SpinMode;
 use crate::tetrio_tables::{ComboTable, KickTable};
 use crate::{search_opener_states, validate_beam_width, SearchState};
 
+const BAG_SAMPLE_MULTIPLIER: usize = 197;
+
 #[derive(Clone)]
 #[napi(object)]
 pub struct OpenerQueueEvaluation {
@@ -194,37 +196,35 @@ fn factorial(value: usize) -> usize {
 }
 
 fn generate_piece_permutations(pieces: &[Piece], max_queues: usize) -> Vec<Vec<Piece>> {
-    let mut remaining = pieces.to_vec();
-    let mut current = Vec::with_capacity(pieces.len());
-    let mut output = Vec::with_capacity(max_queues);
-    push_piece_permutations(&mut remaining, &mut current, &mut output, max_queues);
+    let total_queues = factorial(pieces.len());
+    let queue_count = usize::min(max_queues, total_queues);
+    let mut output = Vec::with_capacity(queue_count);
+    if queue_count == total_queues {
+        for index in 0..total_queues {
+            output.push(nth_piece_permutation(pieces, index));
+        }
+    } else {
+        for sample in 0..queue_count {
+            output.push(nth_piece_permutation(
+                pieces,
+                (sample * BAG_SAMPLE_MULTIPLIER) % total_queues,
+            ));
+        }
+    }
     output
 }
 
-fn push_piece_permutations(
-    remaining: &mut Vec<Piece>,
-    current: &mut Vec<Piece>,
-    output: &mut Vec<Vec<Piece>>,
-    max_queues: usize,
-) {
-    if output.len() >= max_queues {
-        return;
+fn nth_piece_permutation(pieces: &[Piece], index: usize) -> Vec<Piece> {
+    let mut remaining = pieces.to_vec();
+    let mut cursor = index;
+    let mut output = Vec::with_capacity(pieces.len());
+    for divisor in (1..=pieces.len()).rev() {
+        let block = factorial(divisor - 1);
+        let selected = cursor / block;
+        output.push(remaining.remove(selected));
+        cursor %= block;
     }
-    if remaining.is_empty() {
-        output.push(current.clone());
-        return;
-    }
-
-    for index in 0..remaining.len() {
-        let piece = remaining.remove(index);
-        current.push(piece);
-        push_piece_permutations(remaining, current, output, max_queues);
-        current.pop();
-        remaining.insert(index, piece);
-        if output.len() >= max_queues {
-            return;
-        }
-    }
+    output
 }
 
 fn queue_to_string(pieces: &[Piece]) -> String {
@@ -359,4 +359,51 @@ fn compare_queue_evaluation(
         .then_with(|| right.t_spin_potential.cmp(&left.t_spin_potential))
         .then_with(|| right.top_score.total_cmp(&left.top_score))
         .then_with(|| left.queue.cmp(&right.queue))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn exact_piece_permutations_keep_factorial_coverage() {
+        let pieces = vec![Piece::T, Piece::I, Piece::O];
+        let permutations = generate_piece_permutations(&pieces, 6);
+        let queues = permutations
+            .iter()
+            .map(|queue| queue_to_string(queue))
+            .collect::<Vec<_>>();
+
+        assert_eq!(queues.len(), 6);
+        assert_eq!(
+            queues,
+            vec!["TIO", "TOI", "ITO", "IOT", "OTI", "OIT"]
+        );
+    }
+
+    #[test]
+    fn capped_piece_permutations_sample_across_first_pieces() {
+        let pieces = vec![
+            Piece::T,
+            Piece::I,
+            Piece::J,
+            Piece::L,
+            Piece::O,
+            Piece::S,
+            Piece::Z,
+        ];
+        let permutations = generate_piece_permutations(&pieces, 12);
+        let mut first_pieces = permutations
+            .iter()
+            .map(|queue| piece_name(queue[0]))
+            .collect::<Vec<_>>();
+        first_pieces.sort_unstable();
+        first_pieces.dedup();
+
+        assert_eq!(permutations.len(), 12);
+        assert!(
+            first_pieces.len() > 1,
+            "capped sampling should not stay in the first DFS prefix"
+        );
+    }
 }
