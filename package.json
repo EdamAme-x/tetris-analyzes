@@ -9,7 +9,7 @@
     "build:native:debug:force": "bun run scripts/build-native.ts --force",
     "build:native:force": "bun run scripts/build-native.ts --release --force",
     "bench": "bun run bench/bitboard.bench.ts && bun run bench/search-opener.bench.ts && bun run bench/opener-regression.bench.ts",
-    "bench:openers": "bun run bench/opener-regression.bench.ts",
+    "bench:openers": "bun run build:native && bun run bench/opener-regression.bench.ts",
     "bench:release": "bun run build:native && bun run bench",
     "check": "tsc --noEmit",
     "experiment:opener": "bun run build:native && bun run scripts/run-opener-experiment.ts",
