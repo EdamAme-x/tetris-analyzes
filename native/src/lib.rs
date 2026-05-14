@@ -600,7 +600,7 @@ pub(crate) fn search_opener_states(
 
         beam = next_by_key.into_values().collect();
         retain_best_search_states(&mut beam, setup_candidate_pool_width(beam_width));
-        score_t_spin_setup_potential(&mut beam);
+        score_t_spin_setup_potential(&mut beam, pieces);
         retain_best_search_states(&mut beam, beam_width);
     }
 
@@ -625,11 +625,22 @@ fn setup_candidate_pool_width(beam_width: usize) -> usize {
     beam_width.saturating_mul(16).max(beam_width)
 }
 
-fn score_t_spin_setup_potential(beam: &mut [SearchState]) {
+fn score_t_spin_setup_potential(beam: &mut [SearchState], pieces: &[Piece]) {
     for state in beam {
-        state.t_spin_potential = estimate_t_spin_surface_potential(&state.rows);
+        state.t_spin_potential = if has_future_t_piece(state, pieces) {
+            estimate_t_spin_surface_potential(&state.rows)
+        } else {
+            0
+        };
         state.score = score_state(state.metrics, state.firepower, state.t_spin_potential);
     }
+}
+
+fn has_future_t_piece(state: &SearchState, pieces: &[Piece]) -> bool {
+    state.hold == Some(Piece::T)
+        || pieces
+            .get(state.queue_index..)
+            .is_some_and(|remaining| remaining.contains(&Piece::T))
 }
 
 fn piece_choices(pieces: &[Piece], state: &SearchState, hold_enabled: bool) -> Vec<PieceChoice> {
