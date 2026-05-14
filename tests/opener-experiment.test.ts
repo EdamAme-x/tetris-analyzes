@@ -1,6 +1,11 @@
 import { describe, expect, test } from "bun:test";
 import type { FumenCodec, FumenUrls } from "../src/domain/fumen";
-import { renderOpenerExperimentMarkdown, runOpenerExperiment, type OpenerExperimentClock } from "../src/application/run-opener-experiment";
+import {
+  renderOpenerExperimentConsoleSummary,
+  renderOpenerExperimentMarkdown,
+  runOpenerExperiment,
+  type OpenerExperimentClock
+} from "../src/application/run-opener-experiment";
 
 const urls: FumenUrls = {
   edit: "https://fumen.zui.jp/?v115@test",
@@ -103,9 +108,116 @@ describe("opener experiment runner", () => {
 
     const markdown = renderOpenerExperimentMarkdown(report);
     expect(markdown).toContain("# Opener experiment");
+    expect(markdown).toContain("## Best openers");
     expect(markdown).toContain("fake-scenario | TI | false | 4 | 1 | 2.000");
-    expect(markdown).toContain("## Top templates");
-    expect(markdown).toContain("[fumen](https://fumen.zui.jp/?m115@test)");
+    expect(markdown).toContain("## Candidate details");
+    expect(markdown).toContain("[view](https://fumen.zui.jp/?m115@test)");
+  });
+
+  test("renders a best-candidate console summary instead of scenario noise", () => {
+    const report = runOpenerExperiment({
+      scenarios: [
+        {
+          name: "fake-scenario",
+          queue: "TI",
+          hold: false,
+          beamWidth: 4,
+          maxDepth: 1,
+          warmups: 0,
+          iterations: 1
+        }
+      ],
+      clock: createClock("2026-05-14T00:00:00.000Z", [0, 2]),
+      fumenCodec: fakeCodec,
+      search: () => [
+        {
+          score: 10,
+          firepowerScore: 0,
+          depth: 1,
+          queueIndex: 1,
+          rows: new Array(20).fill(0),
+          path: ["T@r0,x3"],
+          placements: [],
+          attack: 0,
+          points: 0,
+          maxCombo: 0,
+          backToBackChain: 0,
+          allClears: 0,
+          occupiedCells: 4,
+          clearedLines: 0,
+          aggregateHeight: 2,
+          holes: 0,
+          bumpiness: 0
+        }
+      ]
+    });
+
+    const summary = renderOpenerExperimentConsoleSummary(report, 1);
+    expect(summary).toContain("Best opener candidates");
+    expect(summary).toContain("#1 attack=0 points=0 score=10.0");
+    expect(summary).toContain("path: T@r0,x3");
+    expect(summary).not.toContain("fake-scenario | TI");
+  });
+
+  test("ranks opener candidates by firepower before search order", () => {
+    const report = runOpenerExperiment({
+      scenarios: [
+        {
+          name: "ranking",
+          queue: "TI",
+          hold: false,
+          beamWidth: 4,
+          maxDepth: 1,
+          warmups: 0,
+          iterations: 1,
+          top: 2
+        }
+      ],
+      clock: createClock("2026-05-14T00:00:00.000Z", [0, 2]),
+      fumenCodec: fakeCodec,
+      search: () => [
+        {
+          score: 100,
+          firepowerScore: 0,
+          depth: 1,
+          queueIndex: 1,
+          rows: new Array(20).fill(0),
+          path: ["quiet"],
+          placements: [],
+          attack: 0,
+          points: 0,
+          maxCombo: 0,
+          backToBackChain: 0,
+          allClears: 0,
+          occupiedCells: 4,
+          clearedLines: 0,
+          aggregateHeight: 2,
+          holes: 0,
+          bumpiness: 0
+        },
+        {
+          score: 20,
+          firepowerScore: 400,
+          depth: 1,
+          queueIndex: 1,
+          rows: new Array(20).fill(0),
+          path: ["attack"],
+          placements: [],
+          attack: 4,
+          points: 400,
+          maxCombo: 0,
+          backToBackChain: 0,
+          allClears: 0,
+          occupiedCells: 4,
+          clearedLines: 2,
+          aggregateHeight: 2,
+          holes: 0,
+          bumpiness: 0
+        }
+      ]
+    });
+
+    expect(report.scenarios[0]?.top.map((candidate) => candidate.path[0])).toEqual(["attack", "quiet"]);
   });
 });
 

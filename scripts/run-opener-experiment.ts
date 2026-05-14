@@ -2,6 +2,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import {
   DEFAULT_OPENER_EXPERIMENT_SCENARIOS,
+  renderOpenerExperimentConsoleSummary,
   renderOpenerExperimentMarkdown,
   runOpenerExperiment
 } from "../src/application/run-opener-experiment";
@@ -23,9 +24,10 @@ await mkdir(outDir, { recursive: true });
 await writeFile(join(outDir, `${filenameBase}.json`), `${JSON.stringify(report, null, 2)}\n`);
 await writeFile(join(outDir, `${filenameBase}.md`), markdown);
 
-console.log(markdown);
-console.log(`wrote ${join(outDir, `${filenameBase}.json`)}`);
-console.log(`wrote ${join(outDir, `${filenameBase}.md`)}`);
+console.log(renderOpenerExperimentConsoleSummary(report, top ?? 5));
+console.log("");
+console.log(`full report: ${join(outDir, `${filenameBase}.md`)}`);
+console.log(`json: ${join(outDir, `${filenameBase}.json`)}`);
 
 function readOption(name: string): string | undefined {
   const prefix = `${name}=`;

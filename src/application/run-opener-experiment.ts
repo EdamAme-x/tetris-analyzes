@@ -41,6 +41,10 @@ export interface OpenerExperimentCandidate {
   readonly urls: FumenUrls;
 }
 
+export interface RankedOpenerCandidate extends OpenerExperimentCandidate {
+  readonly sourceScenario: string;
+}
+
 export interface OpenerExperimentScenarioResult {
   readonly name: string;
   readonly queue: string;
@@ -83,37 +87,14 @@ export interface RunOpenerExperimentInput {
 
 export const DEFAULT_OPENER_EXPERIMENT_SCENARIOS: readonly OpenerExperimentScenario[] = [
   {
-    name: "seed-beam16-depth4-hold",
-    queue: "TILJSZOT",
-    hold: true,
-    beamWidth: 16,
-    maxDepth: 4,
-    tags: ["smoke", "hold"]
-  },
-  {
-    name: "seed-beam64-depth5-hold",
-    queue: "TILJSZOTIL",
-    hold: true,
-    beamWidth: 64,
-    maxDepth: 5,
-    tags: ["baseline", "hold"]
-  },
-  {
-    name: "seed-beam64-depth5-no-hold",
-    queue: "TILJSZOTIL",
-    hold: false,
-    beamWidth: 64,
-    maxDepth: 5,
-    tags: ["control", "no-hold"]
-  },
-  {
-    name: "seed-beam128-depth6-hold",
+    name: "best-openers",
     queue: "TILJSZOTILJ",
     hold: true,
     beamWidth: 128,
     maxDepth: 6,
     iterations: 3,
-    tags: ["wider", "hold"]
+    top: 12,
+    tags: ["best", "hold"]
   }
 ];
 
@@ -131,11 +112,12 @@ export function runOpenerExperiment(input: RunOpenerExperimentInput): OpenerExpe
     generatedAt: clock.isoNow(),
     engine: "native-rust-beam",
     environment,
-    scenarios: input.scenarios.map((scenario) => runScenario(scenario, input.top ?? 5, search, fumenCodec, clock))
+    scenarios: input.scenarios.map((scenario) => runScenario(scenario, input.top, search, fumenCodec, clock))
   };
 }
 
 export function renderOpenerExperimentMarkdown(report: OpenerExperimentReport): string {
+  const bestCandidates = rankOpenerCandidates(report, 12);
   const lines = [
     "# Opener experiment",
     "",
@@ -144,12 +126,36 @@ export function renderOpenerExperimentMarkdown(report: OpenerExperimentReport): 
     `Runtime: ${report.environment.runtime}`,
     `Native: ${report.environment.nativeProfile}`,
     "",
-    "| scenario | queue | hold | beam | depth | median ms | searches/s | result nodes | top attack | top score | holes | bumpiness | preview |",
-    "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |"
+    "## Best openers",
+    "",
+    "| rank | attack | points | score | holes | bumpiness | path | preview |",
+    "| ---: | ---: | ---: | ---: | ---: | ---: | --- | --- |"
   ];
 
+  for (const candidate of bestCandidates) {
+    lines.push(
+      [
+        String(candidate.rank),
+        String(candidate.attack),
+        String(candidate.points),
+        candidate.score.toFixed(1),
+        String(candidate.holes),
+        String(candidate.bumpiness),
+        candidate.path.join(" "),
+        `[view](${candidate.previewUrl})`
+      ].join(" | ")
+    );
+  }
+
+  lines.push(
+    "",
+    "## Search run",
+    "",
+    "| name | queue | hold | beam | depth | median ms | searches/s | nodes |",
+    "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |"
+  );
+
   for (const scenario of report.scenarios) {
-    const top = scenario.top[0];
     lines.push(
       [
         scenario.name,
@@ -159,17 +165,12 @@ export function renderOpenerExperimentMarkdown(report: OpenerExperimentReport): 
         String(scenario.maxDepth),
         scenario.medianMs.toFixed(3),
         scenario.searchesPerSecond.toFixed(1),
-        String(scenario.resultCount),
-        String(top?.attack ?? ""),
-        top?.score.toFixed(1) ?? "",
-        String(top?.holes ?? ""),
-        String(top?.bumpiness ?? ""),
-        top === undefined ? "" : `[fumen](${top.previewUrl})`
+        String(scenario.resultCount)
       ].join(" | ")
     );
   }
 
-  lines.push("", "## Top templates", "");
+  lines.push("", "## Candidate details", "");
   for (const scenario of report.scenarios) {
     lines.push(`### ${scenario.name}`, "");
     if (scenario.top.length === 0) {
@@ -177,7 +178,10 @@ export function renderOpenerExperimentMarkdown(report: OpenerExperimentReport): 
       continue;
     }
 
-    lines.push("| rank | attack | points | score | path | preview URL |", "| ---: | ---: | ---: | ---: | --- | --- |");
+    lines.push(
+      "| rank | attack | points | score | holes | bumpiness | path | preview |",
+      "| ---: | ---: | ---: | ---: | ---: | ---: | --- | --- |"
+    );
     for (const candidate of scenario.top) {
       lines.push(
         [
@@ -185,8 +189,10 @@ export function renderOpenerExperimentMarkdown(report: OpenerExperimentReport): 
           String(candidate.attack),
           String(candidate.points),
           candidate.score.toFixed(1),
+          String(candidate.holes),
+          String(candidate.bumpiness),
           candidate.path.join(" "),
-          `[fumen](${candidate.previewUrl})`
+          `[view](${candidate.previewUrl})`
         ].join(" | ")
       );
     }
@@ -197,9 +203,30 @@ export function renderOpenerExperimentMarkdown(report: OpenerExperimentReport): 
   return lines.join("\n");
 }
 
+export function renderOpenerExperimentConsoleSummary(report: OpenerExperimentReport, topCount = 5): string {
+  const lines = ["Best opener candidates", ""];
+  for (const candidate of rankOpenerCandidates(report, topCount)) {
+    lines.push(
+      `#${candidate.rank} attack=${candidate.attack} points=${candidate.points} score=${candidate.score.toFixed(1)} holes=${candidate.holes} bump=${candidate.bumpiness}`,
+      `path: ${candidate.path.join(" ")}`,
+      `view: ${candidate.previewUrl}`,
+      ""
+    );
+  }
+  return lines.join("\n").trimEnd();
+}
+
+export function rankOpenerCandidates(report: OpenerExperimentReport, topCount: number): RankedOpenerCandidate[] {
+  return report.scenarios
+    .flatMap((scenario) => scenario.top.map((candidate) => ({ ...candidate, sourceScenario: scenario.name })))
+    .sort(compareRankedOpenerCandidates)
+    .slice(0, topCount)
+    .map((candidate, index) => ({ ...candidate, rank: index + 1 }));
+}
+
 function runScenario(
   scenario: OpenerExperimentScenario,
-  defaultTop: number,
+  topOverride: number | undefined,
   search: OpenerSearch,
   fumenCodec: FumenCodec,
   clock: OpenerExperimentClock
@@ -239,7 +266,7 @@ function runScenario(
     minMs: stats.min,
     maxMs: stats.max,
     searchesPerSecond: stats.median === 0 ? 0 : 1_000 / stats.median,
-    top: createTopCandidates(lastNodes, scenario, scenario.top ?? defaultTop, fumenCodec),
+    top: createTopCandidates(lastNodes, scenario, topOverride ?? scenario.top ?? 5, fumenCodec),
     tags: scenario.tags ?? []
   };
 }
@@ -259,30 +286,59 @@ function createTopCandidates(
   topCount: number,
   fumenCodec: FumenCodec
 ): OpenerExperimentCandidate[] {
-  return nodes.slice(0, topCount).map((node, index) => {
-    const data = fumenCodec.encodePages(createOpenerFumenPages(node, { title: `${scenario.name} #${index + 1}` }));
-    const urls = fumenCodec.createUrls(data);
-    return {
-      rank: index + 1,
-      score: node.score,
-      firepowerScore: node.firepowerScore,
-      path: node.path,
-      previewUrl: urls.view,
-      hold: node.hold ?? null,
-      queueIndex: node.queueIndex,
-      attack: node.attack,
-      points: node.points,
-      maxCombo: node.maxCombo,
-      backToBackChain: node.backToBackChain,
-      allClears: node.allClears,
-      occupiedCells: node.occupiedCells,
-      clearedLines: node.clearedLines,
-      aggregateHeight: node.aggregateHeight,
-      holes: node.holes,
-      bumpiness: node.bumpiness,
-      urls
-    };
-  });
+  return [...nodes]
+    .sort(compareSearchNodesForOpener)
+    .slice(0, topCount)
+    .map((node, index) => {
+      const data = fumenCodec.encodePages(createOpenerFumenPages(node, { title: `${scenario.name} #${index + 1}` }));
+      const urls = fumenCodec.createUrls(data);
+      return {
+        rank: index + 1,
+        score: node.score,
+        firepowerScore: node.firepowerScore,
+        path: node.path,
+        previewUrl: urls.view,
+        hold: node.hold ?? null,
+        queueIndex: node.queueIndex,
+        attack: node.attack,
+        points: node.points,
+        maxCombo: node.maxCombo,
+        backToBackChain: node.backToBackChain,
+        allClears: node.allClears,
+        occupiedCells: node.occupiedCells,
+        clearedLines: node.clearedLines,
+        aggregateHeight: node.aggregateHeight,
+        holes: node.holes,
+        bumpiness: node.bumpiness,
+        urls
+      };
+    });
+}
+
+function compareSearchNodesForOpener(left: SearchOpenerBeamNode, right: SearchOpenerBeamNode): number {
+  return (
+    right.attack - left.attack ||
+    right.firepowerScore - left.firepowerScore ||
+    right.score - left.score ||
+    left.holes - right.holes ||
+    left.bumpiness - right.bumpiness ||
+    right.points - left.points ||
+    right.depth - left.depth ||
+    left.path.join(" ").localeCompare(right.path.join(" "))
+  );
+}
+
+function compareRankedOpenerCandidates(left: RankedOpenerCandidate, right: RankedOpenerCandidate): number {
+  return (
+    right.attack - left.attack ||
+    right.firepowerScore - left.firepowerScore ||
+    right.score - left.score ||
+    left.holes - right.holes ||
+    left.bumpiness - right.bumpiness ||
+    right.points - left.points ||
+    right.path.length - left.path.length ||
+    left.path.join(" ").localeCompare(right.path.join(" "))
+  );
 }
 
 function summarizeTimings(samples: readonly number[]): { median: number; min: number; max: number } {
