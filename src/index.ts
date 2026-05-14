@@ -1,5 +1,6 @@
 export * from "./application/create-ruleset";
 export * from "./application/export-fumen";
+export * from "./application/run-opener-experiment";
 export * from "./application/search-opener";
 export * from "./domain/board";
 export * from "./domain/fumen";

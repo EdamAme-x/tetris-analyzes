@@ -9,6 +9,7 @@
     "bench": "bun run bench/bitboard.bench.ts && bun run bench/search-opener.bench.ts",
     "bench:release": "bun run build:native && bun run bench",
     "check": "tsc --noEmit",
+    "experiment:opener": "bun run build:native && bun run scripts/run-opener-experiment.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "generate:tetrio-tables": "bun run scripts/generate-tetrio-tables.ts",
