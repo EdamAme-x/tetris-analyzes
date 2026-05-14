@@ -40,7 +40,7 @@ pub(crate) fn is_reachable_placement(
         y: target_y,
     };
     let target_shape = shapes[target_shape_index];
-    if has_clear_vertical_drop(rows, shapes[target_shape_index], target_x, target_y) {
+    if has_clear_horizontal_entry_drop(rows, target_shape, target_x, target_y) {
         return true;
     }
 
@@ -144,6 +144,27 @@ pub(crate) fn has_clear_vertical_drop(rows: &BoardRows, shape: Shape, x: i8, tar
         }
     }
     true
+}
+
+fn has_clear_horizontal_entry_drop(
+    rows: &BoardRows,
+    shape: Shape,
+    target_x: i8,
+    target_y: i8,
+) -> bool {
+    let spawn_y = BOARD_HEIGHT as i8 - shape.height;
+    let spawn_x = (BOARD_WIDTH as i8 - shape.width) / 2;
+    let (left, right) = if spawn_x <= target_x {
+        (spawn_x, target_x)
+    } else {
+        (target_x, spawn_x)
+    };
+    for x in left..=right {
+        if !can_place(rows, shape, x, spawn_y) {
+            return false;
+        }
+    }
+    has_clear_vertical_drop(rows, shape, target_x, target_y)
 }
 
 pub(crate) fn push_movement_state(

@@ -10,6 +10,7 @@ bun run bench:release
 bun run bench:openers
 bun run experiment:opener
 bun run experiment:opener -- --preset=survey --top=5
+bun run experiment:opener -- --preset=discovery --top=5
 ```
 
 `experiment:opener` writes JSON/Markdown reports with fumen preview URLs under `experiments/runs/`.
@@ -29,4 +30,5 @@ Executable examples live in `tests/`.
 - [x] Native full grounded placement enumeration with reachable-history regression tests
 - [x] Native T-spin setup-aware pruning with precise report-side potential checks
 - [x] Opener reports show B2B chain, difficult attack, and fumen preview URLs
-- [ ] Broaden deterministic two-bag queue discovery beyond the current survey seeds
+- [x] Broaden deterministic two-bag queue discovery beyond the current survey seeds
+- [ ] Add deeper opener-template survivability scoring across many queue permutations

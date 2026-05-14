@@ -3,6 +3,7 @@ import type { FumenCodec, FumenUrls } from "../src/domain/fumen";
 import type { NativeBeamPlacement, NativeClearName } from "../src/infrastructure/native/binding-types";
 import {
   DEFAULT_OPENER_EXPERIMENT_SCENARIOS,
+  DISCOVERY_OPENER_EXPERIMENT_SCENARIOS,
   SURVEY_OPENER_EXPERIMENT_SCENARIOS,
   TETRIO_TL_OPENER_SEARCH_RULES,
   renderOpenerExperimentConsoleSummary,
@@ -38,6 +39,16 @@ describe("opener experiment runner", () => {
     );
     expect(SURVEY_OPENER_EXPERIMENT_SCENARIOS.every((scenario) => scenario.beamWidth === 1024)).toBe(true);
     expect(SURVEY_OPENER_EXPERIMENT_SCENARIOS.every((scenario) => scenario.tags?.includes("survey"))).toBe(true);
+  });
+
+  test("provides deterministic two-bag discovery queues beyond the named survey seeds", () => {
+    const queues = DISCOVERY_OPENER_EXPERIMENT_SCENARIOS.map((scenario) => scenario.queue);
+
+    expect(DISCOVERY_OPENER_EXPERIMENT_SCENARIOS).toHaveLength(24);
+    expect(new Set(queues).size).toBe(queues.length);
+    expect(DISCOVERY_OPENER_EXPERIMENT_SCENARIOS.every((scenario) => scenario.name.startsWith("discover-"))).toBe(true);
+    expect(DISCOVERY_OPENER_EXPERIMENT_SCENARIOS.every((scenario) => scenario.queue.length === 14)).toBe(true);
+    expect(DISCOVERY_OPENER_EXPERIMENT_SCENARIOS.every((scenario) => scenario.rules === TETRIO_TL_OPENER_SEARCH_RULES)).toBe(true);
   });
 
   test("measures native search scenarios and keeps top candidates linkable", () => {
@@ -210,6 +221,35 @@ describe("opener experiment runner", () => {
     );
     expect(summary).toContain("path: T@r0,x3");
     expect(summary).not.toContain("fake-scenario | TI");
+  });
+
+  test("does not rank exhausted queues by post-search T-spin potential", () => {
+    const readyRows = new Array(20).fill(0);
+    readyRows[1] = (1 << 3) | (1 << 5);
+    const report = runOpenerExperiment({
+      scenarios: [
+        {
+          name: "potential",
+          queue: "TI",
+          hold: false,
+          beamWidth: 4,
+          maxDepth: 2,
+          warmups: 0,
+          iterations: 1,
+          top: 2
+        }
+      ],
+      clock: createClock("2026-05-14T00:00:00.000Z", [0, 2]),
+      fumenCodec: fakeCodec,
+      search: () => [
+        { ...candidateNode("exhausted"), queueIndex: 2, rows: readyRows },
+        { ...candidateNode("held-t"), hold: "T", queueIndex: 2, rows: readyRows }
+      ]
+    });
+
+    expect(report.scenarios[0]?.top.find((candidate) => candidate.path[0] === "exhausted")?.tSpinPotential).toBe(0);
+    expect(report.scenarios[0]?.top.find((candidate) => candidate.path[0] === "held-t")?.tSpinPotential).toBeGreaterThan(0);
+    expect(renderOpenerExperimentConsoleSummary(report, 1)).toContain("path: held-t");
   });
 
   test("ranks opener candidates by firepower before search order", () => {

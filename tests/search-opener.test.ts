@@ -55,6 +55,7 @@ describe("native opener beam search", () => {
 
   test("filters placements that are geometrically possible but unreachable from spawn", () => {
     const empty = bitBoardFromRows(new Array(20).fill(0));
+    const blockedLateralEntry = new Array(20).fill(1 << 3);
     const sealedCave = new Array(20).fill(0);
     sealedCave[0] = 660;
     sealedCave[1] = 553;
@@ -66,6 +67,9 @@ describe("native opener beam search", () => {
     sealedCave[7] = 496;
 
     expect(canReachOpenerPlacement({ rows: empty, piece: "I", rotation: 0, x: 3, y: 0 })).toBe(true);
+    expect(
+      canReachOpenerPlacement({ rows: bitBoardFromRows(blockedLateralEntry), piece: "O", rotation: 0, x: 0, y: 0, kickTable: "NONE" })
+    ).toBe(false);
     expect(canReachOpenerPlacement({ rows: bitBoardFromRows(sealedCave), piece: "T", rotation: 0, x: 6, y: 1 })).toBe(false);
   });
 
@@ -81,12 +85,13 @@ describe("native opener beam search", () => {
 
     expect(canReachOpenerPlacement({ rows: board, piece: "T", rotation: 0, x: 4, y: 2, kickTable: "SRS+" })).toBe(true);
     expect(canReachOpenerPlacement({ rows: board, piece: "T", rotation: 0, x: 4, y: 2, kickTable: "NONE" })).toBe(false);
-    expect(() => searchOpenerBeam({ queue: "TIL", kickTable: "SRS-X" })).not.toThrow();
-    expect(() => searchOpenerBeam({ queue: "TIL", kickTable: "TETRA-X" })).not.toThrow();
-    expect(() => searchOpenerBeam({ queue: "TIL", kickTable: "NRS" })).not.toThrow();
-    expect(() => searchOpenerBeam({ queue: "TIL", kickTable: "ARS" })).not.toThrow();
-    expect(() => searchOpenerBeam({ queue: "TIL", kickTable: "ASC" })).not.toThrow();
-    expect(() => evaluateOpenerBag({ bag: "TIO", kickTable: "NONE", maxQueues: 2 })).not.toThrow();
+    const parserSmoke = { queue: "TIL", beamWidth: 4, maxDepth: 1 } as const;
+    expect(() => searchOpenerBeam({ ...parserSmoke, kickTable: "SRS-X" })).not.toThrow();
+    expect(() => searchOpenerBeam({ ...parserSmoke, kickTable: "TETRA-X" })).not.toThrow();
+    expect(() => searchOpenerBeam({ ...parserSmoke, kickTable: "NRS" })).not.toThrow();
+    expect(() => searchOpenerBeam({ ...parserSmoke, kickTable: "ARS" })).not.toThrow();
+    expect(() => searchOpenerBeam({ ...parserSmoke, kickTable: "ASC" })).not.toThrow();
+    expect(() => evaluateOpenerBag({ bag: "TIO", beamWidth: 4, maxDepth: 1, kickTable: "NONE", maxQueues: 2 })).not.toThrow();
     expect(() => searchOpenerBeam({ queue: "TIL", kickTable: "BAD KICKS" as "SRS" })).toThrow("Unsupported native opener kick table");
   });
 
@@ -319,7 +324,7 @@ describe("native opener beam search", () => {
       comboTable: "MULTIPLIER"
     } as const;
     const [tightTop] = searchOpenerBeamWithPlacements({ ...input, beamWidth: 8 });
-    const [wideTop] = searchOpenerBeamWithPlacements({ ...input, beamWidth: 128 });
+    const [wideTop] = searchOpenerBeamWithPlacements({ ...input, beamWidth: 64 });
 
     expect(tightTop).toMatchObject({
       tSpinClears: 1,

@@ -102,14 +102,19 @@ pub(crate) fn estimate_t_spin_potential(rows: &BoardRows, kick_table: KickTable)
     for shape_index in placement_shape_indices(Piece::T).iter().copied() {
         let shape = shapes[shape_index];
         for x in 0..=(BOARD_WIDTH as i8 - shape.width) {
+            let mut can_place_below = false;
             for y in 0..=(BOARD_HEIGHT as i8 - shape.height) {
-                if !can_place(rows, shape, x, y) || (y > 0 && can_place(rows, shape, x, y - 1)) {
+                let can_place_here = can_place(rows, shape, x, y);
+                if !can_place_here || can_place_below {
+                    can_place_below = can_place_here;
                     continue;
                 }
                 if !is_reachable_placement(rows, Piece::T, shape_index, x, y, kick_table) {
-                    break;
+                    can_place_below = can_place_here;
+                    continue;
                 }
                 let Some(placed) = lock_shape(rows, shape, x, y) else {
+                    can_place_below = can_place_here;
                     continue;
                 };
                 let cleared_lines = board::count_full_lines_array(&placed);
@@ -120,7 +125,7 @@ pub(crate) fn estimate_t_spin_potential(rows: &BoardRows, kick_table: KickTable)
                     SpinKind::None | SpinKind::TSpinMini | SpinKind::ImmobileSpin => 0,
                 };
                 best = best.max(value);
-                break;
+                can_place_below = can_place_here;
             }
         }
     }

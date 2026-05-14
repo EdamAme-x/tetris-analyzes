@@ -2,6 +2,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import {
   DEFAULT_OPENER_EXPERIMENT_SCENARIOS,
+  DISCOVERY_OPENER_EXPERIMENT_SCENARIOS,
   SURVEY_OPENER_EXPERIMENT_SCENARIOS,
   renderOpenerExperimentConsoleSummary,
   renderOpenerExperimentMarkdown,
@@ -54,7 +55,9 @@ function scenarioPreset(name: string) {
       return DEFAULT_OPENER_EXPERIMENT_SCENARIOS;
     case "survey":
       return SURVEY_OPENER_EXPERIMENT_SCENARIOS;
+    case "discovery":
+      return DISCOVERY_OPENER_EXPERIMENT_SCENARIOS;
     default:
-      throw new Error(`Unknown opener experiment preset ${name}. Expected default or survey.`);
+      throw new Error(`Unknown opener experiment preset ${name}. Expected default, survey, or discovery.`);
   }
 }

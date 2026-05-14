@@ -115,6 +115,8 @@ const TWO_BAG_TL_SURVEY_QUEUES = [
   ["seed-stziljo", "STZILJOTSTZILJO"],
   ["seed-lstzjio", "LSTZJIOOLSTZJI"]
 ] as const;
+const DISCOVERY_TWO_BAG_SAMPLE_SIZE = 24;
+const DISCOVERY_BAG = "TIJLOSZ";
 
 export const TETRIO_TL_OPENER_SEARCH_RULES = {
   spinMode: "T-SPINS",
@@ -147,6 +149,21 @@ export const SURVEY_OPENER_EXPERIMENT_SCENARIOS: readonly OpenerExperimentScenar
   iterations: 1,
   top: 3,
   tags: ["survey", "hold", "two-bag", "t-spin", "tetrio-tl"]
+}));
+
+export const DISCOVERY_OPENER_EXPERIMENT_SCENARIOS: readonly OpenerExperimentScenario[] = createDiscoveryTwoBagQueues(
+  DISCOVERY_TWO_BAG_SAMPLE_SIZE
+).map((queue, index) => ({
+  name: `discover-${String(index + 1).padStart(2, "0")}`,
+  queue,
+  hold: true,
+  beamWidth: 1024,
+  maxDepth: 14,
+  rules: TETRIO_TL_OPENER_SEARCH_RULES,
+  warmups: 0,
+  iterations: 1,
+  top: 1,
+  tags: ["discovery", "hold", "two-bag", "t-spin", "tetrio-tl"]
 }));
 
 export function runOpenerExperiment(input: RunOpenerExperimentInput): OpenerExperimentReport {
@@ -392,7 +409,7 @@ function createTopCandidates(
         difficultClears: node.difficultClears,
         tSpinClears: node.tSpinClears,
         tSpinAttack: node.tSpinAttack,
-        tSpinPotential: estimateOpenerTSpinPotential(Uint16Array.from(node.rows), rules.kickTable),
+        tSpinPotential: hasFutureT(node, scenario) ? estimateOpenerTSpinPotential(Uint16Array.from(node.rows), rules.kickTable) : 0,
         clearSequence: node.placements
           .filter((placement) => placement.clearName !== "NONE" && placement.clearedLines > 0)
           .map((placement) => `${placement.clearName}:${placement.attack}`),
@@ -462,6 +479,10 @@ function isDifficultClearName(clearName: string): boolean {
   );
 }
 
+function hasFutureT(node: SearchOpenerBeamNode, scenario: OpenerExperimentScenario): boolean {
+  return node.hold === "T" || scenario.queue.slice(node.queueIndex).includes("T");
+}
+
 function formatClearSequence(clearSequence: readonly string[]): string {
   return clearSequence.length === 0 ? "-" : clearSequence.join(" ");
 }
@@ -483,6 +504,38 @@ function formatReportRules(scenarios: readonly OpenerExperimentScenarioResult[])
 
 function rulesEqual(left: OpenerExperimentSearchRules, right: OpenerExperimentSearchRules): boolean {
   return left.spinMode === right.spinMode && left.comboTable === right.comboTable && left.kickTable === right.kickTable;
+}
+
+function createDiscoveryTwoBagQueues(sampleSize: number): string[] {
+  const permutationCount = factorial(DISCOVERY_BAG.length);
+  const queues = new Set<string>();
+  for (let sample = 0; queues.size < sampleSize && sample < permutationCount * 2; sample += 1) {
+    const first = nthPermutation(DISCOVERY_BAG, (sample * 197) % permutationCount);
+    const second = nthPermutation(DISCOVERY_BAG, (sample * 389 + 97) % permutationCount);
+    queues.add(`${first}${second}`);
+  }
+  return [...queues];
+}
+
+function nthPermutation(input: string, index: number): string {
+  const remaining = [...input];
+  let cursor = index;
+  let output = "";
+  for (let divisor = remaining.length; divisor > 0; divisor -= 1) {
+    const block = factorial(divisor - 1);
+    const selected = Math.floor(cursor / block);
+    output += remaining.splice(selected, 1).join("");
+    cursor %= block;
+  }
+  return output;
+}
+
+function factorial(value: number): number {
+  let output = 1;
+  for (let item = 2; item <= value; item += 1) {
+    output *= item;
+  }
+  return output;
 }
 
 function summarizeTimings(samples: readonly number[]): { median: number; min: number; max: number } {
