@@ -23,3 +23,4 @@ Executable examples live in `tests/`.
 - [x] Native generated TETR.IO kick tables for SRS+, SRS, SRS-X, TETRA-X, NRS, ARS, ASC, and NONE
 - [x] Native spin mode selection for T-SPINS, all-spin, mini-only, handheld, stupid, and none variants
 - [x] Known opener benchmark set and regression report
+- [x] Fumen preview operation parity tests for native SRS piece geometry

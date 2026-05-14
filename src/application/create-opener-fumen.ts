@@ -74,10 +74,12 @@ export function createOpenerFumenPages(node: NativeBeamSearchNode, options: Open
   let board = createEmptyBoard();
   return node.placements.map((placement, index) => {
     const piece = assertPlacementPiece(placement);
-    board = lockPlacement(board, placement, piece);
-    const operation = options.includeOperations === false ? undefined : inferFumenOperation(placement, piece);
+    const boardBeforeLock = board;
+    const boardAfterLock = lockPlacement(boardBeforeLock, placement, piece);
+    const operation = options.includeOperations === false ? undefined : inferRequiredFumenOperation(placement, piece);
+    board = boardAfterLock;
     return {
-      fieldRows: boardToFieldRows(board),
+      fieldRows: boardToFieldRows(options.includeOperations === false ? boardAfterLock : boardBeforeLock),
       comment: `${formatCandidateTitle(node, options.title)} step ${index + 1}/${node.placements.length}: ${formatPlacementSummary(placement)}`,
       flags: { lock: true, colorize: true, mirror: false, rise: false },
       ...(operation === undefined ? {} : { operation })
@@ -136,6 +138,14 @@ function formatPlacementSummary(placement: NativeBeamPlacement): string {
     suffixes.push("PC");
   }
   return suffixes.length === 0 ? placement.path : `${placement.path} ${suffixes.join(" ")}`;
+}
+
+function inferRequiredFumenOperation(placement: NativeBeamPlacement, piece: FumenMino): FumenOperation {
+  const operation = inferFumenOperation(placement, piece);
+  if (operation === undefined) {
+    throw new Error(`Placement ${placement.path} cannot be represented as a fumen operation.`);
+  }
+  return operation;
 }
 
 function inferFumenOperation(placement: NativeBeamPlacement, piece: FumenMino): FumenOperation | undefined {

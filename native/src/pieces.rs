@@ -166,19 +166,19 @@ const J1: &[Cell] = &[
     Cell { x: 0, y: 0 },
     Cell { x: 0, y: 1 },
     Cell { x: 0, y: 2 },
-    Cell { x: 1, y: 0 },
+    Cell { x: 1, y: 2 },
 ];
 const J2: &[Cell] = &[
-    Cell { x: 0, y: 0 },
     Cell { x: 0, y: 1 },
     Cell { x: 1, y: 1 },
+    Cell { x: 2, y: 0 },
     Cell { x: 2, y: 1 },
 ];
 const J3: &[Cell] = &[
     Cell { x: 1, y: 0 },
     Cell { x: 1, y: 1 },
     Cell { x: 1, y: 2 },
-    Cell { x: 0, y: 2 },
+    Cell { x: 0, y: 0 },
 ];
 const L0: &[Cell] = &[
     Cell { x: 0, y: 0 },
@@ -190,7 +190,7 @@ const L1: &[Cell] = &[
     Cell { x: 0, y: 0 },
     Cell { x: 0, y: 1 },
     Cell { x: 0, y: 2 },
-    Cell { x: 1, y: 2 },
+    Cell { x: 1, y: 0 },
 ];
 const L2: &[Cell] = &[
     Cell { x: 0, y: 1 },
@@ -202,7 +202,7 @@ const L3: &[Cell] = &[
     Cell { x: 1, y: 0 },
     Cell { x: 1, y: 1 },
     Cell { x: 1, y: 2 },
-    Cell { x: 0, y: 0 },
+    Cell { x: 0, y: 2 },
 ];
 
 const I_SHAPES: &[Shape] = &[

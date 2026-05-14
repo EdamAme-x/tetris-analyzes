@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import type { FumenCodec, FumenUrls } from "../src/domain/fumen";
 import {
   DEFAULT_OPENER_EXPERIMENT_SCENARIOS,
+  TETRIO_TL_OPENER_SEARCH_RULES,
   renderOpenerExperimentConsoleSummary,
   renderOpenerExperimentMarkdown,
   runOpenerExperiment,
@@ -22,7 +23,8 @@ describe("opener experiment runner", () => {
       queue: "SZILOJTSTOZLJI",
       hold: true,
       beamWidth: 1024,
-      maxDepth: 14
+      maxDepth: 14,
+      rules: TETRIO_TL_OPENER_SEARCH_RULES
     });
   });
 
@@ -46,7 +48,15 @@ describe("opener experiment runner", () => {
       fumenCodec: fakeCodec,
       search: (input) => {
         calls += 1;
-        expect(input).toEqual({ queue: "TI", beamWidth: 8, hold: true, maxDepth: 2 });
+        expect(input).toEqual({
+          queue: "TI",
+          beamWidth: 8,
+          hold: true,
+          maxDepth: 2,
+          spinMode: "T-SPINS",
+          comboTable: "MULTIPLIER",
+          kickTable: "SRS+"
+        });
         return [
           {
             score: 42,
@@ -125,10 +135,40 @@ describe("opener experiment runner", () => {
 
     const markdown = renderOpenerExperimentMarkdown(report);
     expect(markdown).toContain("# Opener experiment");
+    expect(markdown).toContain("Rules: spins=T-SPINS, combo=MULTIPLIER, kicks=SRS+");
     expect(markdown).toContain("## Best openers");
-    expect(markdown).toContain("fake-scenario | TI | false | 4 | 1 | 2.000");
+    expect(markdown).toContain("fake-scenario | TI | false | T-SPINS | MULTIPLIER | SRS+ | 4 | 1 | 2.000");
     expect(markdown).toContain("## Candidate details");
     expect(markdown).toContain("[view](https://fumen.zui.jp/?m115@test)");
+  });
+
+  test("renders overridden scenario rules instead of the default TL header", () => {
+    const report = runOpenerExperiment({
+      scenarios: [
+        {
+          name: "custom-rules",
+          queue: "TI",
+          hold: false,
+          beamWidth: 4,
+          maxDepth: 1,
+          warmups: 0,
+          iterations: 1,
+          rules: { spinMode: "NONE", comboTable: "NONE", kickTable: "NONE" }
+        }
+      ],
+      clock: createClock("2026-05-14T00:00:00.000Z", [0, 2]),
+      fumenCodec: fakeCodec,
+      search: (input) => {
+        expect(input.spinMode).toBe("NONE");
+        expect(input.comboTable).toBe("NONE");
+        expect(input.kickTable).toBe("NONE");
+        return [candidateNode("quiet")];
+      }
+    });
+
+    const markdown = renderOpenerExperimentMarkdown(report);
+    expect(markdown).toContain("Rules: spins=NONE, combo=NONE, kicks=NONE");
+    expect(markdown).toContain("custom-rules | TI | false | NONE | NONE | NONE | 4 | 1 | 2.000");
   });
 
   test("renders a best-candidate console summary instead of scenario noise", () => {
@@ -146,30 +186,7 @@ describe("opener experiment runner", () => {
       ],
       clock: createClock("2026-05-14T00:00:00.000Z", [0, 2]),
       fumenCodec: fakeCodec,
-      search: () => [
-        {
-          score: 10,
-          firepowerScore: 0,
-          depth: 1,
-          queueIndex: 1,
-          rows: new Array(20).fill(0),
-          path: ["T@r0,x3"],
-          placements: [],
-          attack: 0,
-          points: 0,
-          maxCombo: 0,
-          backToBackChain: 0,
-          allClears: 0,
-          difficultClears: 0,
-          tSpinClears: 0,
-          tSpinAttack: 0,
-          occupiedCells: 4,
-          clearedLines: 0,
-          aggregateHeight: 2,
-          holes: 0,
-          bumpiness: 0
-        }
-      ]
+      search: () => [candidateNode("T@r0,x3")]
     });
 
     const summary = renderOpenerExperimentConsoleSummary(report, 1);
@@ -313,6 +330,31 @@ describe("opener experiment runner", () => {
     expect(report.scenarios[0]?.top.map((candidate) => candidate.path[0])).toEqual(["tspin", "combo"]);
   });
 });
+
+function candidateNode(path: string) {
+  return {
+    score: 10,
+    firepowerScore: 0,
+    depth: 1,
+    queueIndex: 1,
+    rows: new Array(20).fill(0),
+    path: [path],
+    placements: [],
+    attack: 0,
+    points: 0,
+    maxCombo: 0,
+    backToBackChain: 0,
+    allClears: 0,
+    difficultClears: 0,
+    tSpinClears: 0,
+    tSpinAttack: 0,
+    occupiedCells: 4,
+    clearedLines: 0,
+    aggregateHeight: 2,
+    holes: 0,
+    bumpiness: 0
+  };
+}
 
 const fakeCodec: FumenCodec = {
   encodePages: () => "v115@test",

@@ -1,7 +1,14 @@
 import { createFumenCodec } from "../infrastructure/fumen/tetris-fumen-codec";
 import type { FumenCodec, FumenUrls } from "../domain/fumen";
+import type { NativeComboTable, NativeKickTable, NativeSpinMode } from "../infrastructure/native/binding-types";
 import { createOpenerFumenPages } from "./create-opener-fumen";
 import { searchOpenerBeamWithPlacements, type SearchOpenerBeamInput, type SearchOpenerBeamNode } from "./search-opener";
+
+export interface OpenerExperimentSearchRules {
+  readonly spinMode: NativeSpinMode;
+  readonly comboTable: NativeComboTable;
+  readonly kickTable: NativeKickTable;
+}
 
 export interface OpenerExperimentScenario {
   readonly name: string;
@@ -9,6 +16,7 @@ export interface OpenerExperimentScenario {
   readonly hold: boolean;
   readonly beamWidth: number;
   readonly maxDepth: number;
+  readonly rules?: OpenerExperimentSearchRules;
   readonly warmups?: number;
   readonly iterations?: number;
   readonly top?: number;
@@ -53,6 +61,7 @@ export interface OpenerExperimentScenarioResult {
   readonly name: string;
   readonly queue: string;
   readonly hold: boolean;
+  readonly rules: OpenerExperimentSearchRules;
   readonly beamWidth: number;
   readonly maxDepth: number;
   readonly warmups: number;
@@ -89,6 +98,12 @@ export interface RunOpenerExperimentInput {
   readonly top?: number;
 }
 
+export const TETRIO_TL_OPENER_SEARCH_RULES = {
+  spinMode: "T-SPINS",
+  comboTable: "MULTIPLIER",
+  kickTable: "SRS+"
+} as const satisfies OpenerExperimentSearchRules;
+
 export const DEFAULT_OPENER_EXPERIMENT_SCENARIOS: readonly OpenerExperimentScenario[] = [
   {
     name: "best-two-bag-tspin-openers",
@@ -96,9 +111,10 @@ export const DEFAULT_OPENER_EXPERIMENT_SCENARIOS: readonly OpenerExperimentScena
     hold: true,
     beamWidth: 1024,
     maxDepth: 14,
+    rules: TETRIO_TL_OPENER_SEARCH_RULES,
     iterations: 1,
     top: 8,
-    tags: ["best", "hold", "two-bag", "t-spin"]
+    tags: ["best", "hold", "two-bag", "t-spin", "tetrio-tl"]
   }
 ];
 
@@ -129,6 +145,7 @@ export function renderOpenerExperimentMarkdown(report: OpenerExperimentReport): 
     `Engine: ${report.engine}`,
     `Runtime: ${report.environment.runtime}`,
     `Native: ${report.environment.nativeProfile}`,
+    `Rules: ${formatReportRules(report.scenarios)}`,
     "",
     "## Best openers",
     "",
@@ -158,8 +175,8 @@ export function renderOpenerExperimentMarkdown(report: OpenerExperimentReport): 
     "",
     "## Search run",
     "",
-    "| name | queue | hold | beam | depth | median ms | searches/s | nodes |",
-    "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |"
+    "| name | queue | hold | spins | combo | kicks | beam | depth | median ms | searches/s | nodes |",
+    "| --- | --- | ---: | --- | --- | --- | ---: | ---: | ---: | ---: | ---: |"
   );
 
   for (const scenario of report.scenarios) {
@@ -168,6 +185,9 @@ export function renderOpenerExperimentMarkdown(report: OpenerExperimentReport): 
         scenario.name,
         scenario.queue,
         String(scenario.hold),
+        scenario.rules.spinMode,
+        scenario.rules.comboTable,
+        scenario.rules.kickTable,
         String(scenario.beamWidth),
         String(scenario.maxDepth),
         scenario.medianMs.toFixed(3),
@@ -264,10 +284,12 @@ function runScenario(
   }
 
   const stats = summarizeTimings(timings);
+  const rules = scenarioRules(scenario);
   return {
     name: scenario.name,
     queue: scenario.queue,
     hold: scenario.hold,
+    rules,
     beamWidth: scenario.beamWidth,
     maxDepth: scenario.maxDepth,
     warmups,
@@ -283,12 +305,20 @@ function runScenario(
 }
 
 function searchInput(scenario: OpenerExperimentScenario): SearchOpenerBeamInput {
+  const rules = scenarioRules(scenario);
   return {
     queue: scenario.queue,
     beamWidth: scenario.beamWidth,
     hold: scenario.hold,
-    maxDepth: scenario.maxDepth
+    maxDepth: scenario.maxDepth,
+    spinMode: rules.spinMode,
+    comboTable: rules.comboTable,
+    kickTable: rules.kickTable
   };
+}
+
+function scenarioRules(scenario: OpenerExperimentScenario): OpenerExperimentSearchRules {
+  return scenario.rules ?? TETRIO_TL_OPENER_SEARCH_RULES;
 }
 
 function createTopCandidates(
@@ -366,6 +396,25 @@ function compareRankedOpenerCandidates(left: RankedOpenerCandidate, right: Ranke
 
 function formatClearSequence(clearSequence: readonly string[]): string {
   return clearSequence.length === 0 ? "-" : clearSequence.join(" ");
+}
+
+function formatRules(rules: OpenerExperimentSearchRules): string {
+  return `spins=${rules.spinMode}, combo=${rules.comboTable}, kicks=${rules.kickTable}`;
+}
+
+function formatReportRules(scenarios: readonly OpenerExperimentScenarioResult[]): string {
+  const first = scenarios[0];
+  if (first === undefined) {
+    return formatRules(TETRIO_TL_OPENER_SEARCH_RULES);
+  }
+  if (scenarios.every((scenario) => rulesEqual(scenario.rules, first.rules))) {
+    return formatRules(first.rules);
+  }
+  return "mixed (see Search run)";
+}
+
+function rulesEqual(left: OpenerExperimentSearchRules, right: OpenerExperimentSearchRules): boolean {
+  return left.spinMode === right.spinMode && left.comboTable === right.comboTable && left.kickTable === right.kickTable;
 }
 
 function summarizeTimings(samples: readonly number[]): { median: number; min: number; max: number } {
