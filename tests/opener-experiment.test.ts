@@ -516,6 +516,51 @@ describe("opener experiment runner", () => {
     expect(renderOpenerExperimentMarkdown(report)).toContain("1/2 (50.0%) | 1 (100.0%) | source");
   });
 
+  test("prioritizes replayed templates before unreplayed firepower in replay reports", () => {
+    const strongRows = [9, 8, 7, ...new Array(17).fill(0)];
+    const stableRows = [1, 2, 3, ...new Array(17).fill(0)];
+    const report = runOpenerExperiment({
+      scenarios: [rankingScenario("strong", "HI"), rankingScenario("stable", "IO")],
+      templateReplay: {
+        scenarios: [replayScenario("stable-hit", "JO")],
+        topTemplates: 2
+      },
+      clock: createClock("2026-05-14T00:00:00.000Z", [0, 1, 2, 3]),
+      fumenCodec: fakeCodec,
+      search: (input) => {
+        if (input.queue === "HI") {
+          return [
+            {
+              ...candidateNode("strong"),
+              rows: strongRows,
+              attack: 12,
+              difficultAttack: 12,
+              difficultClears: 3,
+              tSpinClears: 3,
+              tSpinAttack: 12,
+              backToBackChain: 3
+            }
+          ];
+        }
+        return [
+          {
+            ...candidateNode("stable"),
+            rows: stableRows,
+            attack: 8,
+            difficultAttack: 8,
+            difficultClears: 2,
+            tSpinClears: 2,
+            tSpinAttack: 8,
+            backToBackChain: 2
+          }
+        ];
+      }
+    });
+
+    expect(report.templateReplay?.templates.map((template) => template.sources[0])).toEqual(["stable", "strong"]);
+    expect(report.templateReplay?.templates.map((template) => template.replayHitCount)).toEqual([1, 0]);
+  });
+
   test("reuses full template indexes from already searched scenarios during replay", () => {
     const rows = [6, 5, 4, ...new Array(17).fill(0)];
     let calls = 0;

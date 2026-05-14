@@ -896,9 +896,9 @@ function compareRankedOpenerTemplates(left: RankedOpenerTemplate, right: RankedO
 
 function compareReplayTemplates(left: OpenerTemplateReplayEntry, right: OpenerTemplateReplayEntry): number {
   return (
-    compareRankedOpenerCandidates(left.best, right.best) ||
     right.replayHitCount - left.replayHitCount ||
     right.groupedSurvivalCount - left.groupedSurvivalCount ||
+    compareRankedOpenerCandidates(left.best, right.best) ||
     left.key.localeCompare(right.key)
   );
 }
