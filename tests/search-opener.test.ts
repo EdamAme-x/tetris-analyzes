@@ -7,7 +7,7 @@ import {
   searchOpenerBeamWithPlacements
 } from "../src/application/search-opener";
 import { ROW_MASK } from "../src/domain/board";
-import { TETRIO_GARBAGE_ATTACK_TABLE, TETRIO_SCORING_TABLE } from "../src/domain/tetrio-tables";
+import { TETRIO_COMBO_ATTACK_TABLES, TETRIO_GARBAGE_ATTACK_TABLE, TETRIO_SCORING_TABLE } from "../src/domain/tetrio-tables";
 import { bitBoardFromRows } from "../src/infrastructure/bitboard/native-bitboard";
 import type { NativeClearName } from "../src/infrastructure/native/binding-types";
 
@@ -144,6 +144,43 @@ describe("native opener beam search", () => {
     const allClearSingle = evaluateOpenerFirepower([{ clearName: "SINGLE", allClear: true }]).events[0];
     expect(allClearSingle?.attack).toBe(TETRIO_GARBAGE_ATTACK_TABLE.SINGLE + TETRIO_GARBAGE_ATTACK_TABLE.ALL_CLEAR);
     expect(allClearSingle?.points).toBe(TETRIO_SCORING_TABLE.SINGLE + TETRIO_SCORING_TABLE.ALL_CLEAR);
+  });
+
+  test("uses extracted TETR.IO combo tables in native firepower evaluation", () => {
+    const classicDoubles = Array.from({ length: 12 }, () => ({
+      clearName: "DOUBLE",
+      comboTable: "CLASSIC GUIDELINE"
+    })) satisfies Array<{ clearName: NativeClearName; comboTable: "CLASSIC GUIDELINE" }>;
+    const modernDoubles = Array.from({ length: 12 }, () => ({
+      clearName: "DOUBLE",
+      comboTable: "MODERN GUIDELINE"
+    })) satisfies Array<{ clearName: NativeClearName; comboTable: "MODERN GUIDELINE" }>;
+    const noComboDoubles = Array.from({ length: 12 }, () => ({
+      clearName: "DOUBLE",
+      comboTable: "NONE"
+    })) satisfies Array<{ clearName: NativeClearName; comboTable: "NONE" }>;
+
+    expect(evaluateOpenerFirepower(classicDoubles).events.at(-1)?.attack).toBe(
+      TETRIO_GARBAGE_ATTACK_TABLE.DOUBLE + TETRIO_COMBO_ATTACK_TABLES["classic guideline"][10]!
+    );
+    expect(evaluateOpenerFirepower(modernDoubles).events.at(-1)?.attack).toBe(
+      TETRIO_GARBAGE_ATTACK_TABLE.DOUBLE + TETRIO_COMBO_ATTACK_TABLES["modern guideline"][10]!
+    );
+    expect(evaluateOpenerFirepower(noComboDoubles).events.at(-1)?.attack).toBe(TETRIO_GARBAGE_ATTACK_TABLE.DOUBLE);
+  });
+
+  test("ignores impossible all clear markers on no-line firepower events", () => {
+    expect(evaluateOpenerFirepower([{ clearName: "NONE", allClear: true }])).toMatchObject({
+      attack: 0,
+      points: 0,
+      combo: 0,
+      allClears: 0
+    });
+    expect(evaluateOpenerFirepower([{ clearName: "NONE", allClear: true }]).events[0]).toMatchObject({
+      clearName: "NONE",
+      allClear: false,
+      allClearBonus: 0
+    });
   });
 
   test("rejects invalid queues before searching", () => {

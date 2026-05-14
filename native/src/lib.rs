@@ -1,74 +1,73 @@
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
-use std::collections::{HashMap, HashSet, VecDeque};
-use std::sync::OnceLock;
+use std::collections::HashMap;
 
-const BOARD_WIDTH: usize = 10;
-const BOARD_HEIGHT: usize = 20;
-const BOARD_EVALUATION_STRIDE: usize = 5;
-const FUMEN_FIELD_HEIGHT: usize = 23;
-const ROW_MASK: u16 = (1 << BOARD_WIDTH) - 1;
-const TETRIO_BACK_TO_BACK_SCORE_MULTIPLIER: f64 = 1.5;
-const TETRIO_BACK_TO_BACK_BONUS: f64 = 1.0;
-const TETRIO_BACK_TO_BACK_BONUS_LOG: f64 = 0.8;
-const TETRIO_COMBO_SCORE: u32 = 50;
-const TETRIO_COMBO_BONUS: f64 = 0.25;
-const TETRIO_COMBO_MINIFIER: f64 = 1.0;
-const TETRIO_COMBO_MINIFIER_LOG: f64 = 1.25;
-const TETRIO_ALL_CLEAR_ATTACK: u32 = 10;
-const TETRIO_ALL_CLEAR_POINTS: u32 = 3_500;
+mod board;
+mod firepower;
+mod fumen;
+mod movement;
+mod pieces;
+mod spin;
+mod tetrio_tables;
 
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-enum Piece {
-    I,
-    O,
-    T,
-    S,
-    Z,
-    J,
-    L,
-}
-
-#[derive(Clone, Copy)]
-struct Cell {
-    x: i8,
-    y: i8,
-}
-
-#[derive(Clone, Copy)]
-struct Shape {
-    rotation: u8,
-    width: i8,
-    height: i8,
-    cells: &'static [Cell],
-}
-
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-struct MovementState {
-    shape_index: usize,
-    x: i8,
-    y: i8,
-}
+use board::{BoardEvaluation, BoardRows, BOARD_HEIGHT, BOARD_WIDTH};
+use firepower::{
+    advance_firepower, advance_firepower_for_clear_with_combo_table, clear_kind_cleared_lines,
+    clear_kind_name, firepower_score, parse_clear_kind, parse_combo_table, score_state,
+    FirepowerEvent, FirepowerState,
+};
+use movement::{can_place, is_reachable_placement, lock_shape};
+use pieces::{
+    format_placement, parse_piece_string, parse_queue, piece_name, piece_shapes, Cell, Piece, Shape,
+};
+use spin::{detect_spin, spin_kind_name, SpinDetection};
 
 #[derive(Clone)]
 struct SearchState {
-    rows: [u16; BOARD_HEIGHT],
+    rows: BoardRows,
     hold: Option<Piece>,
     queue_index: usize,
     path: Vec<String>,
     placements: Vec<Placement>,
     score: f64,
-    metrics: [u32; BOARD_EVALUATION_STRIDE],
+    metrics: BoardEvaluation,
     firepower: FirepowerState,
 }
 
 #[derive(Eq, Hash, PartialEq)]
 struct SearchKey {
-    rows: [u16; BOARD_HEIGHT],
+    rows: BoardRows,
     hold: Option<Piece>,
     queue_index: usize,
     combo: u32,
     back_to_back_chain: u32,
+}
+
+#[derive(Clone)]
+struct Placement {
+    piece: Piece,
+    rotation: u8,
+    x: i8,
+    y: i8,
+    used_hold: bool,
+    cells: Vec<Cell>,
+    spin: SpinDetection,
+    firepower: FirepowerEvent,
+}
+
+struct PlacedBoard {
+    rows: BoardRows,
+    y: i8,
+    spin: SpinDetection,
+    placement: Option<Placement>,
+}
+
+#[derive(Clone, Copy)]
+struct PieceChoice {
+    piece: Piece,
+    hold: Option<Piece>,
+    queue_index: usize,
+    used_hold: bool,
 }
 
 #[napi(object)]
@@ -91,25 +90,6 @@ pub struct BeamSearchNode {
     pub aggregate_height: u32,
     pub holes: u32,
     pub bumpiness: u32,
-}
-
-#[derive(Clone)]
-struct Placement {
-    piece: Piece,
-    rotation: u8,
-    x: i8,
-    y: i8,
-    used_hold: bool,
-    cells: Vec<Cell>,
-    spin: SpinDetection,
-    firepower: FirepowerEvent,
-}
-
-struct PlacedBoard {
-    rows: [u16; BOARD_HEIGHT],
-    y: i8,
-    spin: SpinDetection,
-    placement: Option<Placement>,
 }
 
 #[napi(object)]
@@ -144,97 +124,6 @@ pub struct BeamPlacement {
     pub all_clear_bonus: u32,
 }
 
-#[derive(Clone, Copy)]
-struct SpinDetection {
-    kind: SpinKind,
-    spin: bool,
-    mini: bool,
-    immobile: bool,
-    occupied_corners: u32,
-    cleared_lines: u32,
-}
-
-#[derive(Clone, Copy, Eq, PartialEq)]
-enum SpinKind {
-    None,
-    TSpin,
-    TSpinMini,
-    ImmobileSpin,
-}
-
-#[derive(Clone, Copy)]
-struct FirepowerState {
-    attack: u32,
-    points: u32,
-    combo: u32,
-    max_combo: u32,
-    back_to_back_chain: u32,
-    all_clears: u32,
-}
-
-#[derive(Clone, Copy)]
-struct FirepowerEvent {
-    clear_kind: ClearKind,
-    attack: u32,
-    base_attack: u32,
-    points: u32,
-    combo: u32,
-    back_to_back: bool,
-    back_to_back_bonus: f64,
-    all_clear: bool,
-    all_clear_bonus: u32,
-}
-
-#[derive(Clone, Copy, Eq, PartialEq)]
-enum ClearKind {
-    None,
-    Single,
-    Double,
-    Triple,
-    Quad,
-    Penta,
-    TSpin,
-    TSpinMini,
-    TSpinMiniSingle,
-    TSpinSingle,
-    TSpinMiniDouble,
-    TSpinDouble,
-    TSpinMiniTriple,
-    TSpinTriple,
-    TSpinMiniQuad,
-    TSpinQuad,
-    TSpinPenta,
-}
-
-impl FirepowerState {
-    fn empty() -> Self {
-        Self {
-            attack: 0,
-            points: 0,
-            combo: 0,
-            max_combo: 0,
-            back_to_back_chain: 0,
-            all_clears: 0,
-        }
-    }
-}
-
-impl FirepowerEvent {
-    fn empty() -> Self {
-        Self {
-            clear_kind: ClearKind::None,
-            attack: 0,
-            base_attack: 0,
-            points: 0,
-            combo: 0,
-            back_to_back: false,
-            back_to_back_bonus: 0.0,
-            all_clear: false,
-            all_clear_bonus: 0,
-        }
-    }
-}
-
 #[napi(object)]
 pub struct BeamSpinDetection {
     pub kind: String,
@@ -249,6 +138,7 @@ pub struct BeamSpinDetection {
 pub struct BeamFirepowerInput {
     pub clear_name: String,
     pub all_clear: Option<bool>,
+    pub combo_table: Option<String>,
 }
 
 #[napi(object)]
@@ -276,176 +166,64 @@ pub struct BeamFirepowerSummary {
     pub events: Vec<BeamFirepowerEvent>,
 }
 
-#[derive(Clone, Copy)]
-struct PieceChoice {
-    piece: Piece,
-    hold: Option<Piece>,
-    queue_index: usize,
-    used_hold: bool,
-}
-
 #[napi(js_name = "createEmptyBoard")]
 pub fn create_empty_board() -> Uint16Array {
-    vec![0_u16; BOARD_HEIGHT].into()
+    board::create_empty_board().into()
 }
 
 #[napi(js_name = "copyBoardRows")]
 pub fn copy_board_rows(rows: Uint16Array) -> Result<Uint16Array> {
-    let rows = rows.as_ref();
-    validate_single_board(rows)?;
-    Ok(rows.to_vec().into())
+    Ok(board::copy_board_rows(rows.as_ref())?.into())
 }
 
 #[napi(js_name = "isPerfectClear")]
 pub fn is_perfect_clear(rows: Uint16Array) -> Result<bool> {
-    let rows = rows.as_ref();
-    validate_single_board_shape(rows)?;
-
-    for (index, row) in rows.iter().copied().enumerate() {
-        validate_row(row, index)?;
-        if row != 0 {
-            return Ok(false);
-        }
-    }
-
-    Ok(true)
+    board::is_perfect_clear(rows.as_ref())
 }
 
 #[napi(js_name = "countOccupiedCells")]
 pub fn count_occupied_cells(rows: Uint16Array) -> Result<u32> {
-    let rows = rows.as_ref();
-    validate_single_board_shape(rows)?;
-    count_occupied_cells_in_rows(rows, 0)
+    board::count_occupied_cells(rows.as_ref())
 }
 
 #[napi(js_name = "clearFullLines")]
 pub fn clear_full_lines(rows: Uint16Array) -> Result<Uint16Array> {
-    let rows = rows.as_ref();
-    validate_single_board_shape(rows)?;
-
-    let mut output = vec![0_u16; BOARD_HEIGHT];
-    clear_full_lines_into(rows, &mut output, 0)?;
-
-    Ok(output.into())
+    Ok(board::clear_full_lines(rows.as_ref())?.into())
 }
 
 #[napi(js_name = "batchCountOccupiedCells")]
 pub fn batch_count_occupied_cells(rows: Uint16Array, board_count: u32) -> Result<Uint32Array> {
-    let rows = rows.as_ref();
-    let board_count = board_count as usize;
-    validate_board_shape(rows, board_count)?;
-
-    let mut counts = Vec::with_capacity(board_count);
-    for board_index in 0..board_count {
-        let offset = board_index * BOARD_HEIGHT;
-        counts.push(count_occupied_cells_in_rows(
-            &rows[offset..offset + BOARD_HEIGHT],
-            offset,
-        )?);
-    }
-
-    Ok(counts.into())
+    Ok(board::batch_count_occupied_cells(rows.as_ref(), board_count)?.into())
 }
 
 #[napi(js_name = "batchClearFullLines")]
 pub fn batch_clear_full_lines(rows: Uint16Array, board_count: u32) -> Result<Uint16Array> {
-    let rows = rows.as_ref();
-    let board_count = board_count as usize;
-    validate_board_shape(rows, board_count)?;
-
-    let mut output = vec![0_u16; rows.len()];
-    for board_index in 0..board_count {
-        let offset = board_index * BOARD_HEIGHT;
-        clear_full_lines_into(
-            &rows[offset..offset + BOARD_HEIGHT],
-            &mut output[offset..offset + BOARD_HEIGHT],
-            offset,
-        )?;
-    }
-
-    Ok(output.into())
+    Ok(board::batch_clear_full_lines(rows.as_ref(), board_count)?.into())
 }
 
 #[napi(js_name = "batchEvaluateBoards")]
 pub fn batch_evaluate_boards(rows: Uint16Array, board_count: u32) -> Result<Uint32Array> {
-    let rows = rows.as_ref();
-    let board_count = board_count as usize;
-    validate_board_shape(rows, board_count)?;
-
-    let mut evaluations = Vec::with_capacity(board_count * BOARD_EVALUATION_STRIDE);
-    for board_index in 0..board_count {
-        let offset = board_index * BOARD_HEIGHT;
-        evaluations.extend_from_slice(&evaluate_board(
-            &rows[offset..offset + BOARD_HEIGHT],
-            offset,
-        )?);
-    }
-
-    Ok(evaluations.into())
+    Ok(board::batch_evaluate_boards(rows.as_ref(), board_count)?.into())
 }
 
 #[napi(js_name = "createGarbageRows")]
 pub fn create_garbage_rows(holes: Uint8Array) -> Result<Uint16Array> {
-    let holes = holes.as_ref();
-    validate_garbage_holes(holes)?;
-
-    let rows = holes
-        .iter()
-        .map(|hole| ROW_MASK ^ (1_u16 << *hole))
-        .collect::<Vec<u16>>();
-    Ok(rows.into())
+    Ok(board::create_garbage_rows(holes.as_ref())?.into())
 }
 
 #[napi(js_name = "applyGarbage")]
 pub fn apply_garbage(rows: Uint16Array, holes: Uint8Array) -> Result<Uint16Array> {
-    let rows = rows.as_ref();
-    let holes = holes.as_ref();
-    validate_single_board_shape(rows)?;
-    for (index, row) in rows.iter().copied().enumerate() {
-        validate_row(row, index)?;
-    }
-    validate_garbage_holes(holes)?;
-
-    if holes.len() > BOARD_HEIGHT {
-        return Err(Error::from_reason(format!(
-            "Cannot apply more than {BOARD_HEIGHT} garbage rows, got {}.",
-            holes.len()
-        )));
-    }
-
-    let mut output = vec![0_u16; BOARD_HEIGHT];
-    for (index, hole) in holes.iter().copied().enumerate() {
-        output[index] = ROW_MASK ^ (1_u16 << hole);
-    }
-    for y in holes.len()..BOARD_HEIGHT {
-        output[y] = rows[y - holes.len()];
-    }
-
-    Ok(output.into())
+    Ok(board::apply_garbage(rows.as_ref(), holes.as_ref())?.into())
 }
 
 #[napi(js_name = "rowsToFumenField")]
 pub fn rows_to_fumen_field(rows: Uint16Array) -> Result<String> {
-    let rows = rows.as_ref();
-    validate_single_board_shape(rows)?;
-    rows_to_fumen_field_string(rows)
+    fumen::rows_to_fumen_field(rows.as_ref())
 }
 
 #[napi(js_name = "batchRowsToFumenFields")]
 pub fn batch_rows_to_fumen_fields(rows: Uint16Array, board_count: u32) -> Result<Vec<String>> {
-    let rows = rows.as_ref();
-    let board_count = board_count as usize;
-    validate_board_shape(rows, board_count)?;
-
-    let mut fields = Vec::with_capacity(board_count);
-    for board_index in 0..board_count {
-        let offset = board_index * BOARD_HEIGHT;
-        fields.push(rows_to_fumen_field_string(
-            &rows[offset..offset + BOARD_HEIGHT],
-        )?);
-    }
-
-    Ok(fields)
+    fumen::batch_rows_to_fumen_fields(rows.as_ref(), board_count)
 }
 
 #[napi(js_name = "canReachOpenerPlacement")]
@@ -456,9 +234,7 @@ pub fn can_reach_opener_placement(
     x: i32,
     y: i32,
 ) -> Result<bool> {
-    let rows = rows.as_ref();
-    validate_single_board(rows)?;
-    let board = rows_to_array(rows)?;
+    let board = board::rows_to_array(rows.as_ref())?;
     let piece = parse_piece_string(&piece)?;
     let rotation = u8::try_from(rotation)
         .map_err(|_| Error::from_reason(format!("rotation must fit in u8, got {rotation}.")))?;
@@ -490,9 +266,7 @@ pub fn detect_opener_spin(
     x: i32,
     y: i32,
 ) -> Result<BeamSpinDetection> {
-    let rows = rows.as_ref();
-    validate_single_board(rows)?;
-    let board = rows_to_array(rows)?;
+    let board = board::rows_to_array(rows.as_ref())?;
     let piece = parse_piece_string(&piece)?;
     let rotation = u8::try_from(rotation)
         .map_err(|_| Error::from_reason(format!("rotation must fit in u8, got {rotation}.")))?;
@@ -522,7 +296,7 @@ pub fn detect_opener_spin(
         shape,
         x,
         y,
-        count_full_lines_array(&locked),
+        board::count_full_lines_array(&locked),
     )))
 }
 
@@ -534,8 +308,19 @@ pub fn evaluate_opener_firepower(events: Vec<BeamFirepowerInput>) -> Result<Beam
     for event in events {
         let clear_kind = parse_clear_kind(&event.clear_name)?;
         let cleared_lines = clear_kind_cleared_lines(clear_kind);
-        let (next_state, firepower_event) =
-            advance_firepower_for_clear(state, clear_kind, cleared_lines, event.all_clear.unwrap_or(false));
+        let combo_table = event
+            .combo_table
+            .as_deref()
+            .map(parse_combo_table)
+            .transpose()?
+            .unwrap_or(crate::tetrio_tables::ComboTable::Multiplier);
+        let (next_state, firepower_event) = advance_firepower_for_clear_with_combo_table(
+            state,
+            clear_kind,
+            cleared_lines,
+            cleared_lines > 0 && event.all_clear.unwrap_or(false),
+            combo_table,
+        );
         state = next_state;
         output_events.push(BeamFirepowerEvent::from(firepower_event));
     }
@@ -589,7 +374,7 @@ fn search_opener_beam_internal(
         })?;
 
     let empty_rows = [0_u16; BOARD_HEIGHT];
-    let initial_metrics = evaluate_board_unchecked(&empty_rows);
+    let initial_metrics = board::evaluate_board_unchecked(&empty_rows);
     let initial_firepower = FirepowerState::empty();
     let mut beam = vec![SearchState {
         rows: empty_rows,
@@ -618,7 +403,7 @@ fn search_opener_beam_internal(
                             include_placements,
                         ) {
                             let rows = placed.rows;
-                            let metrics = evaluate_board_unchecked(&rows);
+                            let metrics = board::evaluate_board_unchecked(&rows);
                             let (firepower, firepower_event) =
                                 advance_firepower(state.firepower, placed.spin, &rows);
                             let score = score_state(metrics, firepower);
@@ -682,483 +467,6 @@ fn search_opener_beam_internal(
     Ok(beam.into_iter().map(BeamSearchNode::from).collect())
 }
 
-fn validate_board_shape(rows: &[u16], board_count: usize) -> Result<()> {
-    let expected_rows = board_count.checked_mul(BOARD_HEIGHT).ok_or_else(|| {
-        Error::from_reason(format!(
-            "boardCount is too large to fit {BOARD_HEIGHT}-row boards."
-        ))
-    })?;
-    if rows.len() != expected_rows {
-        return Err(Error::from_reason(format!(
-            "Expected {expected_rows} row values, got {}.",
-            rows.len()
-        )));
-    }
-
-    Ok(())
-}
-
-fn validate_single_board(rows: &[u16]) -> Result<()> {
-    validate_single_board_shape(rows)?;
-    for (index, row) in rows.iter().copied().enumerate() {
-        validate_row(row, index)?;
-    }
-    Ok(())
-}
-
-fn rows_to_array(rows: &[u16]) -> Result<[u16; BOARD_HEIGHT]> {
-    validate_single_board(rows)?;
-    let mut output = [0_u16; BOARD_HEIGHT];
-    output.copy_from_slice(rows);
-    Ok(output)
-}
-
-fn validate_single_board_shape(rows: &[u16]) -> Result<()> {
-    validate_board_shape(rows, 1)
-}
-
-fn validate_row(row: u16, index: usize) -> Result<()> {
-    if row & !ROW_MASK != 0 {
-        return Err(Error::from_reason(format!(
-            "Row {index} must fit in {BOARD_WIDTH} bits, got {row}."
-        )));
-    }
-    Ok(())
-}
-
-fn validate_garbage_holes(holes: &[u8]) -> Result<()> {
-    for (index, hole) in holes.iter().copied().enumerate() {
-        if usize::from(hole) >= BOARD_WIDTH {
-            return Err(Error::from_reason(format!(
-                "Garbage hole {index} must be between 0 and {}, got {hole}.",
-                BOARD_WIDTH - 1
-            )));
-        }
-    }
-    Ok(())
-}
-
-fn count_occupied_cells_in_rows(rows: &[u16], row_offset: usize) -> Result<u32> {
-    let mut count = 0;
-    for (index, row) in rows.iter().copied().enumerate() {
-        validate_row(row, row_offset + index)?;
-        count += row.count_ones();
-    }
-    Ok(count)
-}
-
-fn clear_full_lines_into(rows: &[u16], output: &mut [u16], row_offset: usize) -> Result<()> {
-    let mut write_y = 0;
-    for (index, row) in rows.iter().copied().enumerate() {
-        validate_row(row, row_offset + index)?;
-        if row != ROW_MASK {
-            output[write_y] = row;
-            write_y += 1;
-        }
-    }
-    Ok(())
-}
-
-fn evaluate_board(rows: &[u16], row_offset: usize) -> Result<[u32; BOARD_EVALUATION_STRIDE]> {
-    let mut occupied_cells = 0;
-    let mut cleared_lines = 0;
-    let mut column_masks = [0_u32; BOARD_WIDTH];
-
-    for (y, row) in rows.iter().copied().enumerate() {
-        validate_row(row, row_offset + y)?;
-        occupied_cells += row.count_ones();
-        if row == ROW_MASK {
-            cleared_lines += 1;
-        }
-        for (x, column_mask) in column_masks.iter_mut().enumerate() {
-            if row & (1_u16 << x) != 0 {
-                *column_mask |= 1_u32 << y;
-            }
-        }
-    }
-
-    let mut aggregate_height = 0;
-    let mut holes = 0;
-    let mut previous_height: Option<u32> = None;
-    let mut bumpiness = 0;
-    for column_mask in column_masks {
-        let height = if column_mask == 0 {
-            0
-        } else {
-            u32::BITS - column_mask.leading_zeros()
-        };
-        aggregate_height += height;
-        holes += height - column_mask.count_ones();
-        if let Some(previous) = previous_height {
-            bumpiness += previous.abs_diff(height);
-        }
-        previous_height = Some(height);
-    }
-
-    Ok([
-        occupied_cells,
-        cleared_lines,
-        aggregate_height,
-        holes,
-        bumpiness,
-    ])
-}
-
-fn evaluate_board_unchecked(rows: &[u16; BOARD_HEIGHT]) -> [u32; BOARD_EVALUATION_STRIDE] {
-    let mut occupied_cells = 0;
-    let mut cleared_lines = 0;
-    let mut column_masks = [0_u32; BOARD_WIDTH];
-
-    for (y, row) in rows.iter().copied().enumerate() {
-        occupied_cells += row.count_ones();
-        if row == ROW_MASK {
-            cleared_lines += 1;
-        }
-        for (x, column_mask) in column_masks.iter_mut().enumerate() {
-            if row & (1_u16 << x) != 0 {
-                *column_mask |= 1_u32 << y;
-            }
-        }
-    }
-
-    let mut aggregate_height = 0;
-    let mut holes = 0;
-    let mut previous_height: Option<u32> = None;
-    let mut bumpiness = 0;
-    for column_mask in column_masks {
-        let height = if column_mask == 0 {
-            0
-        } else {
-            u32::BITS - column_mask.leading_zeros()
-        };
-        aggregate_height += height;
-        holes += height - column_mask.count_ones();
-        if let Some(previous) = previous_height {
-            bumpiness += previous.abs_diff(height);
-        }
-        previous_height = Some(height);
-    }
-
-    [
-        occupied_cells,
-        cleared_lines,
-        aggregate_height,
-        holes,
-        bumpiness,
-    ]
-}
-
-fn score_state(metrics: [u32; BOARD_EVALUATION_STRIDE], firepower: FirepowerState) -> f64 {
-    firepower_score(firepower) + board_shape_score(metrics)
-}
-
-fn firepower_score(firepower: FirepowerState) -> f64 {
-    firepower.attack as f64 * 1_000.0
-        + firepower.points as f64 * 0.05
-        + firepower.max_combo as f64 * 20.0
-        + firepower.back_to_back_chain as f64 * 25.0
-        + firepower.all_clears as f64 * 500.0
-}
-
-fn board_shape_score(metrics: [u32; BOARD_EVALUATION_STRIDE]) -> f64 {
-    let cleared_lines = metrics[1] as f64;
-    let aggregate_height = metrics[2] as f64;
-    let holes = metrics[3] as f64;
-    let bumpiness = metrics[4] as f64;
-    cleared_lines * 120.0 - holes * 90.0 - aggregate_height * 2.2 - bumpiness * 7.0
-}
-
-fn advance_firepower(
-    previous: FirepowerState,
-    spin: SpinDetection,
-    rows_after_clear: &[u16; BOARD_HEIGHT],
-) -> (FirepowerState, FirepowerEvent) {
-    let clear_kind = classify_clear(spin.kind, spin.cleared_lines);
-    let all_clear = spin.cleared_lines > 0 && is_empty_rows(rows_after_clear);
-    advance_firepower_for_clear(previous, clear_kind, spin.cleared_lines, all_clear)
-}
-
-fn advance_firepower_for_clear(
-    previous: FirepowerState,
-    clear_kind: ClearKind,
-    cleared_lines: u32,
-    all_clear: bool,
-) -> (FirepowerState, FirepowerEvent) {
-    let base_attack = clear_kind_attack(clear_kind);
-    let mut attack = base_attack as f64;
-    let mut points = clear_kind_points(clear_kind);
-    let combo = if cleared_lines > 0 {
-        previous.combo + 1
-    } else {
-        0
-    };
-    let max_combo = previous.max_combo.max(combo);
-    let difficult = is_back_to_back_clear(clear_kind);
-    let back_to_back_chain = if difficult {
-        previous.back_to_back_chain + 1
-    } else if cleared_lines > 0 {
-        0
-    } else {
-        previous.back_to_back_chain
-    };
-    let back_to_back = difficult && back_to_back_chain > 1;
-    let back_to_back_bonus = if back_to_back {
-        back_to_back_chain_bonus(back_to_back_chain)
-    } else {
-        0.0
-    };
-
-    if back_to_back {
-        attack += back_to_back_bonus;
-        points = (points as f64 * TETRIO_BACK_TO_BACK_SCORE_MULTIPLIER).floor() as u32;
-    }
-    if combo > 1 {
-        points += TETRIO_COMBO_SCORE * (combo - 1);
-        attack = multiplier_combo_attack(attack, combo);
-    }
-
-    let all_clear_bonus = if all_clear { TETRIO_ALL_CLEAR_ATTACK } else { 0 };
-    let all_clear_points = if all_clear { TETRIO_ALL_CLEAR_POINTS } else { 0 };
-    let event_attack = attack.floor() as u32 + all_clear_bonus;
-    let event_points = points + all_clear_points;
-    let all_clears = previous.all_clears + u32::from(all_clear);
-
-    (
-        FirepowerState {
-            attack: previous.attack + event_attack,
-            points: previous.points + event_points,
-            combo,
-            max_combo,
-            back_to_back_chain,
-            all_clears,
-        },
-        FirepowerEvent {
-            clear_kind,
-            attack: event_attack,
-            base_attack,
-            points: event_points,
-            combo,
-            back_to_back,
-            back_to_back_bonus,
-            all_clear,
-            all_clear_bonus,
-        },
-    )
-}
-
-fn classify_clear(spin_kind: SpinKind, cleared_lines: u32) -> ClearKind {
-    match (spin_kind, cleared_lines) {
-        (SpinKind::TSpinMini, 0) => ClearKind::TSpinMini,
-        (SpinKind::TSpin, 0) => ClearKind::TSpin,
-        (SpinKind::TSpinMini, 1) => ClearKind::TSpinMiniSingle,
-        (SpinKind::TSpin, 1) => ClearKind::TSpinSingle,
-        (SpinKind::TSpinMini, 2) => ClearKind::TSpinMiniDouble,
-        (SpinKind::TSpin, 2) => ClearKind::TSpinDouble,
-        (SpinKind::TSpinMini, 3) => ClearKind::TSpinMiniTriple,
-        (SpinKind::TSpin, 3) => ClearKind::TSpinTriple,
-        (SpinKind::TSpinMini, 4) => ClearKind::TSpinMiniQuad,
-        (SpinKind::TSpin, 4) => ClearKind::TSpinQuad,
-        (SpinKind::TSpin, _) if cleared_lines >= 5 => ClearKind::TSpinPenta,
-        (_, 0) => ClearKind::None,
-        (_, 1) => ClearKind::Single,
-        (_, 2) => ClearKind::Double,
-        (_, 3) => ClearKind::Triple,
-        (_, 4) => ClearKind::Quad,
-        _ => ClearKind::Penta,
-    }
-}
-
-fn parse_clear_kind(input: &str) -> Result<ClearKind> {
-    let normalized = input
-        .trim()
-        .to_ascii_uppercase()
-        .replace(['-', ' '], "_");
-    match normalized.as_str() {
-        "NONE" => Ok(ClearKind::None),
-        "SINGLE" => Ok(ClearKind::Single),
-        "DOUBLE" => Ok(ClearKind::Double),
-        "TRIPLE" => Ok(ClearKind::Triple),
-        "QUAD" => Ok(ClearKind::Quad),
-        "PENTA" => Ok(ClearKind::Penta),
-        "TSPIN" | "T_SPIN" => Ok(ClearKind::TSpin),
-        "TSPIN_MINI" | "T_SPIN_MINI" => Ok(ClearKind::TSpinMini),
-        "TSPIN_MINI_SINGLE" | "T_SPIN_MINI_SINGLE" => Ok(ClearKind::TSpinMiniSingle),
-        "TSPIN_SINGLE" | "T_SPIN_SINGLE" => Ok(ClearKind::TSpinSingle),
-        "TSPIN_MINI_DOUBLE" | "T_SPIN_MINI_DOUBLE" => Ok(ClearKind::TSpinMiniDouble),
-        "TSPIN_DOUBLE" | "T_SPIN_DOUBLE" => Ok(ClearKind::TSpinDouble),
-        "TSPIN_MINI_TRIPLE" | "T_SPIN_MINI_TRIPLE" => Ok(ClearKind::TSpinMiniTriple),
-        "TSPIN_TRIPLE" | "T_SPIN_TRIPLE" => Ok(ClearKind::TSpinTriple),
-        "TSPIN_MINI_QUAD" | "T_SPIN_MINI_QUAD" => Ok(ClearKind::TSpinMiniQuad),
-        "TSPIN_QUAD" | "T_SPIN_QUAD" => Ok(ClearKind::TSpinQuad),
-        "TSPIN_PENTA" | "T_SPIN_PENTA" => Ok(ClearKind::TSpinPenta),
-        _ => Err(Error::from_reason(format!(
-            "Unknown opener firepower clear name {input}."
-        ))),
-    }
-}
-
-fn clear_kind_cleared_lines(kind: ClearKind) -> u32 {
-    match kind {
-        ClearKind::None | ClearKind::TSpin | ClearKind::TSpinMini => 0,
-        ClearKind::Single | ClearKind::TSpinSingle | ClearKind::TSpinMiniSingle => 1,
-        ClearKind::Double | ClearKind::TSpinDouble | ClearKind::TSpinMiniDouble => 2,
-        ClearKind::Triple | ClearKind::TSpinTriple | ClearKind::TSpinMiniTriple => 3,
-        ClearKind::Quad | ClearKind::TSpinQuad | ClearKind::TSpinMiniQuad => 4,
-        ClearKind::Penta | ClearKind::TSpinPenta => 5,
-    }
-}
-
-fn clear_kind_attack(kind: ClearKind) -> u32 {
-    match kind {
-        ClearKind::None => 0,
-        ClearKind::Single => 0,
-        ClearKind::Double => 1,
-        ClearKind::Triple => 2,
-        ClearKind::Quad => 4,
-        ClearKind::Penta => 5,
-        ClearKind::TSpinMini => 0,
-        ClearKind::TSpin => 0,
-        ClearKind::TSpinMiniSingle => 0,
-        ClearKind::TSpinSingle => 2,
-        ClearKind::TSpinMiniDouble => 1,
-        ClearKind::TSpinDouble => 4,
-        ClearKind::TSpinMiniTriple => 2,
-        ClearKind::TSpinTriple => 6,
-        ClearKind::TSpinMiniQuad => 4,
-        ClearKind::TSpinQuad => 10,
-        ClearKind::TSpinPenta => 12,
-    }
-}
-
-fn clear_kind_points(kind: ClearKind) -> u32 {
-    match kind {
-        ClearKind::None => 0,
-        ClearKind::Single => 100,
-        ClearKind::Double => 300,
-        ClearKind::Triple => 500,
-        ClearKind::Quad => 800,
-        ClearKind::Penta => 1_200,
-        ClearKind::TSpinMini => 100,
-        ClearKind::TSpin => 400,
-        ClearKind::TSpinMiniSingle => 200,
-        ClearKind::TSpinSingle => 800,
-        ClearKind::TSpinMiniDouble => 400,
-        ClearKind::TSpinDouble => 1_200,
-        ClearKind::TSpinMiniTriple => 800,
-        ClearKind::TSpinTriple => 1_600,
-        ClearKind::TSpinMiniQuad => 1_600,
-        ClearKind::TSpinQuad => 2_600,
-        ClearKind::TSpinPenta => 3_200,
-    }
-}
-
-fn is_back_to_back_clear(kind: ClearKind) -> bool {
-    matches!(
-        kind,
-        ClearKind::Quad
-            | ClearKind::Penta
-            | ClearKind::TSpinSingle
-            | ClearKind::TSpinDouble
-            | ClearKind::TSpinTriple
-            | ClearKind::TSpinQuad
-            | ClearKind::TSpinPenta
-    )
-}
-
-fn back_to_back_chain_bonus(back_to_back_chain: u32) -> f64 {
-    if back_to_back_chain <= 1 {
-        return 0.0;
-    }
-    let chain = back_to_back_chain - 1;
-    let value = 1.0 + ((chain as f64) * TETRIO_BACK_TO_BACK_BONUS_LOG).ln_1p();
-    TETRIO_BACK_TO_BACK_BONUS
-        * (value.floor()
-            + if chain == 1 {
-                0.0
-            } else {
-                value.fract() / 3.0
-            })
-}
-
-fn multiplier_combo_attack(base_attack: f64, combo: u32) -> f64 {
-    if combo <= 1 {
-        return base_attack;
-    }
-    let combo_index = (combo - 1) as f64;
-    let multiplied = base_attack * (1.0 + TETRIO_COMBO_BONUS * combo_index);
-    if combo <= 2 {
-        return multiplied;
-    }
-    let minified = (TETRIO_COMBO_MINIFIER * combo_index * TETRIO_COMBO_MINIFIER_LOG).ln_1p();
-    multiplied.max(minified)
-}
-
-fn is_empty_rows(rows: &[u16; BOARD_HEIGHT]) -> bool {
-    rows.iter().all(|row| *row == 0)
-}
-
-fn compare_search_state(left: &SearchState, right: &SearchState) -> std::cmp::Ordering {
-    right
-        .score
-        .total_cmp(&left.score)
-        .then_with(|| left.path.len().cmp(&right.path.len()))
-        .then_with(|| left.queue_index.cmp(&right.queue_index))
-}
-
-fn parse_queue(queue: &str) -> Result<Vec<Piece>> {
-    let mut pieces = Vec::new();
-    for char in queue
-        .chars()
-        .filter(|char| !char.is_whitespace() && *char != ',')
-    {
-        pieces.push(parse_piece(char)?);
-    }
-    if pieces.is_empty() {
-        return Err(Error::from_reason(
-            "queue must contain at least one tetromino.",
-        ));
-    }
-    Ok(pieces)
-}
-
-fn parse_piece(char: char) -> Result<Piece> {
-    match char.to_ascii_uppercase() {
-        'I' => Ok(Piece::I),
-        'O' => Ok(Piece::O),
-        'T' => Ok(Piece::T),
-        'S' => Ok(Piece::S),
-        'Z' => Ok(Piece::Z),
-        'J' => Ok(Piece::J),
-        'L' => Ok(Piece::L),
-        _ => Err(Error::from_reason(format!("Unknown tetromino {char}."))),
-    }
-}
-
-fn parse_piece_string(input: &str) -> Result<Piece> {
-    let mut chars = input.chars().filter(|char| !char.is_whitespace());
-    let Some(char) = chars.next() else {
-        return Err(Error::from_reason("piece must contain one tetromino."));
-    };
-    if chars.next().is_some() {
-        return Err(Error::from_reason(format!(
-            "piece must contain one tetromino, got {input}."
-        )));
-    }
-    parse_piece(char)
-}
-
-fn piece_name(piece: Piece) -> &'static str {
-    match piece {
-        Piece::I => "I",
-        Piece::O => "O",
-        Piece::T => "T",
-        Piece::S => "S",
-        Piece::Z => "Z",
-        Piece::J => "J",
-        Piece::L => "L",
-    }
-}
-
 fn piece_choices(pieces: &[Piece], state: &SearchState, hold_enabled: bool) -> Vec<PieceChoice> {
     let Some(current) = pieces.get(state.queue_index).copied() else {
         return Vec::new();
@@ -1195,13 +503,8 @@ fn piece_choices(pieces: &[Piece], state: &SearchState, hold_enabled: bool) -> V
     choices
 }
 
-fn format_placement(piece: Piece, rotation: u8, x: i8, y: i8, used_hold: bool) -> String {
-    let prefix = if used_hold { "hold:" } else { "" };
-    format!("{prefix}{}@r{},x{},y{}", piece_name(piece), rotation, x, y)
-}
-
 fn place_and_clear(
-    rows: &[u16; BOARD_HEIGHT],
+    rows: &BoardRows,
     choice: PieceChoice,
     shape_index: usize,
     shape: Shape,
@@ -1232,10 +535,10 @@ fn place_and_clear(
                     cells.push(absolute);
                 }
             }
-            let cleared_lines = count_full_lines_array(&placed);
+            let cleared_lines = board::count_full_lines_array(&placed);
             let spin = detect_spin(&placed, choice.piece, shape, x, y, cleared_lines);
             return Some(PlacedBoard {
-                rows: clear_full_lines_array(placed),
+                rows: board::clear_full_lines_array(placed),
                 y,
                 spin,
                 placement: cells.map(|cells| Placement {
@@ -1254,457 +557,12 @@ fn place_and_clear(
     None
 }
 
-fn is_reachable_placement(
-    rows: &[u16; BOARD_HEIGHT],
-    piece: Piece,
-    target_shape_index: usize,
-    target_x: i8,
-    target_y: i8,
-) -> bool {
-    let shapes = piece_shapes(piece);
-    let spawn_shape = shapes[0];
-    let spawn = MovementState {
-        shape_index: 0,
-        x: (BOARD_WIDTH as i8 - spawn_shape.width) / 2,
-        y: BOARD_HEIGHT as i8 - spawn_shape.height,
-    };
-
-    if !can_place(rows, spawn_shape, spawn.x, spawn.y) {
-        return false;
-    }
-
-    let target = MovementState {
-        shape_index: target_shape_index,
-        x: target_x,
-        y: target_y,
-    };
-    if has_clear_vertical_drop(rows, shapes[target_shape_index], target_x, target_y) {
-        return true;
-    }
-
-    let mut visited = HashSet::new();
-    let mut queue = VecDeque::from([spawn]);
-    visited.insert(spawn);
-
-    while let Some(state) = queue.pop_front() {
-        if state == target {
-            return true;
-        }
-
-        push_movement_state(
-            rows,
-            shapes,
-            state,
-            state.shape_index,
-            state.x - 1,
-            state.y,
-            &mut visited,
-            &mut queue,
-        );
-        push_movement_state(
-            rows,
-            shapes,
-            state,
-            state.shape_index,
-            state.x + 1,
-            state.y,
-            &mut visited,
-            &mut queue,
-        );
-        push_movement_state(
-            rows,
-            shapes,
-            state,
-            state.shape_index,
-            state.x,
-            state.y - 1,
-            &mut visited,
-            &mut queue,
-        );
-        push_rotation_states(rows, piece, shapes, state, 1, &mut visited, &mut queue);
-        push_rotation_states(rows, piece, shapes, state, -1, &mut visited, &mut queue);
-    }
-
-    false
-}
-
-fn has_clear_vertical_drop(rows: &[u16; BOARD_HEIGHT], shape: Shape, x: i8, target_y: i8) -> bool {
-    let spawn_y = BOARD_HEIGHT as i8 - shape.height;
-    if target_y > spawn_y {
-        return false;
-    }
-    for y in target_y..=spawn_y {
-        if !can_place(rows, shape, x, y) {
-            return false;
-        }
-    }
-    true
-}
-
-fn push_movement_state(
-    rows: &[u16; BOARD_HEIGHT],
-    shapes: &[Shape],
-    _from: MovementState,
-    shape_index: usize,
-    x: i8,
-    y: i8,
-    visited: &mut HashSet<MovementState>,
-    queue: &mut VecDeque<MovementState>,
-) {
-    if y < 0 {
-        return;
-    }
-    let shape = shapes[shape_index];
-    if !can_place(rows, shape, x, y) {
-        return;
-    }
-
-    let next = MovementState { shape_index, x, y };
-    if visited.insert(next) {
-        queue.push_back(next);
-    }
-}
-
-fn push_rotation_states(
-    rows: &[u16; BOARD_HEIGHT],
-    piece: Piece,
-    shapes: &[Shape],
-    state: MovementState,
-    direction: i8,
-    visited: &mut HashSet<MovementState>,
-    queue: &mut VecDeque<MovementState>,
-) {
-    if shapes.len() <= 1 {
-        return;
-    }
-
-    let next_shape_index = if direction > 0 {
-        (state.shape_index + 1) % shapes.len()
-    } else {
-        (state.shape_index + shapes.len() - 1) % shapes.len()
-    };
-    let from_rotation = shapes[state.shape_index].rotation;
-    let to_rotation = shapes[next_shape_index].rotation;
-    let next_shape = shapes[next_shape_index];
-
-    for kick in srs_plus_kicks(piece, from_rotation, to_rotation) {
-        let x = state.x + kick.x;
-        let y = state.y + kick.y;
-        if can_place(rows, next_shape, x, y) {
-            let next = MovementState {
-                shape_index: next_shape_index,
-                x,
-                y,
-            };
-            if visited.insert(next) {
-                queue.push_back(next);
-            }
-        }
-    }
-}
-
-fn can_place(rows: &[u16; BOARD_HEIGHT], shape: Shape, x: i8, y: i8) -> bool {
-    for cell in shape.cells {
-        let board_x = x + cell.x;
-        let board_y = y + cell.y;
-        if board_x < 0
-            || board_x >= BOARD_WIDTH as i8
-            || board_y < 0
-            || board_y >= BOARD_HEIGHT as i8
-        {
-            return false;
-        }
-        if rows[board_y as usize] & (1_u16 << board_x) != 0 {
-            return false;
-        }
-    }
-    true
-}
-
-fn lock_shape(
-    rows: &[u16; BOARD_HEIGHT],
-    shape: Shape,
-    x: i8,
-    y: i8,
-) -> Option<[u16; BOARD_HEIGHT]> {
-    if !can_place(rows, shape, x, y) {
-        return None;
-    }
-
-    let mut output = *rows;
-    for cell in shape.cells {
-        let board_x = x + cell.x;
-        let board_y = y + cell.y;
-        let row_index = usize::try_from(board_y).ok()?;
-        let column = u32::try_from(board_x).ok()?;
-        output[row_index] |= 1_u16 << column;
-    }
-    Some(output)
-}
-
-fn detect_spin(
-    locked_rows: &[u16; BOARD_HEIGHT],
-    piece: Piece,
-    shape: Shape,
-    x: i8,
-    y: i8,
-    cleared_lines: u32,
-) -> SpinDetection {
-    let immobile = is_placement_immobile(locked_rows, shape, x, y);
-    if piece == Piece::T {
-        let occupied_corners = count_t_occupied_corners(locked_rows, shape.rotation, x, y);
-        if occupied_corners >= 3 {
-            let front_corners = count_t_front_corners(locked_rows, shape.rotation, x, y);
-            let mini = front_corners < 2;
-            return SpinDetection {
-                kind: if mini {
-                    SpinKind::TSpinMini
-                } else {
-                    SpinKind::TSpin
-                },
-                spin: true,
-                mini,
-                immobile,
-                occupied_corners,
-                cleared_lines,
-            };
-        }
-
-        return SpinDetection {
-            kind: SpinKind::None,
-            spin: false,
-            mini: false,
-            immobile,
-            occupied_corners,
-            cleared_lines,
-        };
-    }
-
-    if immobile {
-        return SpinDetection {
-            kind: SpinKind::ImmobileSpin,
-            spin: true,
-            mini: false,
-            immobile,
-            occupied_corners: 0,
-            cleared_lines,
-        };
-    }
-
-    SpinDetection {
-        kind: SpinKind::None,
-        spin: false,
-        mini: false,
-        immobile,
-        occupied_corners: 0,
-        cleared_lines,
-    }
-}
-
-fn is_placement_immobile(locked_rows: &[u16; BOARD_HEIGHT], shape: Shape, x: i8, y: i8) -> bool {
-    let board_without_piece = remove_shape_cells(locked_rows, shape, x, y);
-    !can_place(&board_without_piece, shape, x - 1, y)
-        && !can_place(&board_without_piece, shape, x + 1, y)
-        && !can_place(&board_without_piece, shape, x, y - 1)
-}
-
-fn remove_shape_cells(
-    rows: &[u16; BOARD_HEIGHT],
-    shape: Shape,
-    x: i8,
-    y: i8,
-) -> [u16; BOARD_HEIGHT] {
-    let mut output = *rows;
-    for cell in shape.cells {
-        let board_x = x + cell.x;
-        let board_y = y + cell.y;
-        if board_x >= 0
-            && board_x < BOARD_WIDTH as i8
-            && board_y >= 0
-            && board_y < BOARD_HEIGHT as i8
-        {
-            output[board_y as usize] &= !(1_u16 << board_x);
-        }
-    }
-    output
-}
-
-fn count_t_occupied_corners(rows: &[u16; BOARD_HEIGHT], rotation: u8, x: i8, y: i8) -> u32 {
-    t_corner_cells(rotation, x, y)
-        .into_iter()
-        .filter(|cell| is_occupied_or_wall(rows, cell.x, cell.y))
-        .count() as u32
-}
-
-fn count_t_front_corners(rows: &[u16; BOARD_HEIGHT], rotation: u8, x: i8, y: i8) -> u32 {
-    t_front_corner_cells(rotation, x, y)
-        .into_iter()
-        .filter(|cell| is_occupied_or_wall(rows, cell.x, cell.y))
-        .count() as u32
-}
-
-fn t_corner_cells(rotation: u8, x: i8, y: i8) -> [Cell; 4] {
-    let origin = t_origin(rotation, x, y);
-    [
-        Cell {
-            x: origin.x - 1,
-            y: origin.y - 1,
-        },
-        Cell {
-            x: origin.x + 1,
-            y: origin.y - 1,
-        },
-        Cell {
-            x: origin.x - 1,
-            y: origin.y + 1,
-        },
-        Cell {
-            x: origin.x + 1,
-            y: origin.y + 1,
-        },
-    ]
-}
-
-fn t_front_corner_cells(rotation: u8, x: i8, y: i8) -> [Cell; 2] {
-    let origin = t_origin(rotation, x, y);
-    match rotation {
-        0 => [
-            Cell {
-                x: origin.x - 1,
-                y: origin.y + 1,
-            },
-            Cell {
-                x: origin.x + 1,
-                y: origin.y + 1,
-            },
-        ],
-        1 => [
-            Cell {
-                x: origin.x + 1,
-                y: origin.y - 1,
-            },
-            Cell {
-                x: origin.x + 1,
-                y: origin.y + 1,
-            },
-        ],
-        2 => [
-            Cell {
-                x: origin.x - 1,
-                y: origin.y - 1,
-            },
-            Cell {
-                x: origin.x + 1,
-                y: origin.y - 1,
-            },
-        ],
-        3 => [
-            Cell {
-                x: origin.x - 1,
-                y: origin.y - 1,
-            },
-            Cell {
-                x: origin.x - 1,
-                y: origin.y + 1,
-            },
-        ],
-        _ => [origin, origin],
-    }
-}
-
-fn t_origin(rotation: u8, x: i8, y: i8) -> Cell {
-    match rotation {
-        0 => Cell { x: x + 1, y },
-        1 => Cell { x, y: y + 1 },
-        2 => Cell { x: x + 1, y: y + 1 },
-        3 => Cell { x: x + 1, y: y + 1 },
-        _ => Cell { x, y },
-    }
-}
-
-fn is_occupied_or_wall(rows: &[u16; BOARD_HEIGHT], x: i8, y: i8) -> bool {
-    if !(0..BOARD_WIDTH as i8).contains(&x) || !(0..BOARD_HEIGHT as i8).contains(&y) {
-        return true;
-    }
-    rows[y as usize] & (1_u16 << x) != 0
-}
-
-fn count_full_lines_array(rows: &[u16; BOARD_HEIGHT]) -> u32 {
-    rows.iter().filter(|row| **row == ROW_MASK).count() as u32
-}
-
-fn srs_plus_kicks(piece: Piece, from_rotation: u8, to_rotation: u8) -> &'static [Cell] {
-    if piece == Piece::I {
-        match (from_rotation, to_rotation) {
-            (0, 1) => I_KICKS_01,
-            (1, 0) => I_KICKS_10,
-            _ => BASIC_KICKS,
-        }
-    } else {
-        match (from_rotation, to_rotation) {
-            (0, 1) | (2, 1) => JLSTZ_KICKS_01,
-            (1, 0) | (1, 2) => JLSTZ_KICKS_10,
-            (2, 3) | (0, 3) => JLSTZ_KICKS_23,
-            (3, 2) | (3, 0) => JLSTZ_KICKS_32,
-            _ => BASIC_KICKS,
-        }
-    }
-}
-
-const BASIC_KICKS: &[Cell] = &[Cell { x: 0, y: 0 }];
-const JLSTZ_KICKS_01: &[Cell] = &[
-    Cell { x: 0, y: 0 },
-    Cell { x: -1, y: 0 },
-    Cell { x: -1, y: -1 },
-    Cell { x: 0, y: 2 },
-    Cell { x: -1, y: 2 },
-];
-const JLSTZ_KICKS_10: &[Cell] = &[
-    Cell { x: 0, y: 0 },
-    Cell { x: 1, y: 0 },
-    Cell { x: 1, y: 1 },
-    Cell { x: 0, y: -2 },
-    Cell { x: 1, y: -2 },
-];
-const JLSTZ_KICKS_23: &[Cell] = &[
-    Cell { x: 0, y: 0 },
-    Cell { x: 1, y: 0 },
-    Cell { x: 1, y: -1 },
-    Cell { x: 0, y: 2 },
-    Cell { x: 1, y: 2 },
-];
-const JLSTZ_KICKS_32: &[Cell] = &[
-    Cell { x: 0, y: 0 },
-    Cell { x: -1, y: 0 },
-    Cell { x: -1, y: 1 },
-    Cell { x: 0, y: -2 },
-    Cell { x: -1, y: -2 },
-];
-const I_KICKS_01: &[Cell] = &[
-    Cell { x: 0, y: 0 },
-    Cell { x: 1, y: 0 },
-    Cell { x: -2, y: 0 },
-    Cell { x: -2, y: 1 },
-    Cell { x: 1, y: -2 },
-];
-const I_KICKS_10: &[Cell] = &[
-    Cell { x: 0, y: 0 },
-    Cell { x: -1, y: 0 },
-    Cell { x: 2, y: 0 },
-    Cell { x: -1, y: 2 },
-    Cell { x: 2, y: -1 },
-];
-
-fn clear_full_lines_array(rows: [u16; BOARD_HEIGHT]) -> [u16; BOARD_HEIGHT] {
-    let mut output = [0_u16; BOARD_HEIGHT];
-    let mut write_y = 0;
-    for row in rows {
-        if row != ROW_MASK {
-            output[write_y] = row;
-            write_y += 1;
-        }
-    }
-    output
+fn compare_search_state(left: &SearchState, right: &SearchState) -> std::cmp::Ordering {
+    right
+        .score
+        .total_cmp(&left.score)
+        .then_with(|| left.path.len().cmp(&right.path.len()))
+        .then_with(|| left.queue_index.cmp(&right.queue_index))
 }
 
 impl From<SearchState> for BeamSearchNode {
@@ -1806,321 +664,4 @@ impl From<FirepowerEvent> for BeamFirepowerEvent {
             all_clear_bonus: event.all_clear_bonus,
         }
     }
-}
-
-fn spin_kind_name(kind: SpinKind) -> &'static str {
-    match kind {
-        SpinKind::None => "NONE",
-        SpinKind::TSpin => "T_SPIN",
-        SpinKind::TSpinMini => "T_SPIN_MINI",
-        SpinKind::ImmobileSpin => "IMMOBILE_SPIN",
-    }
-}
-
-fn clear_kind_name(kind: ClearKind) -> &'static str {
-    match kind {
-        ClearKind::None => "NONE",
-        ClearKind::Single => "SINGLE",
-        ClearKind::Double => "DOUBLE",
-        ClearKind::Triple => "TRIPLE",
-        ClearKind::Quad => "QUAD",
-        ClearKind::Penta => "PENTA",
-        ClearKind::TSpin => "TSPIN",
-        ClearKind::TSpinMini => "TSPIN_MINI",
-        ClearKind::TSpinMiniSingle => "TSPIN_MINI_SINGLE",
-        ClearKind::TSpinSingle => "TSPIN_SINGLE",
-        ClearKind::TSpinMiniDouble => "TSPIN_MINI_DOUBLE",
-        ClearKind::TSpinDouble => "TSPIN_DOUBLE",
-        ClearKind::TSpinMiniTriple => "TSPIN_MINI_TRIPLE",
-        ClearKind::TSpinTriple => "TSPIN_TRIPLE",
-        ClearKind::TSpinMiniQuad => "TSPIN_MINI_QUAD",
-        ClearKind::TSpinQuad => "TSPIN_QUAD",
-        ClearKind::TSpinPenta => "TSPIN_PENTA",
-    }
-}
-
-const I0: &[Cell] = &[
-    Cell { x: 0, y: 0 },
-    Cell { x: 1, y: 0 },
-    Cell { x: 2, y: 0 },
-    Cell { x: 3, y: 0 },
-];
-const I1: &[Cell] = &[
-    Cell { x: 0, y: 0 },
-    Cell { x: 0, y: 1 },
-    Cell { x: 0, y: 2 },
-    Cell { x: 0, y: 3 },
-];
-const O0: &[Cell] = &[
-    Cell { x: 0, y: 0 },
-    Cell { x: 1, y: 0 },
-    Cell { x: 0, y: 1 },
-    Cell { x: 1, y: 1 },
-];
-const T0: &[Cell] = &[
-    Cell { x: 0, y: 0 },
-    Cell { x: 1, y: 0 },
-    Cell { x: 2, y: 0 },
-    Cell { x: 1, y: 1 },
-];
-const T1: &[Cell] = &[
-    Cell { x: 0, y: 0 },
-    Cell { x: 0, y: 1 },
-    Cell { x: 0, y: 2 },
-    Cell { x: 1, y: 1 },
-];
-const T2: &[Cell] = &[
-    Cell { x: 0, y: 1 },
-    Cell { x: 1, y: 1 },
-    Cell { x: 2, y: 1 },
-    Cell { x: 1, y: 0 },
-];
-const T3: &[Cell] = &[
-    Cell { x: 1, y: 0 },
-    Cell { x: 1, y: 1 },
-    Cell { x: 1, y: 2 },
-    Cell { x: 0, y: 1 },
-];
-const S0: &[Cell] = &[
-    Cell { x: 0, y: 0 },
-    Cell { x: 1, y: 0 },
-    Cell { x: 1, y: 1 },
-    Cell { x: 2, y: 1 },
-];
-const S1: &[Cell] = &[
-    Cell { x: 1, y: 0 },
-    Cell { x: 0, y: 1 },
-    Cell { x: 1, y: 1 },
-    Cell { x: 0, y: 2 },
-];
-const Z0: &[Cell] = &[
-    Cell { x: 1, y: 0 },
-    Cell { x: 2, y: 0 },
-    Cell { x: 0, y: 1 },
-    Cell { x: 1, y: 1 },
-];
-const Z1: &[Cell] = &[
-    Cell { x: 0, y: 0 },
-    Cell { x: 0, y: 1 },
-    Cell { x: 1, y: 1 },
-    Cell { x: 1, y: 2 },
-];
-const J0: &[Cell] = &[
-    Cell { x: 0, y: 0 },
-    Cell { x: 1, y: 0 },
-    Cell { x: 2, y: 0 },
-    Cell { x: 0, y: 1 },
-];
-const J1: &[Cell] = &[
-    Cell { x: 0, y: 0 },
-    Cell { x: 0, y: 1 },
-    Cell { x: 0, y: 2 },
-    Cell { x: 1, y: 0 },
-];
-const J2: &[Cell] = &[
-    Cell { x: 0, y: 0 },
-    Cell { x: 0, y: 1 },
-    Cell { x: 1, y: 1 },
-    Cell { x: 2, y: 1 },
-];
-const J3: &[Cell] = &[
-    Cell { x: 1, y: 0 },
-    Cell { x: 1, y: 1 },
-    Cell { x: 1, y: 2 },
-    Cell { x: 0, y: 2 },
-];
-const L0: &[Cell] = &[
-    Cell { x: 0, y: 0 },
-    Cell { x: 1, y: 0 },
-    Cell { x: 2, y: 0 },
-    Cell { x: 2, y: 1 },
-];
-const L1: &[Cell] = &[
-    Cell { x: 0, y: 0 },
-    Cell { x: 0, y: 1 },
-    Cell { x: 0, y: 2 },
-    Cell { x: 1, y: 2 },
-];
-const L2: &[Cell] = &[
-    Cell { x: 0, y: 1 },
-    Cell { x: 1, y: 1 },
-    Cell { x: 2, y: 1 },
-    Cell { x: 0, y: 0 },
-];
-const L3: &[Cell] = &[
-    Cell { x: 1, y: 0 },
-    Cell { x: 1, y: 1 },
-    Cell { x: 1, y: 2 },
-    Cell { x: 0, y: 0 },
-];
-
-const I_SHAPES: &[Shape] = &[
-    Shape {
-        rotation: 0,
-        width: 4,
-        height: 1,
-        cells: I0,
-    },
-    Shape {
-        rotation: 1,
-        width: 1,
-        height: 4,
-        cells: I1,
-    },
-];
-const O_SHAPES: &[Shape] = &[Shape {
-    rotation: 0,
-    width: 2,
-    height: 2,
-    cells: O0,
-}];
-const T_SHAPES: &[Shape] = &[
-    Shape {
-        rotation: 0,
-        width: 3,
-        height: 2,
-        cells: T0,
-    },
-    Shape {
-        rotation: 1,
-        width: 2,
-        height: 3,
-        cells: T1,
-    },
-    Shape {
-        rotation: 2,
-        width: 3,
-        height: 2,
-        cells: T2,
-    },
-    Shape {
-        rotation: 3,
-        width: 2,
-        height: 3,
-        cells: T3,
-    },
-];
-const S_SHAPES: &[Shape] = &[
-    Shape {
-        rotation: 0,
-        width: 3,
-        height: 2,
-        cells: S0,
-    },
-    Shape {
-        rotation: 1,
-        width: 2,
-        height: 3,
-        cells: S1,
-    },
-];
-const Z_SHAPES: &[Shape] = &[
-    Shape {
-        rotation: 0,
-        width: 3,
-        height: 2,
-        cells: Z0,
-    },
-    Shape {
-        rotation: 1,
-        width: 2,
-        height: 3,
-        cells: Z1,
-    },
-];
-const J_SHAPES: &[Shape] = &[
-    Shape {
-        rotation: 0,
-        width: 3,
-        height: 2,
-        cells: J0,
-    },
-    Shape {
-        rotation: 1,
-        width: 2,
-        height: 3,
-        cells: J1,
-    },
-    Shape {
-        rotation: 2,
-        width: 3,
-        height: 2,
-        cells: J2,
-    },
-    Shape {
-        rotation: 3,
-        width: 2,
-        height: 3,
-        cells: J3,
-    },
-];
-const L_SHAPES: &[Shape] = &[
-    Shape {
-        rotation: 0,
-        width: 3,
-        height: 2,
-        cells: L0,
-    },
-    Shape {
-        rotation: 1,
-        width: 2,
-        height: 3,
-        cells: L1,
-    },
-    Shape {
-        rotation: 2,
-        width: 3,
-        height: 2,
-        cells: L2,
-    },
-    Shape {
-        rotation: 3,
-        width: 2,
-        height: 3,
-        cells: L3,
-    },
-];
-
-fn piece_shapes(piece: Piece) -> &'static [Shape] {
-    match piece {
-        Piece::I => I_SHAPES,
-        Piece::O => O_SHAPES,
-        Piece::T => T_SHAPES,
-        Piece::S => S_SHAPES,
-        Piece::Z => Z_SHAPES,
-        Piece::J => J_SHAPES,
-        Piece::L => L_SHAPES,
-    }
-}
-
-fn rows_to_fumen_field_string(rows: &[u16]) -> Result<String> {
-    let mut field = String::with_capacity(FUMEN_FIELD_HEIGHT * BOARD_WIDTH);
-    let lookup = fumen_row_lookup();
-
-    for y in (0..FUMEN_FIELD_HEIGHT).rev() {
-        let row = if y < BOARD_HEIGHT { rows[y] } else { 0 };
-        validate_row(row, y)?;
-        field.push_str(&lookup[usize::from(row)]);
-    }
-
-    Ok(field)
-}
-
-fn fumen_row_lookup() -> &'static Vec<String> {
-    static ROWS: OnceLock<Vec<String>> = OnceLock::new();
-    ROWS.get_or_init(|| {
-        (0..=ROW_MASK)
-            .map(|row| {
-                let mut text = String::with_capacity(BOARD_WIDTH);
-                for x in 0..BOARD_WIDTH {
-                    if row & (1_u16 << x) == 0 {
-                        text.push('_');
-                    } else {
-                        text.push('X');
-                    }
-                }
-                text
-            })
-            .collect()
-    })
 }

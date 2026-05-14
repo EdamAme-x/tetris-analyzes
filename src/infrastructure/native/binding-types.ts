@@ -29,6 +29,7 @@ export interface NativeBeamPlacement {
 }
 
 export type NativeSpinKind = "NONE" | "T_SPIN" | "T_SPIN_MINI" | "IMMOBILE_SPIN";
+export type NativeComboTable = "MULTIPLIER" | "NONE" | "CLASSIC GUIDELINE" | "MODERN GUIDELINE";
 export type NativeClearName =
   | "NONE"
   | "SINGLE"
@@ -60,6 +61,7 @@ export interface NativeSpinDetection {
 export interface NativeFirepowerInput {
   clearName: NativeClearName;
   allClear?: boolean | undefined;
+  comboTable?: NativeComboTable | undefined;
 }
 
 export interface NativeFirepowerEvent {
