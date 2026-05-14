@@ -546,7 +546,10 @@ pub(crate) fn search_opener_states(
         let mut next_by_key = HashMap::<SearchKey, SearchState>::new();
 
         for state in &beam {
-            for choice in piece_choices(&pieces, state, hold_enabled) {
+            for choice in piece_choices(pieces, state, hold_enabled)
+                .into_iter()
+                .flatten()
+            {
                 let shapes = piece_shapes(choice.piece);
                 for shape_index in placement_shape_indices(choice.piece).iter().copied() {
                     let shape = shapes[shape_index];
@@ -733,40 +736,44 @@ fn spin_mode_allows_t_spin_potential(spin_mode: SpinMode) -> bool {
     spin_mode != SpinMode::None
 }
 
-fn piece_choices(pieces: &[Piece], state: &SearchState, hold_enabled: bool) -> Vec<PieceChoice> {
+fn piece_choices(
+    pieces: &[Piece],
+    state: &SearchState,
+    hold_enabled: bool,
+) -> [Option<PieceChoice>; 2] {
     let Some(current) = pieces.get(state.queue_index).copied() else {
-        return Vec::new();
+        return [None, None];
     };
 
-    let mut choices = vec![PieceChoice {
+    let first = Some(PieceChoice {
         piece: current,
         hold: state.hold,
         queue_index: state.queue_index + 1,
         used_hold: false,
-    }];
-
-    if hold_enabled {
+    });
+    let second = if hold_enabled {
         match state.hold {
-            Some(held) => choices.push(PieceChoice {
+            Some(held) => Some(PieceChoice {
                 piece: held,
                 hold: Some(current),
                 queue_index: state.queue_index + 1,
                 used_hold: true,
             }),
-            None => {
-                if let Some(next) = pieces.get(state.queue_index + 1).copied() {
-                    choices.push(PieceChoice {
-                        piece: next,
-                        hold: Some(current),
-                        queue_index: state.queue_index + 2,
-                        used_hold: true,
-                    });
-                }
-            }
+            None => pieces
+                .get(state.queue_index + 1)
+                .copied()
+                .map(|next| PieceChoice {
+                    piece: next,
+                    hold: Some(current),
+                    queue_index: state.queue_index + 2,
+                    used_hold: true,
+                }),
         }
-    }
+    } else {
+        None
+    };
 
-    choices
+    [first, second]
 }
 
 fn place_grounded_at_y(
