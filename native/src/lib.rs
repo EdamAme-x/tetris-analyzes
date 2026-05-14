@@ -1,8 +1,10 @@
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
+use std::sync::OnceLock;
 
 const BOARD_WIDTH: usize = 10;
 const BOARD_HEIGHT: usize = 20;
+const BOARD_EVALUATION_STRIDE: usize = 5;
 const FUMEN_FIELD_HEIGHT: usize = 23;
 const ROW_MASK: u16 = (1 << BOARD_WIDTH) - 1;
 
@@ -21,24 +23,32 @@ pub fn copy_board_rows(rows: Uint16Array) -> Result<Uint16Array> {
 #[napi(js_name = "isPerfectClear")]
 pub fn is_perfect_clear(rows: Uint16Array) -> Result<bool> {
     let rows = rows.as_ref();
-    validate_single_board(rows)?;
-    Ok(rows.iter().all(|row| *row == 0))
+    validate_single_board_shape(rows)?;
+
+    for (index, row) in rows.iter().copied().enumerate() {
+        validate_row(row, index)?;
+        if row != 0 {
+            return Ok(false);
+        }
+    }
+
+    Ok(true)
 }
 
 #[napi(js_name = "countOccupiedCells")]
 pub fn count_occupied_cells(rows: Uint16Array) -> Result<u32> {
     let rows = rows.as_ref();
-    validate_single_board(rows)?;
-    Ok(count_occupied_cells_in_rows(rows))
+    validate_single_board_shape(rows)?;
+    count_occupied_cells_in_rows(rows, 0)
 }
 
 #[napi(js_name = "clearFullLines")]
 pub fn clear_full_lines(rows: Uint16Array) -> Result<Uint16Array> {
     let rows = rows.as_ref();
-    validate_single_board(rows)?;
+    validate_single_board_shape(rows)?;
 
     let mut output = vec![0_u16; BOARD_HEIGHT];
-    clear_full_lines_into(rows, &mut output);
+    clear_full_lines_into(rows, &mut output, 0)?;
 
     Ok(output.into())
 }
@@ -47,14 +57,15 @@ pub fn clear_full_lines(rows: Uint16Array) -> Result<Uint16Array> {
 pub fn batch_count_occupied_cells(rows: Uint16Array, board_count: u32) -> Result<Uint32Array> {
     let rows = rows.as_ref();
     let board_count = board_count as usize;
-    validate_board_rows(rows, board_count)?;
+    validate_board_shape(rows, board_count)?;
 
     let mut counts = Vec::with_capacity(board_count);
     for board_index in 0..board_count {
         let offset = board_index * BOARD_HEIGHT;
         counts.push(count_occupied_cells_in_rows(
             &rows[offset..offset + BOARD_HEIGHT],
-        ));
+            offset,
+        )?);
     }
 
     Ok(counts.into())
@@ -64,7 +75,7 @@ pub fn batch_count_occupied_cells(rows: Uint16Array, board_count: u32) -> Result
 pub fn batch_clear_full_lines(rows: Uint16Array, board_count: u32) -> Result<Uint16Array> {
     let rows = rows.as_ref();
     let board_count = board_count as usize;
-    validate_board_rows(rows, board_count)?;
+    validate_board_shape(rows, board_count)?;
 
     let mut output = vec![0_u16; rows.len()];
     for board_index in 0..board_count {
@@ -72,10 +83,29 @@ pub fn batch_clear_full_lines(rows: Uint16Array, board_count: u32) -> Result<Uin
         clear_full_lines_into(
             &rows[offset..offset + BOARD_HEIGHT],
             &mut output[offset..offset + BOARD_HEIGHT],
-        );
+            offset,
+        )?;
     }
 
     Ok(output.into())
+}
+
+#[napi(js_name = "batchEvaluateBoards")]
+pub fn batch_evaluate_boards(rows: Uint16Array, board_count: u32) -> Result<Uint32Array> {
+    let rows = rows.as_ref();
+    let board_count = board_count as usize;
+    validate_board_shape(rows, board_count)?;
+
+    let mut evaluations = Vec::with_capacity(board_count * BOARD_EVALUATION_STRIDE);
+    for board_index in 0..board_count {
+        let offset = board_index * BOARD_HEIGHT;
+        evaluations.extend_from_slice(&evaluate_board(
+            &rows[offset..offset + BOARD_HEIGHT],
+            offset,
+        )?);
+    }
+
+    Ok(evaluations.into())
 }
 
 #[napi(js_name = "createGarbageRows")]
@@ -94,7 +124,10 @@ pub fn create_garbage_rows(holes: Uint8Array) -> Result<Uint16Array> {
 pub fn apply_garbage(rows: Uint16Array, holes: Uint8Array) -> Result<Uint16Array> {
     let rows = rows.as_ref();
     let holes = holes.as_ref();
-    validate_single_board(rows)?;
+    validate_single_board_shape(rows)?;
+    for (index, row) in rows.iter().copied().enumerate() {
+        validate_row(row, index)?;
+    }
     validate_garbage_holes(holes)?;
 
     if holes.len() > BOARD_HEIGHT {
@@ -118,29 +151,33 @@ pub fn apply_garbage(rows: Uint16Array, holes: Uint8Array) -> Result<Uint16Array
 #[napi(js_name = "rowsToFumenField")]
 pub fn rows_to_fumen_field(rows: Uint16Array) -> Result<String> {
     let rows = rows.as_ref();
-    validate_single_board(rows)?;
-    Ok(rows_to_fumen_field_string(rows))
+    validate_single_board_shape(rows)?;
+    rows_to_fumen_field_string(rows)
 }
 
 #[napi(js_name = "batchRowsToFumenFields")]
 pub fn batch_rows_to_fumen_fields(rows: Uint16Array, board_count: u32) -> Result<Vec<String>> {
     let rows = rows.as_ref();
     let board_count = board_count as usize;
-    validate_board_rows(rows, board_count)?;
+    validate_board_shape(rows, board_count)?;
 
     let mut fields = Vec::with_capacity(board_count);
     for board_index in 0..board_count {
         let offset = board_index * BOARD_HEIGHT;
         fields.push(rows_to_fumen_field_string(
             &rows[offset..offset + BOARD_HEIGHT],
-        ));
+        )?);
     }
 
     Ok(fields)
 }
 
-fn validate_board_rows(rows: &[u16], board_count: usize) -> Result<()> {
-    let expected_rows = board_count * BOARD_HEIGHT;
+fn validate_board_shape(rows: &[u16], board_count: usize) -> Result<()> {
+    let expected_rows = board_count.checked_mul(BOARD_HEIGHT).ok_or_else(|| {
+        Error::from_reason(format!(
+            "boardCount is too large to fit {BOARD_HEIGHT}-row boards."
+        ))
+    })?;
     if rows.len() != expected_rows {
         return Err(Error::from_reason(format!(
             "Expected {expected_rows} row values, got {}.",
@@ -148,19 +185,28 @@ fn validate_board_rows(rows: &[u16], board_count: usize) -> Result<()> {
         )));
     }
 
-    for (index, row) in rows.iter().copied().enumerate() {
-        if row & !ROW_MASK != 0 {
-            return Err(Error::from_reason(format!(
-                "Row {index} must fit in {BOARD_WIDTH} bits, got {row}."
-            )));
-        }
-    }
-
     Ok(())
 }
 
 fn validate_single_board(rows: &[u16]) -> Result<()> {
-    validate_board_rows(rows, 1)
+    validate_single_board_shape(rows)?;
+    for (index, row) in rows.iter().copied().enumerate() {
+        validate_row(row, index)?;
+    }
+    Ok(())
+}
+
+fn validate_single_board_shape(rows: &[u16]) -> Result<()> {
+    validate_board_shape(rows, 1)
+}
+
+fn validate_row(row: u16, index: usize) -> Result<()> {
+    if row & !ROW_MASK != 0 {
+        return Err(Error::from_reason(format!(
+            "Row {index} must fit in {BOARD_WIDTH} bits, got {row}."
+        )));
+    }
+    Ok(())
 }
 
 fn validate_garbage_holes(holes: &[u8]) -> Result<()> {
@@ -175,34 +221,100 @@ fn validate_garbage_holes(holes: &[u8]) -> Result<()> {
     Ok(())
 }
 
-fn count_occupied_cells_in_rows(rows: &[u16]) -> u32 {
-    rows.iter().map(|row| row.count_ones()).sum()
+fn count_occupied_cells_in_rows(rows: &[u16], row_offset: usize) -> Result<u32> {
+    let mut count = 0;
+    for (index, row) in rows.iter().copied().enumerate() {
+        validate_row(row, row_offset + index)?;
+        count += row.count_ones();
+    }
+    Ok(count)
 }
 
-fn clear_full_lines_into(rows: &[u16], output: &mut [u16]) {
-    output.fill(0);
+fn clear_full_lines_into(rows: &[u16], output: &mut [u16], row_offset: usize) -> Result<()> {
     let mut write_y = 0;
-    for row in rows.iter().copied() {
+    for (index, row) in rows.iter().copied().enumerate() {
+        validate_row(row, row_offset + index)?;
         if row != ROW_MASK {
             output[write_y] = row;
             write_y += 1;
         }
     }
+    Ok(())
 }
 
-fn rows_to_fumen_field_string(rows: &[u16]) -> String {
-    let mut field = String::with_capacity(FUMEN_FIELD_HEIGHT * BOARD_WIDTH);
+fn evaluate_board(rows: &[u16], row_offset: usize) -> Result<[u32; BOARD_EVALUATION_STRIDE]> {
+    let mut occupied_cells = 0;
+    let mut cleared_lines = 0;
+    let mut column_masks = [0_u32; BOARD_WIDTH];
 
-    for y in (0..FUMEN_FIELD_HEIGHT).rev() {
-        let row = if y < BOARD_HEIGHT { rows[y] } else { 0 };
-        for x in 0..BOARD_WIDTH {
-            if row & (1_u16 << x) == 0 {
-                field.push('_');
-            } else {
-                field.push('X');
+    for (y, row) in rows.iter().copied().enumerate() {
+        validate_row(row, row_offset + y)?;
+        occupied_cells += row.count_ones();
+        if row == ROW_MASK {
+            cleared_lines += 1;
+        }
+        for (x, column_mask) in column_masks.iter_mut().enumerate() {
+            if row & (1_u16 << x) != 0 {
+                *column_mask |= 1_u32 << y;
             }
         }
     }
 
-    field
+    let mut aggregate_height = 0;
+    let mut holes = 0;
+    let mut previous_height: Option<u32> = None;
+    let mut bumpiness = 0;
+    for column_mask in column_masks {
+        let height = if column_mask == 0 {
+            0
+        } else {
+            u32::BITS - column_mask.leading_zeros()
+        };
+        aggregate_height += height;
+        holes += height - column_mask.count_ones();
+        if let Some(previous) = previous_height {
+            bumpiness += previous.abs_diff(height);
+        }
+        previous_height = Some(height);
+    }
+
+    Ok([
+        occupied_cells,
+        cleared_lines,
+        aggregate_height,
+        holes,
+        bumpiness,
+    ])
+}
+
+fn rows_to_fumen_field_string(rows: &[u16]) -> Result<String> {
+    let mut field = String::with_capacity(FUMEN_FIELD_HEIGHT * BOARD_WIDTH);
+    let lookup = fumen_row_lookup();
+
+    for y in (0..FUMEN_FIELD_HEIGHT).rev() {
+        let row = if y < BOARD_HEIGHT { rows[y] } else { 0 };
+        validate_row(row, y)?;
+        field.push_str(&lookup[usize::from(row)]);
+    }
+
+    Ok(field)
+}
+
+fn fumen_row_lookup() -> &'static Vec<String> {
+    static ROWS: OnceLock<Vec<String>> = OnceLock::new();
+    ROWS.get_or_init(|| {
+        (0..=ROW_MASK)
+            .map(|row| {
+                let mut text = String::with_capacity(BOARD_WIDTH);
+                for x in 0..BOARD_WIDTH {
+                    if row & (1_u16 << x) == 0 {
+                        text.push('_');
+                    } else {
+                        text.push('X');
+                    }
+                }
+                text
+            })
+            .collect()
+    })
 }

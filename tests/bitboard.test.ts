@@ -1,8 +1,11 @@
 import { describe, expect, test } from "bun:test";
 import { createBoardBatch, ROW_MASK } from "../src/domain/board";
 import {
+  BOARD_EVALUATION_OFFSET,
+  BOARD_EVALUATION_STRIDE,
   applyGarbage,
   batchClearFullLines,
+  batchEvaluateBoards,
   batchCountOccupiedCells,
   bitBoardFromRows,
   clearFullLines,
@@ -46,6 +49,15 @@ describe("native bitboard helpers", () => {
       0b1000000000,
       ...new Array(18).fill(0)
     ]);
+
+    const evaluations = batchEvaluateBoards(batch.rows, batch.boardCount);
+    expect(BOARD_EVALUATION_STRIDE).toBe(5);
+    expect(evaluations[BOARD_EVALUATION_OFFSET.occupiedCells]).toBe(12);
+    expect(evaluations[BOARD_EVALUATION_OFFSET.clearedLines]).toBe(1);
+    expect(evaluations[BOARD_EVALUATION_OFFSET.aggregateHeight]).toBe(12);
+    expect(evaluations[BOARD_EVALUATION_OFFSET.holes]).toBe(0);
+    expect(evaluations[BOARD_EVALUATION_OFFSET.bumpiness]).toBe(3);
+    expect([...evaluations.slice(BOARD_EVALUATION_STRIDE, BOARD_EVALUATION_STRIDE * 2)]).toEqual([14, 1, 21, 7, 1]);
   });
 
   test("creates and applies garbage rows by hole columns", () => {
@@ -68,5 +80,14 @@ describe("native bitboard helpers", () => {
     rows[0] = 2 ** 40;
     expect(() => bitBoardFromRows(rows)).toThrow("10 bits");
     expect(() => createGarbageRows([10])).toThrow("less than 10");
+  });
+
+  test("lets native validation reject invalid batched row masks", () => {
+    const rows = new Uint16Array(20);
+    rows[0] = ROW_MASK + 1;
+
+    expect(() => batchCountOccupiedCells(rows, 1)).toThrow("10 bits");
+    expect(() => batchClearFullLines(rows, 1)).toThrow("10 bits");
+    expect(() => batchEvaluateBoards(rows, 1)).toThrow("10 bits");
   });
 });

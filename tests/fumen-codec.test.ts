@@ -95,6 +95,7 @@ describe("TetrisFumenCodec", () => {
       clearFullLines: (rows) => rows,
       batchCountOccupiedCells: () => new Uint32Array(),
       batchClearFullLines: (rows) => rows,
+      batchEvaluateBoards: () => new Uint32Array(),
       createGarbageRows: () => new Uint16Array(),
       applyGarbage: (rows) => rows,
       rowsToFumenField: () => {

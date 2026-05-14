@@ -30,6 +30,7 @@ export function loadNativeBinding(): NativeBinding {
     "clearFullLines",
     "batchCountOccupiedCells",
     "batchClearFullLines",
+    "batchEvaluateBoards",
     "createGarbageRows",
     "applyGarbage",
     "rowsToFumenField",

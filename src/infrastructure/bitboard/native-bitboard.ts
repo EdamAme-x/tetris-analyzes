@@ -1,5 +1,14 @@
-import { assertBoardBatchRows, BOARD_HEIGHT, BOARD_WIDTH, ROW_MASK } from "../../domain/board";
+import { BOARD_HEIGHT, BOARD_WIDTH, ROW_MASK } from "../../domain/board";
 import { loadNativeBinding } from "../native/load-native-binding";
+
+export const BOARD_EVALUATION_STRIDE = 5;
+export const BOARD_EVALUATION_OFFSET = {
+  occupiedCells: 0,
+  clearedLines: 1,
+  aggregateHeight: 2,
+  holes: 3,
+  bumpiness: 4
+} as const;
 
 export function createEmptyBitBoard(): Uint16Array {
   return loadNativeBinding().createEmptyBoard();
@@ -38,13 +47,18 @@ export function clearFullLines(rows: Uint16Array): Uint16Array {
 }
 
 export function batchCountOccupiedCells(rows: Uint16Array, boardCount: number): Uint32Array {
-  assertBoardBatchRows(rows, boardCount);
+  assertBoardBatchShape(rows, boardCount);
   return loadNativeBinding().batchCountOccupiedCells(rows, boardCount);
 }
 
 export function batchClearFullLines(rows: Uint16Array, boardCount: number): Uint16Array {
-  assertBoardBatchRows(rows, boardCount);
+  assertBoardBatchShape(rows, boardCount);
   return loadNativeBinding().batchClearFullLines(rows, boardCount);
+}
+
+export function batchEvaluateBoards(rows: Uint16Array, boardCount: number): Uint32Array {
+  assertBoardBatchShape(rows, boardCount);
+  return loadNativeBinding().batchEvaluateBoards(rows, boardCount);
 }
 
 export function createGarbageRows(holes: ArrayLike<number>): Uint16Array {
@@ -68,4 +82,14 @@ function toUint8Array(values: ArrayLike<number>): Uint8Array {
     normalized[index] = value;
   }
   return normalized;
+}
+
+function assertBoardBatchShape(rows: Uint16Array, boardCount: number): void {
+  if (!Number.isSafeInteger(boardCount) || boardCount < 0) {
+    throw new Error(`boardCount must be a non-negative safe integer, got ${boardCount}.`);
+  }
+  const expectedLength = boardCount * BOARD_HEIGHT;
+  if (rows.length !== expectedLength) {
+    throw new Error(`Expected ${expectedLength} row values, got ${rows.length}.`);
+  }
 }
