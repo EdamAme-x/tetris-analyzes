@@ -1053,10 +1053,27 @@ function compareReplayTemplates(left: OpenerTemplateReplayEntry, right: OpenerTe
     right.replayHitCount - left.replayHitCount ||
     right.phaseReplayHitCount - left.phaseReplayHitCount ||
     right.phaseProfileReplayHitCount - left.phaseProfileReplayHitCount ||
+    templateReplayQualityFirepower(right) - templateReplayQualityFirepower(left) ||
     compareRankedOpenerCandidates(left.best, right.best) ||
     right.qualityReplayHitCount - left.qualityReplayHitCount ||
     right.groupedSurvivalCount - left.groupedSurvivalCount ||
     left.key.localeCompare(right.key)
+  );
+}
+
+function templateReplayQualityFirepower(template: Pick<OpenerTemplateReplayEntry, "best" | "qualityReplayHitCount">): number {
+  return template.qualityReplayHitCount * openerFirepowerRankValue(template.best);
+}
+
+function openerFirepowerRankValue(
+  candidate: Pick<RankedOpenerCandidate, "tSpinClears" | "tSpinAttack" | "difficultAttack" | "backToBackChain" | "attack">
+): number {
+  return (
+    candidate.tSpinClears * 100_000 +
+    candidate.tSpinAttack * 10_000 +
+    candidate.difficultAttack * 1_000 +
+    candidate.backToBackChain * 100 +
+    candidate.attack
   );
 }
 

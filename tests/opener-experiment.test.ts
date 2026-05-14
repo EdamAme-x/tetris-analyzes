@@ -824,7 +824,7 @@ describe("opener experiment runner", () => {
     });
   });
 
-  test("keeps B2B T-spin firepower ahead of broader quality-only replay matches", () => {
+  test("ranks replayed quality by reproducible B2B T-spin firepower", () => {
     const strongRows = [31, 7, 11, ...new Array(17).fill(0)];
     const broadRows = [3, 5, 9, ...new Array(17).fill(0)];
     const report = runOpenerExperiment({
@@ -879,8 +879,8 @@ describe("opener experiment runner", () => {
       }
     });
 
-    expect(report.templateReplay?.templates.map((template) => template.sources[0])).toEqual(["strong", "broad"]);
-    expect(report.templateReplay?.templates.map((template) => template.qualityReplayHitCount)).toEqual([0, 2]);
+    expect(report.templateReplay?.templates.map((template) => template.sources[0])).toEqual(["broad", "strong"]);
+    expect(report.templateReplay?.templates.map((template) => template.qualityReplayHitCount)).toEqual([2, 0]);
   });
 
   test("groups phase replay across non-best sources of the same final template", () => {
