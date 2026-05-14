@@ -53,3 +53,4 @@ Executable examples live in `tests/`.
 - [x] Reuse native reachability spawn checks across placement candidates
 - [x] Use a lightweight deterministic hasher for native opener search maps
 - [x] Reuse native reachability cache while estimating T-spin continuation potential
+- [x] Skip non-T immobility spin detection on the TETR.IO TL T-spin path

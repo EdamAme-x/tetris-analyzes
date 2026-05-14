@@ -29,7 +29,8 @@ use pieces::{
     placement_shape_indices, Cell, Piece, Shape,
 };
 use spin::{
-    apply_spin_mode, detect_spin, parse_spin_mode, spin_kind_name, SpinDetection, SpinMode,
+    apply_spin_mode, detect_spin, detect_spin_for_mode, parse_spin_mode, spin_kind_name,
+    SpinDetection, SpinMode,
 };
 use tetrio_tables::{ComboTable, KickTable};
 
@@ -887,11 +888,7 @@ fn place_grounded_at_y(
         }
     }
     let cleared_lines = board::count_full_lines_array(&placed);
-    let spin = apply_spin_mode(
-        detect_spin(&placed, choice.piece, shape, x, y, cleared_lines),
-        choice.piece,
-        spin_mode,
-    );
+    let spin = detect_spin_for_mode(&placed, choice.piece, shape, x, y, cleared_lines, spin_mode);
     Some(PlacedBoard {
         rows: board::clear_full_lines_array(placed),
         y,

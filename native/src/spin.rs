@@ -95,6 +95,34 @@ pub(crate) fn detect_spin(
     }
 }
 
+pub(crate) fn detect_spin_for_mode(
+    locked_rows: &BoardRows,
+    piece: Piece,
+    shape: Shape,
+    x: i8,
+    y: i8,
+    cleared_lines: u32,
+    mode: SpinMode,
+) -> SpinDetection {
+    if piece != Piece::T && matches!(mode, SpinMode::TSpins | SpinMode::TSpinsPlus | SpinMode::None)
+    {
+        return SpinDetection {
+            kind: SpinKind::None,
+            spin: false,
+            mini: false,
+            immobile: false,
+            occupied_corners: 0,
+            cleared_lines,
+        };
+    }
+
+    apply_spin_mode(
+        detect_spin(locked_rows, piece, shape, x, y, cleared_lines),
+        piece,
+        mode,
+    )
+}
+
 pub(crate) fn apply_spin_mode(
     detection: SpinDetection,
     piece: Piece,
