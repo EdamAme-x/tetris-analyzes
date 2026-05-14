@@ -52,3 +52,4 @@ Executable examples live in `tests/`.
 - [x] Cache native reachability BFS only after direct-drop checks miss
 - [x] Reuse native reachability spawn checks across placement candidates
 - [x] Use a lightweight deterministic hasher for native opener search maps
+- [x] Reuse native reachability cache while estimating T-spin continuation potential

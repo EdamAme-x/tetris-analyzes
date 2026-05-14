@@ -1,7 +1,7 @@
 use napi::bindgen_prelude::{Error, Result};
 
 use crate::board::{self, BoardEvaluation, BoardRows, BOARD_HEIGHT, BOARD_WIDTH};
-use crate::movement::{can_place, is_reachable_placement, lock_shape};
+use crate::movement::{can_place, is_reachable_placement_with_cache, lock_shape, ReachabilityCache};
 use crate::pieces::{piece_shapes, placement_shape_indices, Piece};
 use crate::spin::{detect_spin, SpinDetection, SpinKind};
 use crate::tetrio_tables::KickTable;
@@ -123,6 +123,7 @@ fn t_spin_setup_score(t_spin_potential: u32, back_to_back_chain: u32) -> f64 {
 pub(crate) fn estimate_t_spin_potential(rows: &BoardRows, kick_table: KickTable) -> u32 {
     let mut best = 0_u32;
     let shapes = piece_shapes(Piece::T);
+    let mut reachable_cache = ReachabilityCache::new(rows, Piece::T);
     for shape_index in placement_shape_indices(Piece::T).iter().copied() {
         let shape = shapes[shape_index];
         for x in 0..=(BOARD_WIDTH as i8 - shape.width) {
@@ -145,7 +146,15 @@ pub(crate) fn estimate_t_spin_potential(rows: &BoardRows, kick_table: KickTable)
                     SpinKind::None | SpinKind::TSpinMini | SpinKind::ImmobileSpin => 0,
                 };
                 if value > best
-                    && is_reachable_placement(rows, Piece::T, shape_index, x, y, kick_table)
+                    && is_reachable_placement_with_cache(
+                        rows,
+                        Piece::T,
+                        shape_index,
+                        x,
+                        y,
+                        kick_table,
+                        &mut reachable_cache,
+                    )
                 {
                     best = value;
                 }
