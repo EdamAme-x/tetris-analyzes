@@ -18,6 +18,24 @@ pub(crate) struct ReachablePlacementSet {
     visited: [bool; MOVEMENT_STATE_CAPACITY],
 }
 
+pub(crate) struct ReachabilityCache {
+    spawn_open: bool,
+    reachable: Option<ReachablePlacementSet>,
+}
+
+impl ReachabilityCache {
+    pub(crate) fn new(rows: &BoardRows, piece: Piece) -> Self {
+        let shapes = piece_shapes(piece);
+        let spawn_shape = shapes[0];
+        let spawn_x = (BOARD_WIDTH as i8 - spawn_shape.width) / 2;
+        let spawn_y = BOARD_HEIGHT as i8 - spawn_shape.height;
+        Self {
+            spawn_open: can_place(rows, spawn_shape, spawn_x, spawn_y),
+            reachable: None,
+        }
+    }
+}
+
 impl ReachablePlacementSet {
     fn contains(
         &self,
@@ -50,7 +68,7 @@ pub(crate) fn is_reachable_placement(
     target_y: i8,
     kick_table: KickTable,
 ) -> bool {
-    let mut reachable_cache = None;
+    let mut reachable_cache = ReachabilityCache::new(rows, piece);
     is_reachable_placement_with_cache(
         rows,
         piece,
@@ -69,29 +87,23 @@ pub(crate) fn is_reachable_placement_with_cache(
     target_x: i8,
     target_y: i8,
     kick_table: KickTable,
-    reachable_cache: &mut Option<ReachablePlacementSet>,
+    reachable_cache: &mut ReachabilityCache,
 ) -> bool {
-    let shapes = piece_shapes(piece);
-    let spawn_shape = shapes[0];
-    let spawn = MovementState {
-        shape_index: 0,
-        x: (BOARD_WIDTH as i8 - spawn_shape.width) / 2,
-        y: BOARD_HEIGHT as i8 - spawn_shape.height,
-    };
-
-    if !can_place(rows, spawn_shape, spawn.x, spawn.y) {
+    if !reachable_cache.spawn_open {
         return false;
     }
 
+    let shapes = piece_shapes(piece);
     let target_shape = shapes[target_shape_index];
     if has_clear_horizontal_entry_drop(rows, target_shape, target_x, target_y) {
         return true;
     }
 
-    if reachable_cache.is_none() {
-        *reachable_cache = build_reachable_placement_set(rows, piece, kick_table);
+    if reachable_cache.reachable.is_none() {
+        reachable_cache.reachable = Some(build_reachable_placement_set(rows, piece, kick_table));
     }
     reachable_cache
+        .reachable
         .as_ref()
         .is_some_and(|reachable| reachable.contains(shapes, target_shape_index, target_x, target_y))
 }
@@ -100,7 +112,7 @@ fn build_reachable_placement_set(
     rows: &BoardRows,
     piece: Piece,
     kick_table: KickTable,
-) -> Option<ReachablePlacementSet> {
+) -> ReachablePlacementSet {
     let shapes = piece_shapes(piece);
     let spawn_shape = shapes[0];
     let spawn = MovementState {
@@ -108,10 +120,6 @@ fn build_reachable_placement_set(
         x: (BOARD_WIDTH as i8 - spawn_shape.width) / 2,
         y: BOARD_HEIGHT as i8 - spawn_shape.height,
     };
-
-    if !can_place(rows, spawn_shape, spawn.x, spawn.y) {
-        return None;
-    }
 
     let mut visited = [false; MOVEMENT_STATE_CAPACITY];
     let mut queue = [spawn; MOVEMENT_STATE_CAPACITY];
@@ -188,7 +196,7 @@ fn build_reachable_placement_set(
         );
     }
 
-    Some(ReachablePlacementSet { visited })
+    ReachablePlacementSet { visited }
 }
 
 fn same_shape_geometry(left: Shape, right: Shape) -> bool {
@@ -387,7 +395,7 @@ mod tests {
     #[test]
     fn direct_drop_reachability_does_not_build_bfs_cache() {
         let rows = [0_u16; BOARD_HEIGHT];
-        let mut cache = None;
+        let mut cache = ReachabilityCache::new(&rows, Piece::I);
 
         assert!(is_reachable_placement_with_cache(
             &rows,
@@ -398,14 +406,14 @@ mod tests {
             KickTable::SrsPlus,
             &mut cache,
         ));
-        assert!(cache.is_none());
+        assert!(cache.reachable.is_none());
     }
 
     #[test]
     fn reachability_cache_is_built_only_after_direct_drop_misses() {
         let mut rows = [0_u16; BOARD_HEIGHT];
         rows[BOARD_HEIGHT - 1] = 1;
-        let mut cache = None;
+        let mut cache = ReachabilityCache::new(&rows, Piece::I);
 
         assert!(is_reachable_placement_with_cache(
             &rows,
@@ -416,7 +424,7 @@ mod tests {
             KickTable::SrsPlus,
             &mut cache,
         ));
-        assert!(cache.is_some());
+        assert!(cache.reachable.is_some());
     }
 }
 

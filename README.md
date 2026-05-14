@@ -50,3 +50,4 @@ Executable examples live in `tests/`.
 - [x] Avoid per-state heap allocation while enumerating hold choices
 - [x] Pre-size native opener search maps to reduce rehashing during beam expansion
 - [x] Cache native reachability BFS only after direct-drop checks miss
+- [x] Reuse native reachability spawn checks across placement candidates

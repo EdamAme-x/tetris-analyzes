@@ -21,7 +21,7 @@ use firepower::{
 };
 use movement::{
     can_place, is_reachable_placement, is_reachable_placement_with_cache, lock_shape,
-    parse_kick_table, ReachablePlacementSet,
+    parse_kick_table, ReachabilityCache,
 };
 use pieces::{
     format_placement, parse_piece_string, parse_queue, piece_name, piece_shapes,
@@ -556,7 +556,7 @@ pub(crate) fn search_opener_states(
                 .flatten()
             {
                 let shapes = piece_shapes(choice.piece);
-                let mut reachable_cache = None;
+                let mut reachable_cache = ReachabilityCache::new(&state.rows, choice.piece);
                 for shape_index in placement_shape_indices(choice.piece).iter().copied() {
                     let shape = shapes[shape_index];
                     for x in 0..=(BOARD_WIDTH as i8 - shape.width) {
@@ -799,7 +799,7 @@ fn place_grounded_at_y(
     y: i8,
     include_placement: bool,
     kick_table: KickTable,
-    reachable_cache: &mut Option<ReachablePlacementSet>,
+    reachable_cache: &mut ReachabilityCache,
     spin_mode: SpinMode,
 ) -> Option<PlacedBoard> {
     if !is_reachable_placement_with_cache(
