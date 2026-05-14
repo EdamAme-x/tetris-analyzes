@@ -78,7 +78,7 @@ export function createOpenerFumenPages(node: NativeBeamSearchNode, options: Open
     const operation = options.includeOperations === false ? undefined : inferFumenOperation(placement, piece);
     return {
       fieldRows: boardToFieldRows(board),
-      comment: `${formatCandidateTitle(node, options.title)} step ${index + 1}/${node.placements.length}: ${placement.path}`,
+      comment: `${formatCandidateTitle(node, options.title)} step ${index + 1}/${node.placements.length}: ${formatPlacementSummary(placement)}`,
       flags: { lock: true, colorize: true, mirror: false, rise: false },
       ...(operation === undefined ? {} : { operation })
     };
@@ -116,6 +116,17 @@ function clearFullRows(board: ColoredBoard): ColoredBoard {
 
 function boardToFieldRows(board: ColoredBoard): string[] {
   return [...board].reverse().map((row) => row.join(""));
+}
+
+function formatPlacementSummary(placement: NativeBeamPlacement): string {
+  const suffixes = [];
+  if (placement.spinKind !== "NONE") {
+    suffixes.push(placement.spinKind);
+  }
+  if (placement.clearedLines > 0) {
+    suffixes.push(`${placement.clearedLines}L`);
+  }
+  return suffixes.length === 0 ? placement.path : `${placement.path} ${suffixes.join(" ")}`;
 }
 
 function inferFumenOperation(placement: NativeBeamPlacement, piece: FumenMino): FumenOperation | undefined {

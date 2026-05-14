@@ -12,9 +12,12 @@ export const OPENER_ENGINE_TASKS = [
   {
     id: "spin-detection",
     title: "Detect T-spin, mini, all-spin, and all-mini classifications.",
-    status: "pending",
+    status: "in-progress",
     implementation: "native-rust",
-    evidence: []
+    evidence: [
+      "detectOpenerSpin classifies T_SPIN, T_SPIN_MINI, and IMMOBILE_SPIN primitives in native Rust.",
+      "searchOpenerBeamWithPlacements exposes per-placement spinKind and clearedLines for fumen preview and firepower scoring."
+    ]
   },
   {
     id: "firepower-evaluation",

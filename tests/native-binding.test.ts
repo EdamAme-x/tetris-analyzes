@@ -50,6 +50,7 @@ function createValidBinding(): NativeBinding {
     rowsToFumenField: () => "",
     batchRowsToFumenFields: () => [],
     canReachOpenerPlacement: () => false,
+    detectOpenerSpin: () => ({ kind: "NONE", spin: false, mini: false, immobile: false, occupiedCorners: 0, clearedLines: 0 }),
     searchOpenerBeam: () => [],
     searchOpenerBeamWithPlacements: () => []
   };

@@ -20,6 +20,7 @@ const nativeBindingSpec = {
   rowsToFumenField: "function",
   batchRowsToFumenFields: "function",
   canReachOpenerPlacement: "function",
+  detectOpenerSpin: "function",
   searchOpenerBeam: "function",
   searchOpenerBeamWithPlacements: "function"
 } satisfies { readonly [K in keyof NativeBinding]: "function" };

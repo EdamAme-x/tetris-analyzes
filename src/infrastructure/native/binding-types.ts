@@ -11,6 +11,23 @@ export interface NativeBeamPlacement {
   usedHold: boolean;
   cells: NativePlacementCell[];
   path: string;
+  spinKind: NativeSpinKind;
+  spin: boolean;
+  mini: boolean;
+  immobile: boolean;
+  occupiedCorners: number;
+  clearedLines: number;
+}
+
+export type NativeSpinKind = "NONE" | "T_SPIN" | "T_SPIN_MINI" | "IMMOBILE_SPIN";
+
+export interface NativeSpinDetection {
+  kind: NativeSpinKind;
+  spin: boolean;
+  mini: boolean;
+  immobile: boolean;
+  occupiedCorners: number;
+  clearedLines: number;
 }
 
 export interface NativeBeamSearchNode {
@@ -42,6 +59,7 @@ export interface NativeBinding {
   rowsToFumenField(rows: Uint16Array): string;
   batchRowsToFumenFields(rows: Uint16Array, boardCount: number): string[];
   canReachOpenerPlacement(rows: Uint16Array, piece: string, rotation: number, x: number, y: number): boolean;
+  detectOpenerSpin(rows: Uint16Array, piece: string, rotation: number, x: number, y: number): NativeSpinDetection;
   searchOpenerBeam(queue: string, beamWidth: number, holdEnabled: boolean, maxDepth: number): NativeBeamSearchNode[];
   searchOpenerBeamWithPlacements(queue: string, beamWidth: number, holdEnabled: boolean, maxDepth: number): NativeBeamSearchNode[];
 }

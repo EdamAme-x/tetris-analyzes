@@ -108,6 +108,7 @@ describe("TetrisFumenCodec", () => {
         return ["_".repeat(230), "_".repeat(230)];
       },
       canReachOpenerPlacement: () => false,
+      detectOpenerSpin: () => ({ kind: "NONE", spin: false, mini: false, immobile: false, occupiedCorners: 0, clearedLines: 0 }),
       searchOpenerBeam: () => [],
       searchOpenerBeamWithPlacements: () => []
     };

@@ -83,6 +83,7 @@ struct Placement {
     y: i8,
     used_hold: bool,
     cells: Vec<Cell>,
+    spin: SpinDetection,
 }
 
 struct PlacedBoard {
@@ -106,6 +107,40 @@ pub struct BeamPlacement {
     pub used_hold: bool,
     pub cells: Vec<BeamPlacementCell>,
     pub path: String,
+    pub spin_kind: String,
+    pub spin: bool,
+    pub mini: bool,
+    pub immobile: bool,
+    pub occupied_corners: u32,
+    pub cleared_lines: u32,
+}
+
+#[derive(Clone, Copy)]
+struct SpinDetection {
+    kind: SpinKind,
+    spin: bool,
+    mini: bool,
+    immobile: bool,
+    occupied_corners: u32,
+    cleared_lines: u32,
+}
+
+#[derive(Clone, Copy, Eq, PartialEq)]
+enum SpinKind {
+    None,
+    TSpin,
+    TSpinMini,
+    ImmobileSpin,
+}
+
+#[napi(object)]
+pub struct BeamSpinDetection {
+    pub kind: String,
+    pub spin: bool,
+    pub mini: bool,
+    pub immobile: bool,
+    pub occupied_corners: u32,
+    pub cleared_lines: u32,
 }
 
 #[derive(Clone, Copy)]
@@ -312,6 +347,50 @@ pub fn can_reach_opener_placement(
     Ok(can_place(&board, shape, x, y)
         && (y == 0 || !can_place(&board, shape, x, y - 1))
         && is_reachable_placement(&board, piece, shape_index, x, y))
+}
+
+#[napi(js_name = "detectOpenerSpin")]
+pub fn detect_opener_spin(
+    rows: Uint16Array,
+    piece: String,
+    rotation: u32,
+    x: i32,
+    y: i32,
+) -> Result<BeamSpinDetection> {
+    let rows = rows.as_ref();
+    validate_single_board(rows)?;
+    let board = rows_to_array(rows)?;
+    let piece = parse_piece_string(&piece)?;
+    let rotation = u8::try_from(rotation)
+        .map_err(|_| Error::from_reason(format!("rotation must fit in u8, got {rotation}.")))?;
+    let shape = piece_shapes(piece)
+        .iter()
+        .find(|shape| shape.rotation == rotation)
+        .copied()
+        .ok_or_else(|| {
+            Error::from_reason(format!(
+                "Piece {} has no rotation {rotation}.",
+                piece_name(piece)
+            ))
+        })?;
+    let x =
+        i8::try_from(x).map_err(|_| Error::from_reason(format!("x must fit in i8, got {x}.")))?;
+    let y =
+        i8::try_from(y).map_err(|_| Error::from_reason(format!("y must fit in i8, got {y}.")))?;
+    let Some(locked) = lock_shape(&board, shape, x, y) else {
+        return Err(Error::from_reason(format!(
+            "Cannot place {} rotation {rotation} at x={x}, y={y}.",
+            piece_name(piece)
+        )));
+    };
+    Ok(BeamSpinDetection::from(detect_spin(
+        &locked,
+        piece,
+        shape,
+        x,
+        y,
+        count_full_lines_array(&locked),
+    )))
 }
 
 #[napi(js_name = "searchOpenerBeam")]
@@ -727,12 +806,12 @@ fn place_and_clear(
                 continue;
             }
 
-            let mut placed = *rows;
             let mut cells = if include_placement {
                 Some(Vec::with_capacity(shape.cells.len()))
             } else {
                 None
             };
+            let mut placed = *rows;
             for cell in shape.cells {
                 let absolute = Cell {
                     x: x + cell.x,
@@ -745,16 +824,30 @@ fn place_and_clear(
                     cells.push(absolute);
                 }
             }
+            let cleared_lines = count_full_lines_array(&placed);
+            let spin = if include_placement {
+                Some(detect_spin(
+                    &placed,
+                    choice.piece,
+                    shape,
+                    x,
+                    y,
+                    cleared_lines,
+                ))
+            } else {
+                None
+            };
             return Some(PlacedBoard {
                 rows: clear_full_lines_array(placed),
                 y,
-                placement: cells.map(|cells| Placement {
+                placement: cells.zip(spin).map(|(cells, spin)| Placement {
                     piece: choice.piece,
                     rotation: shape.rotation,
                     x,
                     y,
                     used_hold: choice.used_hold,
                     cells,
+                    spin,
                 }),
             });
         }
@@ -929,6 +1022,218 @@ fn can_place(rows: &[u16; BOARD_HEIGHT], shape: Shape, x: i8, y: i8) -> bool {
     true
 }
 
+fn lock_shape(
+    rows: &[u16; BOARD_HEIGHT],
+    shape: Shape,
+    x: i8,
+    y: i8,
+) -> Option<[u16; BOARD_HEIGHT]> {
+    if !can_place(rows, shape, x, y) {
+        return None;
+    }
+
+    let mut output = *rows;
+    for cell in shape.cells {
+        let board_x = x + cell.x;
+        let board_y = y + cell.y;
+        let row_index = usize::try_from(board_y).ok()?;
+        let column = u32::try_from(board_x).ok()?;
+        output[row_index] |= 1_u16 << column;
+    }
+    Some(output)
+}
+
+fn detect_spin(
+    locked_rows: &[u16; BOARD_HEIGHT],
+    piece: Piece,
+    shape: Shape,
+    x: i8,
+    y: i8,
+    cleared_lines: u32,
+) -> SpinDetection {
+    let immobile = is_placement_immobile(locked_rows, shape, x, y);
+    if piece == Piece::T {
+        let occupied_corners = count_t_occupied_corners(locked_rows, shape.rotation, x, y);
+        if occupied_corners >= 3 {
+            let front_corners = count_t_front_corners(locked_rows, shape.rotation, x, y);
+            let mini = front_corners < 2;
+            return SpinDetection {
+                kind: if mini {
+                    SpinKind::TSpinMini
+                } else {
+                    SpinKind::TSpin
+                },
+                spin: true,
+                mini,
+                immobile,
+                occupied_corners,
+                cleared_lines,
+            };
+        }
+
+        return SpinDetection {
+            kind: SpinKind::None,
+            spin: false,
+            mini: false,
+            immobile,
+            occupied_corners,
+            cleared_lines,
+        };
+    }
+
+    if immobile {
+        return SpinDetection {
+            kind: SpinKind::ImmobileSpin,
+            spin: true,
+            mini: false,
+            immobile,
+            occupied_corners: 0,
+            cleared_lines,
+        };
+    }
+
+    SpinDetection {
+        kind: SpinKind::None,
+        spin: false,
+        mini: false,
+        immobile,
+        occupied_corners: 0,
+        cleared_lines,
+    }
+}
+
+fn is_placement_immobile(locked_rows: &[u16; BOARD_HEIGHT], shape: Shape, x: i8, y: i8) -> bool {
+    let board_without_piece = remove_shape_cells(locked_rows, shape, x, y);
+    !can_place(&board_without_piece, shape, x - 1, y)
+        && !can_place(&board_without_piece, shape, x + 1, y)
+        && !can_place(&board_without_piece, shape, x, y - 1)
+}
+
+fn remove_shape_cells(
+    rows: &[u16; BOARD_HEIGHT],
+    shape: Shape,
+    x: i8,
+    y: i8,
+) -> [u16; BOARD_HEIGHT] {
+    let mut output = *rows;
+    for cell in shape.cells {
+        let board_x = x + cell.x;
+        let board_y = y + cell.y;
+        if board_x >= 0
+            && board_x < BOARD_WIDTH as i8
+            && board_y >= 0
+            && board_y < BOARD_HEIGHT as i8
+        {
+            output[board_y as usize] &= !(1_u16 << board_x);
+        }
+    }
+    output
+}
+
+fn count_t_occupied_corners(rows: &[u16; BOARD_HEIGHT], rotation: u8, x: i8, y: i8) -> u32 {
+    t_corner_cells(rotation, x, y)
+        .into_iter()
+        .filter(|cell| is_occupied_or_wall(rows, cell.x, cell.y))
+        .count() as u32
+}
+
+fn count_t_front_corners(rows: &[u16; BOARD_HEIGHT], rotation: u8, x: i8, y: i8) -> u32 {
+    t_front_corner_cells(rotation, x, y)
+        .into_iter()
+        .filter(|cell| is_occupied_or_wall(rows, cell.x, cell.y))
+        .count() as u32
+}
+
+fn t_corner_cells(rotation: u8, x: i8, y: i8) -> [Cell; 4] {
+    let origin = t_origin(rotation, x, y);
+    [
+        Cell {
+            x: origin.x - 1,
+            y: origin.y - 1,
+        },
+        Cell {
+            x: origin.x + 1,
+            y: origin.y - 1,
+        },
+        Cell {
+            x: origin.x - 1,
+            y: origin.y + 1,
+        },
+        Cell {
+            x: origin.x + 1,
+            y: origin.y + 1,
+        },
+    ]
+}
+
+fn t_front_corner_cells(rotation: u8, x: i8, y: i8) -> [Cell; 2] {
+    let origin = t_origin(rotation, x, y);
+    match rotation {
+        0 => [
+            Cell {
+                x: origin.x - 1,
+                y: origin.y + 1,
+            },
+            Cell {
+                x: origin.x + 1,
+                y: origin.y + 1,
+            },
+        ],
+        1 => [
+            Cell {
+                x: origin.x + 1,
+                y: origin.y - 1,
+            },
+            Cell {
+                x: origin.x + 1,
+                y: origin.y + 1,
+            },
+        ],
+        2 => [
+            Cell {
+                x: origin.x - 1,
+                y: origin.y - 1,
+            },
+            Cell {
+                x: origin.x + 1,
+                y: origin.y - 1,
+            },
+        ],
+        3 => [
+            Cell {
+                x: origin.x - 1,
+                y: origin.y - 1,
+            },
+            Cell {
+                x: origin.x - 1,
+                y: origin.y + 1,
+            },
+        ],
+        _ => [origin, origin],
+    }
+}
+
+fn t_origin(rotation: u8, x: i8, y: i8) -> Cell {
+    match rotation {
+        0 => Cell { x: x + 1, y },
+        1 => Cell { x, y: y + 1 },
+        2 => Cell { x: x + 1, y: y + 1 },
+        3 => Cell { x: x + 1, y: y + 1 },
+        _ => Cell { x, y },
+    }
+}
+
+fn is_occupied_or_wall(rows: &[u16; BOARD_HEIGHT], x: i8, y: i8) -> bool {
+    if !(0..BOARD_WIDTH as i8).contains(&x) || !(0..BOARD_HEIGHT as i8).contains(&y) {
+        return true;
+    }
+    rows[y as usize] & (1_u16 << x) != 0
+}
+
+fn count_full_lines_array(rows: &[u16; BOARD_HEIGHT]) -> u32 {
+    rows.iter().filter(|row| **row == ROW_MASK).count() as u32
+}
+
 fn srs_plus_kicks(piece: Piece, from_rotation: u8, to_rotation: u8) -> &'static [Cell] {
     if piece == Piece::I {
         match (from_rotation, to_rotation) {
@@ -1050,7 +1355,35 @@ impl From<Placement> for BeamPlacement {
                 })
                 .collect(),
             path,
+            spin_kind: spin_kind_name(placement.spin.kind).to_string(),
+            spin: placement.spin.spin,
+            mini: placement.spin.mini,
+            immobile: placement.spin.immobile,
+            occupied_corners: placement.spin.occupied_corners,
+            cleared_lines: placement.spin.cleared_lines,
         }
+    }
+}
+
+impl From<SpinDetection> for BeamSpinDetection {
+    fn from(spin: SpinDetection) -> Self {
+        Self {
+            kind: spin_kind_name(spin.kind).to_string(),
+            spin: spin.spin,
+            mini: spin.mini,
+            immobile: spin.immobile,
+            occupied_corners: spin.occupied_corners,
+            cleared_lines: spin.cleared_lines,
+        }
+    }
+}
+
+fn spin_kind_name(kind: SpinKind) -> &'static str {
+    match kind {
+        SpinKind::None => "NONE",
+        SpinKind::TSpin => "T_SPIN",
+        SpinKind::TSpinMini => "T_SPIN_MINI",
+        SpinKind::ImmobileSpin => "IMMOBILE_SPIN",
     }
 }
 

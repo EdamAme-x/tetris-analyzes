@@ -1,5 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import { canReachOpenerPlacement, searchOpenerBeam, searchOpenerBeamWithPlacements } from "../src/application/search-opener";
+import {
+  canReachOpenerPlacement,
+  detectOpenerSpin,
+  searchOpenerBeam,
+  searchOpenerBeamWithPlacements
+} from "../src/application/search-opener";
 import { ROW_MASK } from "../src/domain/board";
 import { bitBoardFromRows } from "../src/infrastructure/bitboard/native-bitboard";
 
@@ -26,6 +31,8 @@ describe("native opener beam search", () => {
     expect(nodes[0]?.placements).toHaveLength(4);
     expect(nodes[0]?.placements[0]?.cells).toHaveLength(4);
     expect(nodes[0]?.placements[0]?.path).toContain(",y");
+    expect(nodes[0]?.placements[0]?.spinKind).toBeDefined();
+    expect(nodes[0]?.placements[0]?.clearedLines).toBeGreaterThanOrEqual(0);
   });
 
   test("models hold inside the native search brancher", () => {
@@ -43,6 +50,33 @@ describe("native opener beam search", () => {
 
     expect(canReachOpenerPlacement({ rows: empty, piece: "I", rotation: 0, x: 3, y: 0 })).toBe(true);
     expect(canReachOpenerPlacement({ rows: bitBoardFromRows(sealedCave), piece: "I", rotation: 0, x: 3, y: 0 })).toBe(false);
+  });
+
+  test("detects T-spin, T-spin mini, and immobile spin primitives in native code", () => {
+    const fullTSpinRows = new Array(20).fill(0);
+    fullTSpinRows[1] = (1 << 3) | (1 << 5);
+    const miniTSpinRows = new Array(20).fill(0);
+    miniTSpinRows[1] = 1 << 3;
+    const immobileIRows = new Array(20).fill(0);
+    immobileIRows[0] = (1 << 2) | (1 << 7);
+
+    expect(detectOpenerSpin({ rows: bitBoardFromRows(fullTSpinRows), piece: "T", rotation: 0, x: 3, y: 0 })).toMatchObject({
+      kind: "T_SPIN",
+      spin: true,
+      mini: false,
+      occupiedCorners: 4
+    });
+    expect(detectOpenerSpin({ rows: bitBoardFromRows(miniTSpinRows), piece: "T", rotation: 0, x: 3, y: 0 })).toMatchObject({
+      kind: "T_SPIN_MINI",
+      spin: true,
+      mini: true,
+      occupiedCorners: 3
+    });
+    expect(detectOpenerSpin({ rows: bitBoardFromRows(immobileIRows), piece: "I", rotation: 0, x: 3, y: 0 })).toMatchObject({
+      kind: "IMMOBILE_SPIN",
+      spin: true,
+      immobile: true
+    });
   });
 
   test("rejects invalid queues before searching", () => {
