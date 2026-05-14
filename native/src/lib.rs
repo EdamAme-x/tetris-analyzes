@@ -631,15 +631,20 @@ fn score_t_spin_setup_potential(
     kick_table: KickTable,
     spin_mode: SpinMode,
 ) {
+    let mut potential_by_rows = HashMap::<BoardRows, u32>::new();
     for state in beam {
-        state.t_spin_potential = if spin_mode_allows_t_spin_potential(spin_mode)
-            && has_future_t_piece(state, pieces)
-            && estimate_t_spin_surface_potential(&state.rows) > 0
-        {
-            estimate_t_spin_potential(&state.rows, kick_table)
-        } else {
-            0
-        };
+        state.t_spin_potential =
+            if spin_mode_allows_t_spin_potential(spin_mode) && has_future_t_piece(state, pieces) {
+                *potential_by_rows.entry(state.rows).or_insert_with(|| {
+                    if estimate_t_spin_surface_potential(&state.rows) > 0 {
+                        estimate_t_spin_potential(&state.rows, kick_table)
+                    } else {
+                        0
+                    }
+                })
+            } else {
+                0
+            };
         state.score = score_state(state.metrics, state.firepower, state.t_spin_potential);
     }
 }
@@ -648,7 +653,7 @@ fn has_future_t_piece(state: &SearchState, pieces: &[Piece]) -> bool {
     state.hold == Some(Piece::T)
         || pieces
             .get(state.queue_index..)
-        .is_some_and(|remaining| remaining.contains(&Piece::T))
+            .is_some_and(|remaining| remaining.contains(&Piece::T))
 }
 
 fn spin_mode_allows_t_spin_potential(spin_mode: SpinMode) -> bool {
