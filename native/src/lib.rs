@@ -15,8 +15,8 @@ use bag::{evaluate_opener_bag_internal, OpenerBagEvaluation};
 use board::{BoardEvaluation, BoardRows, BOARD_HEIGHT, BOARD_WIDTH};
 use firepower::{
     advance_firepower_for_clear_with_combo_table, advance_firepower_with_combo_table,
-    clear_kind_cleared_lines, clear_kind_name, estimate_t_spin_potential, firepower_score, parse_clear_kind,
-    parse_combo_table, score_state, FirepowerEvent, FirepowerState,
+    clear_kind_cleared_lines, clear_kind_name, estimate_t_spin_potential, firepower_score,
+    parse_clear_kind, parse_combo_table, score_state, FirepowerEvent, FirepowerState,
 };
 use movement::{can_place, is_reachable_placement, lock_shape, parse_kick_table};
 use pieces::{
@@ -556,7 +556,9 @@ pub(crate) fn search_opener_states(
                                 back_to_back_chain: firepower.back_to_back_chain,
                             };
                             match next_by_key.get(&key) {
-                                Some(existing) if existing.score >= next_state.score => {}
+                                Some(existing)
+                                    if compare_search_state(existing, &next_state)
+                                        != std::cmp::Ordering::Greater => {}
                                 _ => {
                                     next_by_key.insert(key, next_state);
                                 }
@@ -572,12 +574,24 @@ pub(crate) fn search_opener_states(
         }
 
         beam = next_by_key.into_values().collect();
-        beam.sort_by(compare_search_state);
-        beam.truncate(beam_width);
+        retain_best_search_states(&mut beam, beam_width);
     }
 
     beam.sort_by(compare_search_state);
     beam
+}
+
+fn retain_best_search_states(beam: &mut Vec<SearchState>, beam_width: usize) {
+    if beam.len() <= beam_width {
+        beam.sort_by(compare_search_state);
+        return;
+    }
+
+    {
+        let (retained, _, _) = beam.select_nth_unstable_by(beam_width, compare_search_state);
+        retained.sort_by(compare_search_state);
+    }
+    beam.truncate(beam_width);
 }
 
 fn piece_choices(pieces: &[Piece], state: &SearchState, hold_enabled: bool) -> Vec<PieceChoice> {
@@ -703,7 +717,7 @@ fn compare_search_state(left: &SearchState, right: &SearchState) -> std::cmp::Or
         .then_with(|| right.score.total_cmp(&left.score))
         .then_with(|| right.firepower.points.cmp(&left.firepower.points))
         .then_with(|| left.path.len().cmp(&right.path.len()))
-        .then_with(|| left.queue_index.cmp(&right.queue_index))
+        .then_with(|| left.path.cmp(&right.path))
 }
 
 pub(crate) fn validate_beam_width(beam_width: u32) -> Result<usize> {
