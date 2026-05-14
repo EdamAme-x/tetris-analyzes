@@ -404,7 +404,7 @@ describe("opener experiment runner", () => {
     const summary = renderOpenerExperimentConsoleSummary(report, 1);
     expect(summary).toContain("Best opener templates");
     expect(summary).toContain(
-      "#1 sources=fake-scenario survival=1 (100.0%) queueIndex=1 hold=- attack=0 difficultAttack=0 otherAttack=0 tspin=0 tspinAttack=0 b2b=0 tspinPotential=0 points=0 score=10.0"
+      "#1 sources=fake-scenario survival=1 (100.0%) queueIndex=1 hold=- attack=0 difficultAttack=0 otherAttack=0 spin=0 spinAttack=0 tspin=0 tspinAttack=0 b2b=0 tspinPotential=0 points=0 score=10.0"
     );
     expect(summary).toContain("path: T@r0,x3");
     expect(summary).not.toContain("fake-scenario | TI");
@@ -1730,7 +1730,7 @@ describe("opener experiment runner", () => {
       ]
     });
 
-    expect(report.scenarios[0]?.top[0]?.clearSequence).toEqual(["TSPIN_SINGLE:2"]);
+    expect(report.scenarios[0]?.top[0]?.clearSequence).toEqual(["I_SPIN_SINGLE:2"]);
     expect(report.scenarios[0]?.top[0]).toMatchObject({ difficultAttack: 2, nonDifficultAttack: 0 });
   });
 

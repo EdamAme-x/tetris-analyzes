@@ -421,13 +421,17 @@ describe("native opener beam search", () => {
     const [wideTop] = searchOpenerBeamWithPlacements({ ...input, beamWidth: 64 });
 
     expect(tightTop).toMatchObject({
-      tSpinClears: 1,
-      tSpinAttack: 2,
+      spinClears: 1,
+      spinAttack: 2,
+      tSpinClears: 0,
+      tSpinAttack: 0,
       difficultClears: 1,
       backToBackChain: 1,
       attack: 2
     });
     expect(wideTop).toMatchObject({
+      spinClears: tightTop?.spinClears,
+      spinAttack: tightTop?.spinAttack,
       tSpinClears: tightTop?.tSpinClears,
       tSpinAttack: tightTop?.tSpinAttack,
       difficultClears: tightTop?.difficultClears,
@@ -435,6 +439,7 @@ describe("native opener beam search", () => {
       attack: tightTop?.attack
     });
     expect(tightTop?.placements.some((placement) => placement.clearName === "TSPIN_SINGLE")).toBe(true);
+    expect(tightTop?.placements.some((placement) => placement.piece === "I" && placement.clearName === "TSPIN_SINGLE")).toBe(true);
   });
 
   test("keeps medium-depth TL pruning on B2B T-spin lines", () => {

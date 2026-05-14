@@ -79,6 +79,22 @@ describe("opener fumen preview pages", () => {
     expect(countCells(finalCells, "O")).toBe(4);
   });
 
+  test("labels non-T all-spin clears without calling them T-spins in comments", () => {
+    const placement = {
+      ...placementFromOperation({ type: "I", rotation: "spawn", x: 3, y: 0 }),
+      spinKind: "T_SPIN" as const,
+      spin: true,
+      clearedLines: 1,
+      clearName: "TSPIN_SINGLE" as const,
+      attack: 2
+    };
+
+    const [page] = createOpenerFumenPages(nodeWithPlacements([placement]), { title: "all spin" });
+
+    expect(page?.comment).toContain("I_SPIN_SINGLE");
+    expect(page?.comment).not.toContain("TSPIN_SINGLE");
+  });
+
   test("carries line clears into the next operation page without double-locking", () => {
     const node = nodeWithPlacements([
       placementFromOperation({ type: "O", rotation: "spawn", x: 0, y: 0 }),

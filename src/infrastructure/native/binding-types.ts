@@ -117,6 +117,8 @@ export interface NativeBeamSearchNode {
   allClears: number;
   difficultClears: number;
   difficultAttack: number;
+  spinClears?: number;
+  spinAttack?: number;
   tSpinClears: number;
   tSpinAttack: number;
   tSpinPotential: number;
@@ -140,6 +142,8 @@ export interface NativeOpenerQueueEvaluation {
   points: number;
   allClears: number;
   difficultClears: number;
+  spinClears?: number;
+  spinAttack?: number;
   tSpinClears: number;
   tSpinAttack: number;
   backToBackChain: number;

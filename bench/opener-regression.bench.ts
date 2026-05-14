@@ -19,6 +19,8 @@ interface OpenerRegressionResult {
   readonly topAttack: number;
   readonly topTSpinClears: number;
   readonly topTSpinAttack: number;
+  readonly topSpinClears: number;
+  readonly topSpinAttack: number;
   readonly topDifficultClears: number;
   readonly topBackToBackChain: number;
   readonly topScore: number;
@@ -108,9 +110,9 @@ for (const bench of rotateCases(cases, rounds)) {
 
 console.log("");
 console.log(
-  "| opener seed | median ms | searches/s | nodes | queue index | hold | attack | tspin | tspin attack | difficult | b2b | score | holes | bumpiness | checksum | top path |"
+  "| opener seed | median ms | searches/s | nodes | queue index | hold | attack | spin | spin attack | tspin | tspin attack | difficult | b2b | score | holes | bumpiness | checksum | top path |"
 );
-console.log("| --- | ---: | ---: | ---: | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |");
+console.log("| --- | ---: | ---: | ---: | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |");
 for (const bench of cases) {
   const timings = samples.get(bench.name) ?? [];
   const summary = summarize(timings);
@@ -129,6 +131,8 @@ for (const bench of cases) {
       String(latestResult.topQueueIndex),
       latestResult.topHold,
       String(latestResult.topAttack),
+      String(latestResult.topSpinClears),
+      String(latestResult.topSpinAttack),
       String(latestResult.topTSpinClears),
       String(latestResult.topTSpinAttack),
       String(latestResult.topDifficultClears),
@@ -175,6 +179,8 @@ function runCase(bench: OpenerRegressionCase): OpenerRegressionResult {
     topQueueIndex: top.queueIndex,
     topHold: top.hold ?? "-",
     topAttack: top.attack,
+    topSpinClears: top.spinClears ?? top.tSpinClears,
+    topSpinAttack: top.spinAttack ?? top.tSpinAttack,
     topTSpinClears: top.tSpinClears,
     topTSpinAttack: top.tSpinAttack,
     topDifficultClears: top.difficultClears,

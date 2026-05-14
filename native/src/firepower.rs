@@ -21,6 +21,8 @@ pub(crate) struct FirepowerState {
     pub(crate) all_clears: u32,
     pub(crate) difficult_clears: u32,
     pub(crate) difficult_attack: u32,
+    pub(crate) spin_clears: u32,
+    pub(crate) spin_attack: u32,
     pub(crate) t_spin_clears: u32,
     pub(crate) t_spin_attack: u32,
 }
@@ -50,6 +52,8 @@ impl FirepowerState {
             all_clears: 0,
             difficult_clears: 0,
             difficult_attack: 0,
+            spin_clears: 0,
+            spin_attack: 0,
             t_spin_clears: 0,
             t_spin_attack: 0,
         }
@@ -86,8 +90,8 @@ pub(crate) fn score_state(
 pub(crate) fn firepower_score(firepower: FirepowerState) -> f64 {
     firepower.attack as f64 * 1_000.0
         + firepower.difficult_attack as f64 * 900.0
-        + firepower.t_spin_attack as f64 * 1_500.0
-        + firepower.t_spin_clears as f64 * 3_000.0
+        + firepower.spin_attack as f64 * 1_500.0
+        + firepower.spin_clears as f64 * 3_000.0
         + firepower.difficult_clears as f64 * 1_750.0
         + firepower.points as f64 * 0.05
         + firepower.max_combo as f64 * 20.0
@@ -191,6 +195,7 @@ pub(crate) fn estimate_quad_well_potential(rows: &BoardRows) -> u32 {
 
 pub(crate) fn advance_firepower_with_combo_table(
     previous: FirepowerState,
+    piece: Piece,
     spin: SpinDetection,
     rows_after_clear: &BoardRows,
     combo_table: ComboTable,
@@ -202,6 +207,7 @@ pub(crate) fn advance_firepower_with_combo_table(
         clear_kind,
         spin.cleared_lines,
         all_clear,
+        spin.spin.then_some(piece),
         combo_table,
         spin.force_back_to_back,
         spin.halve_attack,
@@ -213,6 +219,7 @@ pub(crate) fn advance_firepower_for_clear_with_combo_table(
     clear_kind: ClearKind,
     cleared_lines: u32,
     all_clear: bool,
+    spin_piece: Option<Piece>,
     combo_table: ComboTable,
     force_back_to_back: bool,
     halve_attack: bool,
@@ -268,7 +275,8 @@ pub(crate) fn advance_firepower_for_clear_with_combo_table(
     let event_points = points + all_clear_points;
     let all_clears = previous.all_clears + u32::from(all_clear);
     let difficult_clear = difficult && cleared_lines > 0;
-    let t_spin_clear = is_real_t_spin_line_clear(clear_kind);
+    let spin_clear = is_spin_line_clear(clear_kind);
+    let t_spin_clear = is_real_t_spin_line_clear(clear_kind, spin_piece);
 
     (
         FirepowerState {
@@ -281,6 +289,8 @@ pub(crate) fn advance_firepower_for_clear_with_combo_table(
             difficult_clears: previous.difficult_clears + u32::from(difficult_clear),
             difficult_attack: previous.difficult_attack
                 + if difficult_clear { event_attack } else { 0 },
+            spin_clears: previous.spin_clears + u32::from(spin_clear),
+            spin_attack: previous.spin_attack + if spin_clear { event_attack } else { 0 },
             t_spin_clears: previous.t_spin_clears + u32::from(t_spin_clear),
             t_spin_attack: previous.t_spin_attack + if t_spin_clear { event_attack } else { 0 },
         },
@@ -373,7 +383,21 @@ fn is_back_to_back_clear(kind: ClearKind) -> bool {
     tetrio_tables::is_back_to_back_clear(kind)
 }
 
-fn is_real_t_spin_line_clear(kind: ClearKind) -> bool {
+fn is_spin_line_clear(kind: ClearKind) -> bool {
+    matches!(
+        kind,
+        ClearKind::TSpinSingle
+            | ClearKind::TSpinDouble
+            | ClearKind::TSpinTriple
+            | ClearKind::TSpinQuad
+            | ClearKind::TSpinPenta
+    )
+}
+
+fn is_real_t_spin_line_clear(kind: ClearKind, spin_piece: Option<Piece>) -> bool {
+    if spin_piece.unwrap_or(Piece::T) != Piece::T {
+        return false;
+    }
     matches!(
         kind,
         ClearKind::TSpinSingle
@@ -437,6 +461,7 @@ mod tests {
             ClearKind::Double,
             2,
             false,
+            None,
             ComboTable::Multiplier,
             false,
             false,
@@ -446,6 +471,7 @@ mod tests {
             ClearKind::Quad,
             4,
             false,
+            None,
             ComboTable::Multiplier,
             false,
             false,
@@ -462,6 +488,7 @@ mod tests {
     fn forced_b2b_spin_clears_start_and_continue_back_to_back() {
         let (first_state, first_event) = advance_firepower_with_combo_table(
             FirepowerState::empty(),
+            Piece::I,
             spin_detection(SpinKind::TSpinMini, 1, true),
             &[1_u16; BOARD_HEIGHT],
             ComboTable::Multiplier,
@@ -472,6 +499,7 @@ mod tests {
 
         let (second_state, second_event) = advance_firepower_with_combo_table(
             first_state,
+            Piece::I,
             spin_detection(SpinKind::TSpinMini, 1, true),
             &[1_u16; BOARD_HEIGHT],
             ComboTable::Multiplier,
@@ -482,12 +510,30 @@ mod tests {
     }
 
     #[test]
+    fn non_t_all_spin_attack_is_not_counted_as_real_t_spin_attack() {
+        let (state, event) = advance_firepower_with_combo_table(
+            FirepowerState::empty(),
+            Piece::I,
+            spin_detection(SpinKind::TSpin, 1, false),
+            &[1_u16; BOARD_HEIGHT],
+            ComboTable::Multiplier,
+        );
+
+        assert_eq!(event.attack, 2);
+        assert_eq!(state.spin_clears, 1);
+        assert_eq!(state.spin_attack, 2);
+        assert_eq!(state.t_spin_clears, 0);
+        assert_eq!(state.t_spin_attack, 0);
+    }
+
+    #[test]
     fn spin_halve_attack_halves_non_t_handheld_attack() {
         let mut spin = spin_detection(SpinKind::TSpin, 2, false);
         spin.halve_attack = true;
 
         let (_, event) = advance_firepower_with_combo_table(
             FirepowerState::empty(),
+            Piece::I,
             spin,
             &[1_u16; BOARD_HEIGHT],
             ComboTable::Multiplier,

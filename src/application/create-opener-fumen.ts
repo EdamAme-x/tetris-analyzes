@@ -123,10 +123,10 @@ function boardToFieldRows(board: ColoredBoard): string[] {
 function formatPlacementSummary(placement: NativeBeamPlacement): string {
   const suffixes = [];
   if (placement.clearName !== "NONE") {
-    suffixes.push(placement.clearName);
+    suffixes.push(displayPlacementClearName(placement));
   }
   if (placement.clearName === "NONE" && placement.spinKind !== "NONE") {
-    suffixes.push(placement.spinKind);
+    suffixes.push(displayPlacementSpinKind(placement));
   }
   if (placement.clearedLines > 0) {
     suffixes.push(`${placement.clearedLines}L`);
@@ -138,6 +138,23 @@ function formatPlacementSummary(placement: NativeBeamPlacement): string {
     suffixes.push("PC");
   }
   return suffixes.length === 0 ? placement.path : `${placement.path} ${suffixes.join(" ")}`;
+}
+
+function displayPlacementClearName(placement: NativeBeamPlacement): string {
+  if (placement.piece !== "T" && placement.clearName.startsWith("TSPIN")) {
+    return `${placement.piece}_SPIN${placement.clearName.slice("TSPIN".length)}`;
+  }
+  return placement.clearName;
+}
+
+function displayPlacementSpinKind(placement: NativeBeamPlacement): string {
+  if (placement.piece !== "T" && placement.spinKind === "T_SPIN") {
+    return `${placement.piece}_SPIN`;
+  }
+  if (placement.piece !== "T" && placement.spinKind === "T_SPIN_MINI") {
+    return `${placement.piece}_SPIN_MINI`;
+  }
+  return placement.spinKind;
 }
 
 function inferRequiredFumenOperation(placement: NativeBeamPlacement, piece: FumenMino): FumenOperation {

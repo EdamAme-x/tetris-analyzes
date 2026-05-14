@@ -236,6 +236,8 @@ pub struct BeamSearchNode {
     pub all_clears: u32,
     pub difficult_clears: u32,
     pub difficult_attack: u32,
+    pub spin_clears: u32,
+    pub spin_attack: u32,
     pub t_spin_clears: u32,
     pub t_spin_attack: u32,
     pub t_spin_potential: u32,
@@ -493,6 +495,7 @@ pub fn evaluate_opener_firepower(events: Vec<BeamFirepowerInput>) -> Result<Beam
             clear_kind,
             cleared_lines,
             cleared_lines > 0 && event.all_clear.unwrap_or(false),
+            None,
             combo_table,
             false,
             false,
@@ -723,6 +726,7 @@ pub(crate) fn search_opener_states(
                                 let (firepower, firepower_event) =
                                     advance_firepower_with_combo_table(
                                         state.firepower,
+                                        choice.piece,
                                         placed.spin,
                                         &rows,
                                         combo_table,
@@ -1029,14 +1033,16 @@ fn holeless_diversity_start_depth(max_depth: usize) -> Option<usize> {
 fn is_phase_diversity_candidate(state: &SearchState, best: &SearchState) -> bool {
     state.firepower.t_spin_clears.saturating_add(1) >= best.firepower.t_spin_clears
         && state.firepower.t_spin_attack.saturating_add(4) >= best.firepower.t_spin_attack
+        && state.firepower.spin_clears.saturating_add(1) >= best.firepower.spin_clears
+        && state.firepower.spin_attack.saturating_add(4) >= best.firepower.spin_attack
         && state.firepower.difficult_attack.saturating_add(4) >= best.firepower.difficult_attack
         && state.firepower.back_to_back_chain.saturating_add(1) >= best.firepower.back_to_back_chain
 }
 
 fn is_holeless_diversity_candidate(state: &SearchState, best: &SearchState) -> bool {
     state.metrics[3] == 0
-        && state.firepower.t_spin_clears == best.firepower.t_spin_clears
-        && state.firepower.t_spin_attack == best.firepower.t_spin_attack
+        && state.firepower.spin_clears == best.firepower.spin_clears
+        && state.firepower.spin_attack == best.firepower.spin_attack
         && state.firepower.difficult_clears == best.firepower.difficult_clears
         && state.firepower.difficult_attack == best.firepower.difficult_attack
         && state.firepower.back_to_back_chain == best.firepower.back_to_back_chain
@@ -1344,6 +1350,20 @@ fn place_grounded_at_y(
 fn compare_search_state(left: &SearchState, right: &SearchState) -> std::cmp::Ordering {
     let ordering = right
         .firepower
+        .spin_clears
+        .cmp(&left.firepower.spin_clears);
+    if ordering != std::cmp::Ordering::Equal {
+        return ordering;
+    }
+    let ordering = right
+        .firepower
+        .spin_attack
+        .cmp(&left.firepower.spin_attack);
+    if ordering != std::cmp::Ordering::Equal {
+        return ordering;
+    }
+    let ordering = right
+        .firepower
         .t_spin_clears
         .cmp(&left.firepower.t_spin_clears);
     if ordering != std::cmp::Ordering::Equal {
@@ -1406,6 +1426,18 @@ fn compare_search_state_to_candidate(
     right_firepower: FirepowerState,
     right_path_len: usize,
 ) -> std::cmp::Ordering {
+    let ordering = right_firepower
+        .spin_clears
+        .cmp(&left.firepower.spin_clears);
+    if ordering != std::cmp::Ordering::Equal {
+        return ordering;
+    }
+    let ordering = right_firepower
+        .spin_attack
+        .cmp(&left.firepower.spin_attack);
+    if ordering != std::cmp::Ordering::Equal {
+        return ordering;
+    }
     let ordering = right_firepower
         .t_spin_clears
         .cmp(&left.firepower.t_spin_clears);
@@ -1524,6 +1556,8 @@ impl BeamSearchNode {
             all_clears: state.firepower.all_clears,
             difficult_clears: state.firepower.difficult_clears,
             difficult_attack: state.firepower.difficult_attack,
+            spin_clears: state.firepower.spin_clears,
+            spin_attack: state.firepower.spin_attack,
             t_spin_clears: state.firepower.t_spin_clears,
             t_spin_attack: state.firepower.t_spin_attack,
             t_spin_potential: state.t_spin_potential,
@@ -1715,6 +1749,13 @@ mod tests {
     }
 
     #[test]
+    fn row_mirroring_keeps_only_board_width_bits() {
+        assert_eq!(mirror_row_mask(0b0000000001), 0b1000000000);
+        assert_eq!(mirror_row_mask(0b1000000000), 0b0000000001);
+        assert_eq!(mirror_row_mask(0b1011000001), 0b1000001101);
+    }
+
+    #[test]
     fn phase_diverse_retention_keeps_alternate_bag_scaffolds() {
         let mut beam = Vec::new();
         for index in 0..40 {
@@ -1750,6 +1791,8 @@ mod tests {
         firepower.attack = 14;
         firepower.difficult_attack = 14;
         firepower.difficult_clears = 3;
+        firepower.spin_attack = 14;
+        firepower.spin_clears = 3;
         firepower.t_spin_attack = 14;
         firepower.t_spin_clears = 3;
         firepower.back_to_back_chain = 3;
@@ -1845,11 +1888,15 @@ mod tests {
             back_to_back_chain: 3,
         };
         let mut near = FirepowerState::empty();
+        near.spin_clears = 2;
+        near.spin_attack = 8;
         near.t_spin_clears = 2;
         near.t_spin_attack = 8;
         near.difficult_attack = 8;
         near.back_to_back_chain = 2;
         let mut far = FirepowerState::empty();
+        far.spin_clears = 1;
+        far.spin_attack = 4;
         far.t_spin_clears = 1;
         far.t_spin_attack = 4;
         far.difficult_attack = 4;

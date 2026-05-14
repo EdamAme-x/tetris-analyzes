@@ -24,6 +24,7 @@ Executable examples live in `tests/`.
 - [x] Native bitboard, line clear, garbage, and fumen field helpers
 - [x] Native opener beam search with hold and reachability filtering
 - [x] Native spin/firepower scoring with generated TETR.IO clear and combo tables
+- [x] Separate native all-spin firepower counters from real T-spin counters
 - [x] Native 7-bag buildability sampling with Pareto queue ranking
 - [x] Native generated TETR.IO kick tables for SRS+, SRS, SRS-X, TETRA-X, NRS, ARS, ASC, and NONE
 - [x] Native spin mode selection for T-SPINS, all-spin, mini-only, handheld, stupid, and none variants
@@ -36,6 +37,7 @@ Executable examples live in `tests/`.
 - [x] Native T-spin setup-aware pruning with precise report-side potential checks
 - [x] Native T-spin setup pruning filters unreachable continuation slots before beam ranking
 - [x] Opener reports show B2B chain, difficult attack, and fumen preview URLs
+- [x] Opener reports label non-T all-spin clears as I/J/L/O/S/Z spin clears instead of T-spins
 - [x] Broaden deterministic two-bag queue discovery beyond the current survey seeds
 - [x] Keep survey/discovery queues to valid two-bag inputs
 - [x] Native bag ranking exposes and prefers TL B2B/T-spin continuation metrics over perfect-clear bias

@@ -64,6 +64,8 @@ export interface OpenerExperimentCandidate {
   readonly backToBackChain: number;
   readonly allClears: number;
   readonly difficultClears: number;
+  readonly spinClears: number;
+  readonly spinAttack: number;
   readonly tSpinClears: number;
   readonly tSpinAttack: number;
   readonly tSpinPotential: number;
@@ -102,6 +104,8 @@ export interface OpenerTemplateReplayHit {
   readonly score?: number;
   readonly attack?: number;
   readonly difficultAttack?: number;
+  readonly spinClears?: number;
+  readonly spinAttack?: number;
   readonly tSpinClears?: number;
   readonly tSpinAttack?: number;
   readonly backToBackChain?: number;
@@ -183,6 +187,8 @@ export interface OpenerScenarioReachableQuality {
   readonly rank: number;
   readonly queueIndex: number;
   readonly difficultAttack: number;
+  readonly spinClears: number;
+  readonly spinAttack: number;
   readonly tSpinClears: number;
   readonly tSpinAttack: number;
   readonly backToBackChain: number;
@@ -442,8 +448,8 @@ export function renderOpenerExperimentMarkdown(report: OpenerExperimentReport): 
     "",
     "## Best openers",
     "",
-    "| rank | survival | source | attack | difficult attack | other attack | tspin | tspin attack | b2b | tspin potential | points | score | holes | bumpiness | clears | path | preview |",
-    "| ---: | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- | --- |"
+    "| rank | survival | source | attack | difficult attack | other attack | spin | spin attack | tspin | tspin attack | b2b | tspin potential | points | score | holes | bumpiness | clears | path | preview |",
+    "| ---: | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- | --- |"
   ];
 
   for (const candidate of bestCandidates) {
@@ -455,6 +461,8 @@ export function renderOpenerExperimentMarkdown(report: OpenerExperimentReport): 
         String(candidate.attack),
         String(candidate.difficultAttack),
         String(candidate.nonDifficultAttack),
+        String(candidate.spinClears),
+        String(candidate.spinAttack),
         String(candidate.tSpinClears),
         String(candidate.tSpinAttack),
         String(candidate.backToBackChain),
@@ -474,8 +482,8 @@ export function renderOpenerExperimentMarkdown(report: OpenerExperimentReport): 
     "",
     "## Template survivability",
     "",
-    "| rank | survival | sources | attack | difficult attack | tspin | b2b | holes | bumpiness | clears | preview |",
-    "| ---: | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- |"
+    "| rank | survival | sources | attack | difficult attack | spin | tspin | b2b | holes | bumpiness | clears | preview |",
+    "| ---: | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- |"
   );
   for (const template of rankOpenerTemplates(report, 12)) {
     lines.push(
@@ -485,6 +493,7 @@ export function renderOpenerExperimentMarkdown(report: OpenerExperimentReport): 
         template.sources.join(" "),
         String(template.best.attack),
         String(template.best.difficultAttack),
+        String(template.best.spinClears),
         String(template.best.tSpinClears),
         String(template.best.backToBackChain),
         String(template.best.holes),
@@ -500,8 +509,8 @@ export function renderOpenerExperimentMarkdown(report: OpenerExperimentReport): 
       "",
       "## Template replay",
       "",
-      "| rank | replay hits | phase hits | profile hits | quality hits | grouped survival | sources | attack | difficult attack | tspin | tspin attack | b2b | best replay rank | clears | preview |",
-      "| ---: | ---: | ---: | ---: | ---: | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- |"
+      "| rank | replay hits | phase hits | profile hits | quality hits | grouped survival | sources | attack | difficult attack | spin | spin attack | tspin | tspin attack | b2b | best replay rank | clears | preview |",
+      "| ---: | ---: | ---: | ---: | ---: | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- |"
     );
     for (const template of report.templateReplay.templates.slice(0, 12)) {
       lines.push(
@@ -515,6 +524,8 @@ export function renderOpenerExperimentMarkdown(report: OpenerExperimentReport): 
           template.sources.join(" "),
           String(template.best.attack),
           String(template.best.difficultAttack),
+          String(template.best.spinClears),
+          String(template.best.spinAttack),
           String(template.best.tSpinClears),
           String(template.best.tSpinAttack),
           String(template.best.backToBackChain),
@@ -563,8 +574,8 @@ export function renderOpenerExperimentMarkdown(report: OpenerExperimentReport): 
     }
 
     lines.push(
-      "| rank | queue index | hold | attack | difficult attack | other attack | tspin | tspin attack | b2b | tspin potential | points | score | holes | bumpiness | clears | path | preview |",
-      "| ---: | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- | --- |"
+      "| rank | queue index | hold | attack | difficult attack | other attack | spin | spin attack | tspin | tspin attack | b2b | tspin potential | points | score | holes | bumpiness | clears | path | preview |",
+      "| ---: | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- | --- |"
     );
     for (const candidate of scenario.top) {
       lines.push(
@@ -575,6 +586,8 @@ export function renderOpenerExperimentMarkdown(report: OpenerExperimentReport): 
           String(candidate.attack),
           String(candidate.difficultAttack),
           String(candidate.nonDifficultAttack),
+          String(candidate.spinClears),
+          String(candidate.spinAttack),
           String(candidate.tSpinClears),
           String(candidate.tSpinAttack),
           String(candidate.backToBackChain),
@@ -602,7 +615,7 @@ export function renderOpenerExperimentConsoleSummary(report: OpenerExperimentRep
     for (const template of report.templateReplay.templates.slice(0, topCount)) {
       const candidate = template.best;
       lines.push(
-        `#${template.rank} sources=${template.sources.join(",")} replay=${formatReplaySurvival(template)} phase=${formatPhaseReplaySurvival(template)} profile=${formatPhaseProfileReplaySurvival(template)} quality=${formatQualityReplaySurvival(template)} grouped=${formatGroupedReplaySurvival(template)} queueIndex=${candidate.queueIndex} hold=${candidate.hold ?? "-"} attack=${candidate.attack} difficultAttack=${candidate.difficultAttack} otherAttack=${candidate.nonDifficultAttack} tspin=${candidate.tSpinClears} tspinAttack=${candidate.tSpinAttack} b2b=${candidate.backToBackChain} tspinPotential=${candidate.tSpinPotential} points=${candidate.points} score=${candidate.score.toFixed(1)} holes=${candidate.holes} bump=${candidate.bumpiness}`,
+        `#${template.rank} sources=${template.sources.join(",")} replay=${formatReplaySurvival(template)} phase=${formatPhaseReplaySurvival(template)} profile=${formatPhaseProfileReplaySurvival(template)} quality=${formatQualityReplaySurvival(template)} grouped=${formatGroupedReplaySurvival(template)} queueIndex=${candidate.queueIndex} hold=${candidate.hold ?? "-"} attack=${candidate.attack} difficultAttack=${candidate.difficultAttack} otherAttack=${candidate.nonDifficultAttack} spin=${candidate.spinClears} spinAttack=${candidate.spinAttack} tspin=${candidate.tSpinClears} tspinAttack=${candidate.tSpinAttack} b2b=${candidate.backToBackChain} tspinPotential=${candidate.tSpinPotential} points=${candidate.points} score=${candidate.score.toFixed(1)} holes=${candidate.holes} bump=${candidate.bumpiness}`,
         `clears: ${formatClearSequence(candidate.clearSequence)}`,
         `path: ${candidate.path.join(" ")}`,
         `view: ${candidate.previewUrl}`,
@@ -616,7 +629,7 @@ export function renderOpenerExperimentConsoleSummary(report: OpenerExperimentRep
   for (const template of rankOpenerTemplates(report, topCount)) {
     const candidate = template.best;
     lines.push(
-      `#${template.rank} sources=${template.sources.join(",")} survival=${formatTemplateSurvival(template)} queueIndex=${candidate.queueIndex} hold=${candidate.hold ?? "-"} attack=${candidate.attack} difficultAttack=${candidate.difficultAttack} otherAttack=${candidate.nonDifficultAttack} tspin=${candidate.tSpinClears} tspinAttack=${candidate.tSpinAttack} b2b=${candidate.backToBackChain} tspinPotential=${candidate.tSpinPotential} points=${candidate.points} score=${candidate.score.toFixed(1)} holes=${candidate.holes} bump=${candidate.bumpiness}`,
+      `#${template.rank} sources=${template.sources.join(",")} survival=${formatTemplateSurvival(template)} queueIndex=${candidate.queueIndex} hold=${candidate.hold ?? "-"} attack=${candidate.attack} difficultAttack=${candidate.difficultAttack} otherAttack=${candidate.nonDifficultAttack} spin=${candidate.spinClears} spinAttack=${candidate.spinAttack} tspin=${candidate.tSpinClears} tspinAttack=${candidate.tSpinAttack} b2b=${candidate.backToBackChain} tspinPotential=${candidate.tSpinPotential} points=${candidate.points} score=${candidate.score.toFixed(1)} holes=${candidate.holes} bump=${candidate.bumpiness}`,
       `clears: ${formatClearSequence(candidate.clearSequence)}`,
       `path: ${candidate.path.join(" ")}`,
       `view: ${candidate.previewUrl}`,
@@ -814,6 +827,8 @@ export function replayOpenerTemplateSurvivability(
           score: node.score,
           attack: node.attack,
           difficultAttack: node.difficultAttack,
+          spinClears: nodeSpinClears(node),
+          spinAttack: nodeSpinAttack(node),
           tSpinClears: node.tSpinClears,
           tSpinAttack: node.tSpinAttack,
           backToBackChain: node.backToBackChain,
@@ -1092,6 +1107,8 @@ function createTopCandidates(
         backToBackChain: node.backToBackChain,
         allClears: node.allClears,
         difficultClears: node.difficultClears,
+        spinClears: nodeSpinClears(node),
+        spinAttack: nodeSpinAttack(node),
         tSpinClears: node.tSpinClears,
         tSpinAttack: node.tSpinAttack,
         tSpinPotential,
@@ -1118,10 +1135,20 @@ function rankSearchNodes(nodes: readonly SearchOpenerBeamNode[], scenario: Opene
     .sort(compareSearchNodesForOpener);
 }
 
+function nodeSpinClears(node: SearchOpenerBeamNode): number {
+  return node.spinClears ?? node.tSpinClears;
+}
+
+function nodeSpinAttack(node: SearchOpenerBeamNode): number {
+  return node.spinAttack ?? node.tSpinAttack;
+}
+
 function compareSearchNodesForOpener(left: SearchNodeWithReportPotential, right: SearchNodeWithReportPotential): number {
   const leftNode = left.node;
   const rightNode = right.node;
   return (
+    nodeSpinClears(rightNode) - nodeSpinClears(leftNode) ||
+    nodeSpinAttack(rightNode) - nodeSpinAttack(leftNode) ||
     rightNode.tSpinClears - leftNode.tSpinClears ||
     rightNode.tSpinAttack - leftNode.tSpinAttack ||
     rightNode.difficultClears - leftNode.difficultClears ||
@@ -1139,6 +1166,8 @@ function compareSearchNodesForOpener(left: SearchNodeWithReportPotential, right:
 
 function compareRankedOpenerCandidates(left: RankedOpenerCandidate, right: RankedOpenerCandidate): number {
   return (
+    right.spinClears - left.spinClears ||
+    right.spinAttack - left.spinAttack ||
     right.tSpinClears - left.tSpinClears ||
     right.tSpinAttack - left.tSpinAttack ||
     right.difficultClears - left.difficultClears ||
@@ -1181,11 +1210,16 @@ function templateReplayQualityFirepower(template: Pick<OpenerTemplateReplayEntry
 }
 
 function openerFirepowerRankValue(
-  candidate: Pick<RankedOpenerCandidate, "tSpinClears" | "tSpinAttack" | "difficultAttack" | "backToBackChain" | "attack">
+  candidate: Pick<
+    RankedOpenerCandidate,
+    "spinClears" | "spinAttack" | "tSpinClears" | "tSpinAttack" | "difficultAttack" | "backToBackChain" | "attack"
+  >
 ): number {
   return (
-    candidate.tSpinClears * 100_000 +
-    candidate.tSpinAttack * 10_000 +
+    candidate.spinClears * 100_000 +
+    candidate.spinAttack * 10_000 +
+    candidate.tSpinClears * 1_000 +
+    candidate.tSpinAttack * 100 +
     candidate.difficultAttack * 1_000 +
     candidate.backToBackChain * 100 +
     candidate.attack
@@ -1231,7 +1265,14 @@ function addPhaseReplayHits(
 function clearSequence(node: SearchOpenerBeamNode): string[] {
   return node.placements
     .filter((placement) => placement.clearName !== "NONE" && placement.clearedLines > 0 && placement.attack > 0)
-    .map((placement) => `${placement.clearName}:${placement.attack}`);
+    .map((placement) => `${displayPlacementClearName(placement)}:${placement.attack}`);
+}
+
+function displayPlacementClearName(placement: SearchOpenerBeamNode["placements"][number]): string {
+  if (placement.piece !== "T" && placement.clearName.startsWith("TSPIN")) {
+    return `${placement.piece}_SPIN${placement.clearName.slice("TSPIN".length)}`;
+  }
+  return placement.clearName;
 }
 
 function hasFutureT(node: SearchOpenerBeamNode, scenario: OpenerExperimentScenario): boolean {
@@ -1327,6 +1368,8 @@ function searchNodeQuality(node: SearchOpenerBeamNode, index: number): OpenerSce
     rank: index + 1,
     queueIndex: node.queueIndex,
     difficultAttack: node.difficultAttack,
+    spinClears: nodeSpinClears(node),
+    spinAttack: nodeSpinAttack(node),
     tSpinClears: node.tSpinClears,
     tSpinAttack: node.tSpinAttack,
     backToBackChain: node.backToBackChain,
@@ -1337,11 +1380,13 @@ function searchNodeQuality(node: SearchOpenerBeamNode, index: number): OpenerSce
 }
 
 function meetsReplayQuality(quality: OpenerScenarioReachableQuality, target: RankedOpenerCandidate): boolean {
-  const hasFirepowerTarget = target.difficultAttack > 0 || target.tSpinClears > 0 || target.backToBackChain > 0;
+  const hasFirepowerTarget = target.difficultAttack > 0 || target.spinClears > 0 || target.tSpinClears > 0 || target.backToBackChain > 0;
   return (
     hasFirepowerTarget &&
     quality.queueIndex >= target.queueIndex &&
     quality.difficultAttack >= target.difficultAttack &&
+    quality.spinClears >= target.spinClears &&
+    quality.spinAttack >= target.spinAttack &&
     quality.tSpinClears >= target.tSpinClears &&
     quality.tSpinAttack >= target.tSpinAttack &&
     quality.backToBackChain >= target.backToBackChain &&

@@ -24,6 +24,8 @@ pub struct OpenerQueueEvaluation {
     pub points: u32,
     pub all_clears: u32,
     pub difficult_clears: u32,
+    pub spin_clears: u32,
+    pub spin_attack: u32,
     pub t_spin_clears: u32,
     pub t_spin_attack: u32,
     pub back_to_back_chain: u32,
@@ -259,6 +261,8 @@ fn evaluate_queue(
             points: 0,
             all_clears: 0,
             difficult_clears: 0,
+            spin_clears: 0,
+            spin_attack: 0,
             t_spin_clears: 0,
             t_spin_attack: 0,
             back_to_back_chain: 0,
@@ -286,6 +290,8 @@ fn evaluate_queue(
         points: state.firepower.points,
         all_clears: state.firepower.all_clears,
         difficult_clears: state.firepower.difficult_clears,
+        spin_clears: state.firepower.spin_clears,
+        spin_attack: state.firepower.spin_attack,
         t_spin_clears: state.firepower.t_spin_clears,
         t_spin_attack: state.firepower.t_spin_attack,
         back_to_back_chain: state.firepower.back_to_back_chain,
@@ -301,8 +307,8 @@ fn opener_weighted_score(state: &SearchState, buildable: bool) -> f64 {
     buildable_bonus
         + state.score
         + f64::from(state.firepower.difficult_attack) * 900.0
-        + f64::from(state.firepower.t_spin_attack) * 1_200.0
-        + f64::from(state.firepower.t_spin_clears) * 2_500.0
+        + f64::from(state.firepower.spin_attack) * 1_200.0
+        + f64::from(state.firepower.spin_clears) * 2_500.0
         + f64::from(state.firepower.difficult_clears) * 1_200.0
         + f64::from(state.firepower.back_to_back_chain) * 1_000.0
         + f64::from(state.t_spin_potential) * 800.0
@@ -327,6 +333,8 @@ fn mark_pareto_fronts(evaluations: &mut [OpenerQueueEvaluation]) {
 fn dominates(left: &OpenerQueueEvaluation, right: &OpenerQueueEvaluation) -> bool {
     let no_worse = u8::from(left.buildable) >= u8::from(right.buildable)
         && left.depth >= right.depth
+        && left.spin_clears >= right.spin_clears
+        && left.spin_attack >= right.spin_attack
         && left.t_spin_clears >= right.t_spin_clears
         && left.t_spin_attack >= right.t_spin_attack
         && left.back_to_back_chain >= right.back_to_back_chain
@@ -339,6 +347,8 @@ fn dominates(left: &OpenerQueueEvaluation, right: &OpenerQueueEvaluation) -> boo
         && left.bumpiness <= right.bumpiness;
     let strictly_better = u8::from(left.buildable) > u8::from(right.buildable)
         || left.depth > right.depth
+        || left.spin_clears > right.spin_clears
+        || left.spin_attack > right.spin_attack
         || left.t_spin_clears > right.t_spin_clears
         || left.t_spin_attack > right.t_spin_attack
         || left.back_to_back_chain > right.back_to_back_chain
@@ -361,6 +371,8 @@ fn compare_queue_evaluation(
         .cmp(&left.pareto_front)
         .then_with(|| left.dominated_by.cmp(&right.dominated_by))
         .then_with(|| right.weighted_score.total_cmp(&left.weighted_score))
+        .then_with(|| right.spin_clears.cmp(&left.spin_clears))
+        .then_with(|| right.spin_attack.cmp(&left.spin_attack))
         .then_with(|| right.t_spin_clears.cmp(&left.t_spin_clears))
         .then_with(|| right.t_spin_attack.cmp(&left.t_spin_attack))
         .then_with(|| right.back_to_back_chain.cmp(&left.back_to_back_chain))
