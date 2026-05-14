@@ -37,6 +37,7 @@ export interface OpenerExperimentCandidate {
   readonly rank: number;
   readonly score: number;
   readonly firepowerScore: number;
+  readonly finalRows: readonly number[];
   readonly path: readonly string[];
   readonly previewUrl: string;
   readonly hold: string | null;
@@ -63,6 +64,17 @@ export interface OpenerExperimentCandidate {
 
 export interface RankedOpenerCandidate extends OpenerExperimentCandidate {
   readonly sourceScenario: string;
+  readonly survivalCount: number;
+  readonly survivalRate: number;
+}
+
+export interface RankedOpenerTemplate {
+  readonly rank: number;
+  readonly key: string;
+  readonly survivalCount: number;
+  readonly survivalRate: number;
+  readonly sources: readonly string[];
+  readonly best: RankedOpenerCandidate;
 }
 
 export interface OpenerExperimentScenarioResult {
@@ -202,14 +214,16 @@ export function renderOpenerExperimentMarkdown(report: OpenerExperimentReport): 
     "",
     "## Best openers",
     "",
-    "| rank | attack | difficult attack | other attack | tspin | tspin attack | b2b | tspin potential | points | score | holes | bumpiness | clears | path | preview |",
-    "| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- | --- |"
+    "| rank | survival | source | attack | difficult attack | other attack | tspin | tspin attack | b2b | tspin potential | points | score | holes | bumpiness | clears | path | preview |",
+    "| ---: | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- | --- |"
   ];
 
   for (const candidate of bestCandidates) {
     lines.push(
       [
         String(candidate.rank),
+        formatSurvival(candidate),
+        candidate.sourceScenario,
         String(candidate.attack),
         String(candidate.difficultAttack),
         String(candidate.nonDifficultAttack),
@@ -224,6 +238,31 @@ export function renderOpenerExperimentMarkdown(report: OpenerExperimentReport): 
         formatClearSequence(candidate.clearSequence),
         candidate.path.join(" "),
         `[view](${candidate.previewUrl})`
+      ].join(" | ")
+    );
+  }
+
+  lines.push(
+    "",
+    "## Template survivability",
+    "",
+    "| rank | survival | sources | attack | difficult attack | tspin | b2b | holes | bumpiness | clears | preview |",
+    "| ---: | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- |"
+  );
+  for (const template of rankOpenerTemplates(report, 12)) {
+    lines.push(
+      [
+        String(template.rank),
+        formatTemplateSurvival(template),
+        template.sources.join(" "),
+        String(template.best.attack),
+        String(template.best.difficultAttack),
+        String(template.best.tSpinClears),
+        String(template.best.backToBackChain),
+        String(template.best.holes),
+        String(template.best.bumpiness),
+        formatClearSequence(template.best.clearSequence),
+        `[view](${template.best.previewUrl})`
       ].join(" | ")
     );
   }
@@ -298,7 +337,7 @@ export function renderOpenerExperimentConsoleSummary(report: OpenerExperimentRep
   const lines = ["Best opener candidates", ""];
   for (const candidate of rankOpenerCandidates(report, topCount)) {
     lines.push(
-      `#${candidate.rank} attack=${candidate.attack} difficultAttack=${candidate.difficultAttack} otherAttack=${candidate.nonDifficultAttack} tspin=${candidate.tSpinClears} tspinAttack=${candidate.tSpinAttack} b2b=${candidate.backToBackChain} tspinPotential=${candidate.tSpinPotential} points=${candidate.points} score=${candidate.score.toFixed(1)} holes=${candidate.holes} bump=${candidate.bumpiness}`,
+      `#${candidate.rank} source=${candidate.sourceScenario} survival=${formatSurvival(candidate)} attack=${candidate.attack} difficultAttack=${candidate.difficultAttack} otherAttack=${candidate.nonDifficultAttack} tspin=${candidate.tSpinClears} tspinAttack=${candidate.tSpinAttack} b2b=${candidate.backToBackChain} tspinPotential=${candidate.tSpinPotential} points=${candidate.points} score=${candidate.score.toFixed(1)} holes=${candidate.holes} bump=${candidate.bumpiness}`,
       `clears: ${formatClearSequence(candidate.clearSequence)}`,
       `path: ${candidate.path.join(" ")}`,
       `view: ${candidate.previewUrl}`,
@@ -309,11 +348,48 @@ export function renderOpenerExperimentConsoleSummary(report: OpenerExperimentRep
 }
 
 export function rankOpenerCandidates(report: OpenerExperimentReport, topCount: number): RankedOpenerCandidate[] {
+  const survivalByTemplate = countTemplateSurvivors(report);
   return report.scenarios
-    .flatMap((scenario) => scenario.top.map((candidate) => ({ ...candidate, sourceScenario: scenario.name })))
+    .flatMap((scenario) =>
+      scenario.top.map((candidate) => ({
+        ...candidate,
+        sourceScenario: scenario.name,
+        survivalCount: survivalByTemplate.get(templateKey(candidate)) ?? 1,
+        survivalRate: (survivalByTemplate.get(templateKey(candidate)) ?? 1) / report.scenarios.length
+      }))
+    )
     .sort(compareRankedOpenerCandidates)
     .slice(0, topCount)
     .map((candidate, index) => ({ ...candidate, rank: index + 1 }));
+}
+
+export function rankOpenerTemplates(report: OpenerExperimentReport, topCount: number): RankedOpenerTemplate[] {
+  const byKey = new Map<string, { best: RankedOpenerCandidate; sources: Set<string> }>();
+  for (const candidate of rankOpenerCandidates(report, Number.MAX_SAFE_INTEGER)) {
+    const key = templateKey(candidate);
+    const current = byKey.get(key);
+    if (current === undefined) {
+      byKey.set(key, { best: candidate, sources: new Set([candidate.sourceScenario]) });
+      continue;
+    }
+    current.sources.add(candidate.sourceScenario);
+    if (compareRankedOpenerCandidates(candidate, current.best) < 0) {
+      current.best = candidate;
+    }
+  }
+
+  return [...byKey.entries()]
+    .map(([key, group]) => ({
+      rank: 0,
+      key,
+      survivalCount: group.sources.size,
+      survivalRate: group.sources.size / report.scenarios.length,
+      sources: [...group.sources].sort(),
+      best: group.best
+    }))
+    .sort(compareRankedOpenerTemplates)
+    .slice(0, topCount)
+    .map((template, index) => ({ ...template, rank: index + 1 }));
 }
 
 function runScenario(
@@ -407,6 +483,7 @@ function createTopCandidates(
         rank: index + 1,
         score: node.score,
         firepowerScore: node.firepowerScore,
+        finalRows: node.rows,
         path: node.path,
         previewUrl: urls.view,
         hold: node.hold ?? null,
@@ -458,6 +535,7 @@ function compareSearchNodesForOpener(left: SearchNodeWithReportPotential, right:
 
 function compareRankedOpenerCandidates(left: RankedOpenerCandidate, right: RankedOpenerCandidate): number {
   return (
+    right.survivalCount - left.survivalCount ||
     right.tSpinClears - left.tSpinClears ||
     right.tSpinAttack - left.tSpinAttack ||
     right.backToBackChain - left.backToBackChain ||
@@ -472,6 +550,12 @@ function compareRankedOpenerCandidates(left: RankedOpenerCandidate, right: Ranke
     right.points - left.points ||
     right.path.length - left.path.length ||
     left.path.join(" ").localeCompare(right.path.join(" "))
+  );
+}
+
+function compareRankedOpenerTemplates(left: RankedOpenerTemplate, right: RankedOpenerTemplate): number {
+  return (
+    right.survivalCount - left.survivalCount || compareRankedOpenerCandidates(left.best, right.best) || left.key.localeCompare(right.key)
   );
 }
 
@@ -496,6 +580,35 @@ function isDifficultClearName(clearName: string): boolean {
 
 function hasFutureT(node: SearchOpenerBeamNode, scenario: OpenerExperimentScenario): boolean {
   return node.hold === "T" || scenario.queue.slice(node.queueIndex).includes("T");
+}
+
+function countTemplateSurvivors(report: OpenerExperimentReport): Map<string, number> {
+  const sourcesByTemplate = new Map<string, Set<string>>();
+  for (const scenario of report.scenarios) {
+    for (const candidate of scenario.top) {
+      const key = templateKey(candidate);
+      const sources = sourcesByTemplate.get(key) ?? new Set<string>();
+      sources.add(scenario.name);
+      sourcesByTemplate.set(key, sources);
+    }
+  }
+  return new Map([...sourcesByTemplate].map(([key, sources]) => [key, sources.size]));
+}
+
+function templateKey(candidate: Pick<OpenerExperimentCandidate, "finalRows">): string {
+  return candidate.finalRows.join(",");
+}
+
+function formatSurvival(candidate: Pick<RankedOpenerCandidate, "survivalCount" | "survivalRate">): string {
+  return `${candidate.survivalCount} (${formatPercent(candidate.survivalRate)})`;
+}
+
+function formatTemplateSurvival(template: Pick<RankedOpenerTemplate, "survivalCount" | "survivalRate">): string {
+  return `${template.survivalCount} (${formatPercent(template.survivalRate)})`;
+}
+
+function formatPercent(value: number): string {
+  return `${(value * 100).toFixed(1)}%`;
 }
 
 function spinModeAllowsTSpinPotential(spinMode: NativeSpinMode): boolean {

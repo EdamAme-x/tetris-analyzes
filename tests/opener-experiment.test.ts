@@ -6,6 +6,7 @@ import {
   DISCOVERY_OPENER_EXPERIMENT_SCENARIOS,
   SURVEY_OPENER_EXPERIMENT_SCENARIOS,
   TETRIO_TL_OPENER_SEARCH_RULES,
+  rankOpenerTemplates,
   renderOpenerExperimentConsoleSummary,
   renderOpenerExperimentMarkdown,
   runOpenerExperiment,
@@ -163,6 +164,7 @@ describe("opener experiment runner", () => {
     expect(markdown).toContain("# Opener experiment");
     expect(markdown).toContain("Rules: spins=T-SPINS, combo=MULTIPLIER, kicks=SRS+");
     expect(markdown).toContain("## Best openers");
+    expect(markdown).toContain("## Template survivability");
     expect(markdown).toContain("fake-scenario | TI | false | T-SPINS | MULTIPLIER | SRS+ | 4 | 1 | 2.000");
     expect(markdown).toContain("## Candidate details");
     expect(markdown).toContain("[view](https://fumen.zui.jp/?m115@test)");
@@ -218,7 +220,7 @@ describe("opener experiment runner", () => {
     const summary = renderOpenerExperimentConsoleSummary(report, 1);
     expect(summary).toContain("Best opener candidates");
     expect(summary).toContain(
-      "#1 attack=0 difficultAttack=0 otherAttack=0 tspin=0 tspinAttack=0 b2b=0 tspinPotential=0 points=0 score=10.0"
+      "#1 source=fake-scenario survival=1 (100.0%) attack=0 difficultAttack=0 otherAttack=0 tspin=0 tspinAttack=0 b2b=0 tspinPotential=0 points=0 score=10.0"
     );
     expect(summary).toContain("path: T@r0,x3");
     expect(summary).not.toContain("fake-scenario | TI");
@@ -251,6 +253,44 @@ describe("opener experiment runner", () => {
     expect(report.scenarios[0]?.top.find((candidate) => candidate.path[0] === "exhausted")?.tSpinPotential).toBe(0);
     expect(report.scenarios[0]?.top.find((candidate) => candidate.path[0] === "held-t")?.tSpinPotential).toBeGreaterThan(0);
     expect(renderOpenerExperimentConsoleSummary(report, 1)).toContain("path: held-t");
+  });
+
+  test("groups repeated final boards as opener template survivability", () => {
+    const sharedRows = [1, 2, 3, ...new Array(17).fill(0)];
+    const report = runOpenerExperiment({
+      scenarios: [
+        {
+          name: "left",
+          queue: "IT",
+          hold: false,
+          beamWidth: 4,
+          maxDepth: 1,
+          warmups: 0,
+          iterations: 1,
+          top: 1
+        },
+        {
+          name: "right",
+          queue: "TI",
+          hold: false,
+          beamWidth: 4,
+          maxDepth: 1,
+          warmups: 0,
+          iterations: 1,
+          top: 1
+        }
+      ],
+      clock: createClock("2026-05-14T00:00:00.000Z", [0, 2, 10, 12]),
+      fumenCodec: fakeCodec,
+      search: () => [{ ...candidateNode("shared-template"), rows: sharedRows }]
+    });
+
+    expect(rankOpenerTemplates(report, 1)[0]).toMatchObject({
+      survivalCount: 2,
+      survivalRate: 1,
+      sources: ["left", "right"]
+    });
+    expect(renderOpenerExperimentMarkdown(report)).toContain("2 (100.0%) | left right");
   });
 
   test("keeps T-spin continuation potential before slicing scenario top candidates", () => {
