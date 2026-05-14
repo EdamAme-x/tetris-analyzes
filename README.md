@@ -100,6 +100,7 @@ Executable examples live in `tests/`.
 - [x] Rank replay reports by reproducible B2B/T-spin firepower instead of brittle peak firepower
 - [x] Use compact native replay search to skip path and placement conversion during survivability checks
 - [x] Include active combo state in TL template identity, phase replay, and replay-quality checks
+- [x] Rebuild replay phase prefix rows in place instead of allocating filtered row arrays
 - [x] Promote additional measured TL-gated three-bag queues into continuation discovery
 - [x] Replay continuation phase survivability against the native fourteen-piece frontier
 - [x] Preserve native continuation phase diversity by hold and B2B state

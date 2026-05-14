@@ -1405,12 +1405,20 @@ function advanceHoldStateFromPlacement(
   return { hold: current, queueIndex: queueIndex + 1 };
 }
 
-function clearFullLineRows(rows: readonly number[]): number[] {
-  const keptRows = rows.filter((row) => row !== ROW_MASK);
-  while (keptRows.length < BOARD_HEIGHT) {
-    keptRows.push(0);
+function clearFullLineRows(rows: number[]): number[] {
+  let writeIndex = 0;
+  for (let readIndex = 0; readIndex < BOARD_HEIGHT; readIndex += 1) {
+    const row = rows[readIndex] ?? 0;
+    if (row !== ROW_MASK) {
+      rows[writeIndex] = row;
+      writeIndex += 1;
+    }
   }
-  return keptRows;
+  while (writeIndex < BOARD_HEIGHT) {
+    rows[writeIndex] = 0;
+    writeIndex += 1;
+  }
+  return rows;
 }
 
 function statefulTemplateKey(state: TemplateStateKeyInput): string {
