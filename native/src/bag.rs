@@ -79,10 +79,12 @@ pub(crate) fn evaluate_opener_bag_internal(
     let max_depth = usize::min(max_depth as usize, pieces.len());
 
     let mut evaluations = Vec::with_capacity(max_queues);
+    let mut queue = Vec::with_capacity(pieces.len());
     for sample in 0..max_queues {
-        let queue = nth_piece_permutation(
+        write_nth_piece_permutation(
             &pieces,
             sampled_piece_permutation_index(sample, max_queues, total_queues),
+            &mut queue,
         );
         let states = search_opener_states(
             &queue,
@@ -206,17 +208,31 @@ fn sampled_piece_permutation_index(sample: usize, queue_count: usize, total_queu
     }
 }
 
+#[cfg(test)]
 fn nth_piece_permutation(pieces: &[Piece], index: usize) -> Vec<Piece> {
-    let mut remaining = pieces.to_vec();
-    let mut cursor = index;
     let mut output = Vec::with_capacity(pieces.len());
+    write_nth_piece_permutation(pieces, index, &mut output);
+    output
+}
+
+fn write_nth_piece_permutation(pieces: &[Piece], index: usize, output: &mut Vec<Piece>) {
+    let mut remaining = [Piece::I; 7];
+    for (slot, piece) in remaining.iter_mut().zip(pieces.iter().copied()) {
+        *slot = piece;
+    }
+
+    output.clear();
+    let mut remaining_len = pieces.len();
+    let mut cursor = index;
     for divisor in (1..=pieces.len()).rev() {
         let block = factorial(divisor - 1);
         let selected = cursor / block;
-        output.push(remaining.remove(selected));
+        debug_assert!(selected < remaining_len);
+        output.push(remaining[selected]);
+        remaining.copy_within(selected + 1..remaining_len, selected);
+        remaining_len -= 1;
         cursor %= block;
     }
-    output
 }
 
 fn queue_to_string(pieces: &[Piece]) -> String {
