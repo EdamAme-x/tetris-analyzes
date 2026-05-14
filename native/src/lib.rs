@@ -26,7 +26,7 @@ use movement::{
 };
 use pieces::{
     format_placement, parse_piece_string, parse_queue, piece_name, piece_shapes,
-    placement_shape_indices, Cell, Piece, Shape,
+    placement_shape_indices, Piece, Shape,
 };
 use spin::{
     detect_spin, detect_spin_for_mode, parse_spin_mode, spin_kind_name, SpinDetection, SpinMode,
@@ -182,7 +182,6 @@ struct Placement {
     x: i8,
     y: i8,
     used_hold: bool,
-    cells: Vec<Cell>,
     spin: SpinDetection,
     firepower: FirepowerEvent,
 }
@@ -940,25 +939,11 @@ fn place_grounded_at_y(
         return None;
     }
 
-    let mut cells = if include_placement {
-        Some(Vec::with_capacity(shape.cells.len()))
-    } else {
-        None
-    };
     let mut placed = *rows;
     let x_shift = u32::try_from(x).ok()?;
     let base_y = usize::try_from(y).ok()?;
     for dy in 0..shape.height as usize {
         placed[base_y + dy] |= shape.row_masks[dy] << x_shift;
-    }
-    if let Some(cells) = &mut cells {
-        for cell in shape.cells {
-            let absolute = Cell {
-                x: x + cell.x,
-                y: y + cell.y,
-            };
-            cells.push(absolute);
-        }
     }
     let (cleared_rows, cleared_lines) = board::clear_full_lines_array_with_count(placed);
     let spin = detect_spin_for_mode(&placed, choice.piece, shape, x, y, cleared_lines, spin_mode);
@@ -966,13 +951,12 @@ fn place_grounded_at_y(
         rows: cleared_rows,
         y,
         spin,
-        placement: cells.map(|cells| Placement {
+        placement: include_placement.then_some(Placement {
             piece: choice.piece,
             rotation: shape.rotation,
             x,
             y,
             used_hold: choice.used_hold,
-            cells,
             spin,
             firepower: FirepowerEvent::empty(),
         }),
@@ -1121,18 +1105,22 @@ impl From<Placement> for BeamPlacement {
             placement.y,
             placement.used_hold,
         );
+        let shape = piece_shapes(placement.piece)
+            .iter()
+            .find(|shape| shape.rotation == placement.rotation)
+            .expect("placement rotation must match a declared shape");
         Self {
             piece: piece_name(placement.piece).to_string(),
             rotation: u32::from(placement.rotation),
             x: i32::from(placement.x),
             y: i32::from(placement.y),
             used_hold: placement.used_hold,
-            cells: placement
+            cells: shape
                 .cells
-                .into_iter()
+                .iter()
                 .map(|cell| BeamPlacementCell {
-                    x: i32::from(cell.x),
-                    y: i32::from(cell.y),
+                    x: i32::from(placement.x + cell.x),
+                    y: i32::from(placement.y + cell.y),
                 })
                 .collect(),
             path,
