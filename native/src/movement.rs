@@ -293,12 +293,7 @@ pub(crate) fn push_rotation_states(
 
     let from_rotation = shapes[state.shape_index].rotation;
     let to_rotation = (i16::from(from_rotation) + i16::from(direction)).rem_euclid(4) as u8;
-    let Some(next_shape_index) = shapes
-        .iter()
-        .position(|shape| shape.rotation == to_rotation)
-    else {
-        return;
-    };
+    let next_shape_index = to_rotation as usize;
     let next_shape = shapes[next_shape_index];
 
     for kick in kicks_for(kick_table, piece, from_rotation, to_rotation) {

@@ -468,4 +468,26 @@ mod tests {
             }
         }
     }
+
+    #[test]
+    fn shape_arrays_are_indexed_by_rotation() {
+        for piece in [
+            Piece::I,
+            Piece::O,
+            Piece::T,
+            Piece::S,
+            Piece::Z,
+            Piece::J,
+            Piece::L,
+        ] {
+            for (index, shape) in piece_shapes(piece).iter().enumerate() {
+                assert_eq!(
+                    usize::from(shape.rotation),
+                    index,
+                    "{} shape index must match rotation",
+                    piece_name(piece)
+                );
+            }
+        }
+    }
 }
