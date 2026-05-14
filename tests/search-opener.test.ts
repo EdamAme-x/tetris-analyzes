@@ -210,6 +210,17 @@ describe("native opener beam search", () => {
     expect(evaluation.topQueues).toHaveLength(3);
   });
 
+  test("passes combo table rules into native search and bag evaluation", () => {
+    expect(() => searchOpenerBeam({ queue: "TIL", comboTable: "MODERN GUIDELINE" })).not.toThrow();
+    expect(() => evaluateOpenerBag({ bag: "TIO", comboTable: "CLASSIC GUIDELINE", maxQueues: 2 })).not.toThrow();
+    expect(() => searchOpenerBeam({ queue: "TIL", comboTable: "BAD TABLE" as "MODERN GUIDELINE" })).toThrow(
+      "Unknown opener firepower combo table"
+    );
+    expect(() => evaluateOpenerBag({ bag: "TIO", comboTable: "BAD TABLE" as "MODERN GUIDELINE" })).toThrow(
+      "Unknown opener firepower combo table"
+    );
+  });
+
   test("rejects invalid queues before searching", () => {
     expect(() => searchOpenerBeam({ queue: "TX", beamWidth: 8 })).toThrow("Unknown tetromino");
     expect(() => evaluateOpenerBag({ bag: "TT" })).toThrow("must not repeat");

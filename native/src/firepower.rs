@@ -76,28 +76,20 @@ pub(crate) fn board_shape_score(metrics: BoardEvaluation) -> f64 {
     cleared_lines * 120.0 - holes * 90.0 - aggregate_height * 2.2 - bumpiness * 7.0
 }
 
-pub(crate) fn advance_firepower(
+pub(crate) fn advance_firepower_with_combo_table(
     previous: FirepowerState,
     spin: SpinDetection,
     rows_after_clear: &BoardRows,
+    combo_table: ComboTable,
 ) -> (FirepowerState, FirepowerEvent) {
     let clear_kind = classify_clear(spin.kind, spin.cleared_lines);
     let all_clear = spin.cleared_lines > 0 && board::is_empty_rows(rows_after_clear);
-    advance_firepower_for_clear(previous, clear_kind, spin.cleared_lines, all_clear)
-}
-
-pub(crate) fn advance_firepower_for_clear(
-    previous: FirepowerState,
-    clear_kind: ClearKind,
-    cleared_lines: u32,
-    all_clear: bool,
-) -> (FirepowerState, FirepowerEvent) {
     advance_firepower_for_clear_with_combo_table(
         previous,
         clear_kind,
-        cleared_lines,
+        spin.cleared_lines,
         all_clear,
-        ComboTable::Multiplier,
+        combo_table,
     )
 }
 

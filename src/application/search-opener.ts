@@ -1,6 +1,7 @@
 import { loadNativeBinding } from "../infrastructure/native/load-native-binding";
 import type {
   NativeBeamSearchNode,
+  NativeComboTable,
   NativeFirepowerInput,
   NativeFirepowerSummary,
   NativeOpenerBagEvaluation,
@@ -14,6 +15,7 @@ export interface SearchOpenerBeamInput {
   readonly beamWidth?: number;
   readonly hold?: boolean;
   readonly maxDepth?: number;
+  readonly comboTable?: NativeComboTable;
 }
 
 export interface EvaluateOpenerBagInput {
@@ -23,6 +25,7 @@ export interface EvaluateOpenerBagInput {
   readonly maxDepth?: number;
   readonly maxQueues?: number;
   readonly topQueueCount?: number;
+  readonly comboTable?: NativeComboTable;
 }
 
 export type SearchOpenerBeamNode = NativeBeamSearchNode;
@@ -38,7 +41,13 @@ export interface OpenerPlacementReachabilityInput {
 
 export function searchOpenerBeam(input: SearchOpenerBeamInput): SearchOpenerBeamNode[] {
   const queue = typeof input.queue === "string" ? input.queue : input.queue.join("");
-  return loadNativeBinding().searchOpenerBeam(queue, input.beamWidth ?? 64, input.hold ?? true, input.maxDepth ?? queue.length);
+  return loadNativeBinding().searchOpenerBeam(
+    queue,
+    input.beamWidth ?? 64,
+    input.hold ?? true,
+    input.maxDepth ?? queue.length,
+    input.comboTable
+  );
 }
 
 export function searchOpenerBeamWithPlacements(input: SearchOpenerBeamInput): SearchOpenerBeamNode[] {
@@ -47,7 +56,8 @@ export function searchOpenerBeamWithPlacements(input: SearchOpenerBeamInput): Se
     queue,
     input.beamWidth ?? 64,
     input.hold ?? true,
-    input.maxDepth ?? queue.length
+    input.maxDepth ?? queue.length,
+    input.comboTable
   );
 }
 
@@ -59,7 +69,8 @@ export function evaluateOpenerBag(input: EvaluateOpenerBagInput = {}): OpenerBag
     input.hold ?? true,
     input.maxDepth ?? Math.min(4, bag.length),
     input.maxQueues ?? 0,
-    input.topQueueCount ?? 16
+    input.topQueueCount ?? 16,
+    input.comboTable
   );
 }
 

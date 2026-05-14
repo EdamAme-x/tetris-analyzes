@@ -3,6 +3,7 @@ use napi_derive::napi;
 
 use crate::firepower::firepower_score;
 use crate::pieces::{parse_queue, piece_name, Piece};
+use crate::tetrio_tables::ComboTable;
 use crate::{search_opener_states, validate_beam_width, SearchState};
 
 #[derive(Clone)]
@@ -49,6 +50,7 @@ pub(crate) fn evaluate_opener_bag_internal(
     max_depth: u32,
     max_queues: u32,
     top_queue_count: u32,
+    combo_table: ComboTable,
 ) -> Result<OpenerBagEvaluation> {
     let pieces = parse_unique_bag(bag)?;
     let total_queues = factorial(pieces.len());
@@ -68,7 +70,14 @@ pub(crate) fn evaluate_opener_bag_internal(
 
     let mut evaluations = Vec::with_capacity(queues.len());
     for queue in queues {
-        let states = search_opener_states(&queue, beam_width, hold_enabled, max_depth, false);
+        let states = search_opener_states(
+            &queue,
+            beam_width,
+            hold_enabled,
+            max_depth,
+            false,
+            combo_table,
+        );
         evaluations.push(evaluate_queue(
             queue_to_string(&queue),
             states.into_iter().next(),

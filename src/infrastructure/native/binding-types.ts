@@ -158,14 +158,27 @@ export interface NativeBinding {
   canReachOpenerPlacement(rows: Uint16Array, piece: string, rotation: number, x: number, y: number): boolean;
   detectOpenerSpin(rows: Uint16Array, piece: string, rotation: number, x: number, y: number): NativeSpinDetection;
   evaluateOpenerFirepower(events: NativeFirepowerInput[]): NativeFirepowerSummary;
-  searchOpenerBeam(queue: string, beamWidth: number, holdEnabled: boolean, maxDepth: number): NativeBeamSearchNode[];
-  searchOpenerBeamWithPlacements(queue: string, beamWidth: number, holdEnabled: boolean, maxDepth: number): NativeBeamSearchNode[];
+  searchOpenerBeam(
+    queue: string,
+    beamWidth: number,
+    holdEnabled: boolean,
+    maxDepth: number,
+    comboTable?: NativeComboTable
+  ): NativeBeamSearchNode[];
+  searchOpenerBeamWithPlacements(
+    queue: string,
+    beamWidth: number,
+    holdEnabled: boolean,
+    maxDepth: number,
+    comboTable?: NativeComboTable
+  ): NativeBeamSearchNode[];
   evaluateOpenerBag(
     bag: string,
     beamWidth: number,
     holdEnabled: boolean,
     maxDepth: number,
     maxQueues: number,
-    topQueueCount: number
+    topQueueCount: number,
+    comboTable?: NativeComboTable
   ): NativeOpenerBagEvaluation;
 }

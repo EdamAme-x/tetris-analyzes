@@ -14,15 +14,16 @@ mod tetrio_tables;
 use bag::{evaluate_opener_bag_internal, OpenerBagEvaluation};
 use board::{BoardEvaluation, BoardRows, BOARD_HEIGHT, BOARD_WIDTH};
 use firepower::{
-    advance_firepower, advance_firepower_for_clear_with_combo_table, clear_kind_cleared_lines,
-    clear_kind_name, firepower_score, parse_clear_kind, parse_combo_table, score_state,
-    FirepowerEvent, FirepowerState,
+    advance_firepower_for_clear_with_combo_table, advance_firepower_with_combo_table,
+    clear_kind_cleared_lines, clear_kind_name, firepower_score, parse_clear_kind,
+    parse_combo_table, score_state, FirepowerEvent, FirepowerState,
 };
 use movement::{can_place, is_reachable_placement, lock_shape};
 use pieces::{
     format_placement, parse_piece_string, parse_queue, piece_name, piece_shapes, Cell, Piece, Shape,
 };
 use spin::{detect_spin, spin_kind_name, SpinDetection};
+use tetrio_tables::ComboTable;
 
 #[derive(Clone)]
 pub(crate) struct SearchState {
@@ -345,8 +346,16 @@ pub fn search_opener_beam(
     beam_width: u32,
     hold_enabled: bool,
     max_depth: u32,
+    combo_table: Option<String>,
 ) -> Result<Vec<BeamSearchNode>> {
-    search_opener_beam_internal(queue, beam_width, hold_enabled, max_depth, false)
+    search_opener_beam_internal(
+        queue,
+        beam_width,
+        hold_enabled,
+        max_depth,
+        false,
+        combo_table,
+    )
 }
 
 #[napi(js_name = "searchOpenerBeamWithPlacements")]
@@ -355,8 +364,16 @@ pub fn search_opener_beam_with_placements(
     beam_width: u32,
     hold_enabled: bool,
     max_depth: u32,
+    combo_table: Option<String>,
 ) -> Result<Vec<BeamSearchNode>> {
-    search_opener_beam_internal(queue, beam_width, hold_enabled, max_depth, true)
+    search_opener_beam_internal(
+        queue,
+        beam_width,
+        hold_enabled,
+        max_depth,
+        true,
+        combo_table,
+    )
 }
 
 #[napi(js_name = "evaluateOpenerBag")]
@@ -367,7 +384,9 @@ pub fn evaluate_opener_bag(
     max_depth: u32,
     max_queues: u32,
     top_queue_count: u32,
+    combo_table: Option<String>,
 ) -> Result<OpenerBagEvaluation> {
+    let combo_table = parse_optional_combo_table(combo_table.as_deref())?;
     evaluate_opener_bag_internal(
         &bag,
         beam_width,
@@ -375,6 +394,7 @@ pub fn evaluate_opener_bag(
         max_depth,
         max_queues,
         top_queue_count,
+        combo_table,
     )
 }
 
@@ -384,10 +404,12 @@ fn search_opener_beam_internal(
     hold_enabled: bool,
     max_depth: u32,
     include_placements: bool,
+    combo_table: Option<String>,
 ) -> Result<Vec<BeamSearchNode>> {
     let pieces = parse_queue(&queue)?;
     let max_depth = usize::min(max_depth as usize, pieces.len());
     let beam_width = validate_beam_width(beam_width)?;
+    let combo_table = parse_optional_combo_table(combo_table.as_deref())?;
 
     Ok(search_opener_states(
         &pieces,
@@ -395,6 +417,7 @@ fn search_opener_beam_internal(
         hold_enabled,
         max_depth,
         include_placements,
+        combo_table,
     )
     .into_iter()
     .map(BeamSearchNode::from)
@@ -407,6 +430,7 @@ pub(crate) fn search_opener_states(
     hold_enabled: bool,
     max_depth: usize,
     include_placements: bool,
+    combo_table: ComboTable,
 ) -> Vec<SearchState> {
     let empty_rows = [0_u16; BOARD_HEIGHT];
     let initial_metrics = board::evaluate_board_unchecked(&empty_rows);
@@ -439,8 +463,12 @@ pub(crate) fn search_opener_states(
                         ) {
                             let rows = placed.rows;
                             let metrics = board::evaluate_board_unchecked(&rows);
-                            let (firepower, firepower_event) =
-                                advance_firepower(state.firepower, placed.spin, &rows);
+                            let (firepower, firepower_event) = advance_firepower_with_combo_table(
+                                state.firepower,
+                                placed.spin,
+                                &rows,
+                                combo_table,
+                            );
                             let score = score_state(metrics, firepower);
                             let mut path = state.path.clone();
                             path.push(format_placement(
@@ -605,6 +633,13 @@ pub(crate) fn validate_beam_width(beam_width: u32) -> Result<usize> {
         .ok()
         .filter(|width| *width > 0)
         .ok_or_else(|| Error::from_reason(format!("beamWidth must be positive, got {beam_width}.")))
+}
+
+fn parse_optional_combo_table(input: Option<&str>) -> Result<ComboTable> {
+    input
+        .map(parse_combo_table)
+        .transpose()
+        .map(|combo_table| combo_table.unwrap_or(ComboTable::Multiplier))
 }
 
 impl From<SearchState> for BeamSearchNode {

@@ -5,7 +5,6 @@ export * from "./application/run-opener-experiment";
 export * from "./application/search-opener";
 export * from "./domain/board";
 export * from "./domain/fumen";
-export * from "./domain/opener-engine-tasks";
 export * from "./domain/rules";
 export * from "./infrastructure/bitboard/native-bitboard";
 export * from "./infrastructure/fumen/tetris-fumen-codec";
