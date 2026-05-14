@@ -1,5 +1,7 @@
 import { describe, expect, test } from "bun:test";
-import { searchOpenerBeam, searchOpenerBeamWithPlacements } from "../src/application/search-opener";
+import { canReachOpenerPlacement, searchOpenerBeam, searchOpenerBeamWithPlacements } from "../src/application/search-opener";
+import { ROW_MASK } from "../src/domain/board";
+import { bitBoardFromRows } from "../src/infrastructure/bitboard/native-bitboard";
 
 describe("native opener beam search", () => {
   test("searches placements in native code and returns scored beam nodes without detail payload by default", () => {
@@ -32,6 +34,15 @@ describe("native opener beam search", () => {
     expect(nodes.some((node) => node.hold === "Z" && node.path[0]?.startsWith("hold:I@") && node.placements[0]?.usedHold === true)).toBe(
       true
     );
+  });
+
+  test("filters placements that are geometrically possible but unreachable from spawn", () => {
+    const empty = bitBoardFromRows(new Array(20).fill(0));
+    const sealedCave = new Array(20).fill(0);
+    sealedCave[1] = ROW_MASK;
+
+    expect(canReachOpenerPlacement({ rows: empty, piece: "I", rotation: 0, x: 3, y: 0 })).toBe(true);
+    expect(canReachOpenerPlacement({ rows: bitBoardFromRows(sealedCave), piece: "I", rotation: 0, x: 3, y: 0 })).toBe(false);
   });
 
   test("rejects invalid queues before searching", () => {

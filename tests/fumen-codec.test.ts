@@ -107,6 +107,7 @@ describe("TetrisFumenCodec", () => {
         expect(boardCount).toBe(2);
         return ["_".repeat(230), "_".repeat(230)];
       },
+      canReachOpenerPlacement: () => false,
       searchOpenerBeam: () => [],
       searchOpenerBeamWithPlacements: () => []
     };

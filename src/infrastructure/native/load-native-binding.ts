@@ -19,6 +19,7 @@ const nativeBindingSpec = {
   applyGarbage: "function",
   rowsToFumenField: "function",
   batchRowsToFumenFields: "function",
+  canReachOpenerPlacement: "function",
   searchOpenerBeam: "function",
   searchOpenerBeamWithPlacements: "function"
 } satisfies { readonly [K in keyof NativeBinding]: "function" };

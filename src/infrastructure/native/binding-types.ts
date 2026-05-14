@@ -41,6 +41,7 @@ export interface NativeBinding {
   applyGarbage(rows: Uint16Array, holes: Uint8Array): Uint16Array;
   rowsToFumenField(rows: Uint16Array): string;
   batchRowsToFumenFields(rows: Uint16Array, boardCount: number): string[];
+  canReachOpenerPlacement(rows: Uint16Array, piece: string, rotation: number, x: number, y: number): boolean;
   searchOpenerBeam(queue: string, beamWidth: number, holdEnabled: boolean, maxDepth: number): NativeBeamSearchNode[];
   searchOpenerBeamWithPlacements(queue: string, beamWidth: number, holdEnabled: boolean, maxDepth: number): NativeBeamSearchNode[];
 }

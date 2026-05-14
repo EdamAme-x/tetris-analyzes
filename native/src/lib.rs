@@ -1,6 +1,6 @@
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::OnceLock;
 
 const BOARD_WIDTH: usize = 10;
@@ -32,6 +32,13 @@ struct Shape {
     width: i8,
     height: i8,
     cells: &'static [Cell],
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+struct MovementState {
+    shape_index: usize,
+    x: i8,
+    y: i8,
 }
 
 #[derive(Clone)]
@@ -273,6 +280,40 @@ pub fn batch_rows_to_fumen_fields(rows: Uint16Array, board_count: u32) -> Result
     Ok(fields)
 }
 
+#[napi(js_name = "canReachOpenerPlacement")]
+pub fn can_reach_opener_placement(
+    rows: Uint16Array,
+    piece: String,
+    rotation: u32,
+    x: i32,
+    y: i32,
+) -> Result<bool> {
+    let rows = rows.as_ref();
+    validate_single_board(rows)?;
+    let board = rows_to_array(rows)?;
+    let piece = parse_piece_string(&piece)?;
+    let rotation = u8::try_from(rotation)
+        .map_err(|_| Error::from_reason(format!("rotation must fit in u8, got {rotation}.")))?;
+    let shape_index = piece_shapes(piece)
+        .iter()
+        .position(|shape| shape.rotation == rotation)
+        .ok_or_else(|| {
+            Error::from_reason(format!(
+                "Piece {} has no rotation {rotation}.",
+                piece_name(piece)
+            ))
+        })?;
+    let x =
+        i8::try_from(x).map_err(|_| Error::from_reason(format!("x must fit in i8, got {x}.")))?;
+    let y =
+        i8::try_from(y).map_err(|_| Error::from_reason(format!("y must fit in i8, got {y}.")))?;
+    let shape = piece_shapes(piece)[shape_index];
+
+    Ok(can_place(&board, shape, x, y)
+        && (y == 0 || !can_place(&board, shape, x, y - 1))
+        && is_reachable_placement(&board, piece, shape_index, x, y))
+}
+
 #[napi(js_name = "searchOpenerBeam")]
 pub fn search_opener_beam(
     queue: String,
@@ -326,11 +367,16 @@ fn search_opener_beam_internal(
 
         for state in &beam {
             for choice in piece_choices(&pieces, state, hold_enabled) {
-                for shape in piece_shapes(choice.piece).iter().copied() {
+                for (shape_index, shape) in piece_shapes(choice.piece).iter().copied().enumerate() {
                     for x in 0..=(BOARD_WIDTH as i8 - shape.width) {
-                        if let Some(placed) =
-                            place_and_clear(&state.rows, choice, shape, x, include_placements)
-                        {
+                        if let Some(placed) = place_and_clear(
+                            &state.rows,
+                            choice,
+                            shape_index,
+                            shape,
+                            x,
+                            include_placements,
+                        ) {
                             let rows = placed.rows;
                             let metrics = evaluate_board_unchecked(&rows);
                             let score = score_metrics(metrics);
@@ -412,6 +458,13 @@ fn validate_single_board(rows: &[u16]) -> Result<()> {
         validate_row(row, index)?;
     }
     Ok(())
+}
+
+fn rows_to_array(rows: &[u16]) -> Result<[u16; BOARD_HEIGHT]> {
+    validate_single_board(rows)?;
+    let mut output = [0_u16; BOARD_HEIGHT];
+    output.copy_from_slice(rows);
+    Ok(output)
 }
 
 fn validate_single_board_shape(rows: &[u16]) -> Result<()> {
@@ -594,6 +647,19 @@ fn parse_piece(char: char) -> Result<Piece> {
     }
 }
 
+fn parse_piece_string(input: &str) -> Result<Piece> {
+    let mut chars = input.chars().filter(|char| !char.is_whitespace());
+    let Some(char) = chars.next() else {
+        return Err(Error::from_reason("piece must contain one tetromino."));
+    };
+    if chars.next().is_some() {
+        return Err(Error::from_reason(format!(
+            "piece must contain one tetromino, got {input}."
+        )));
+    }
+    parse_piece(char)
+}
+
 fn piece_name(piece: Piece) -> &'static str {
     match piece {
         Piece::I => "I",
@@ -650,12 +716,17 @@ fn format_placement(piece: Piece, rotation: u8, x: i8, y: i8, used_hold: bool) -
 fn place_and_clear(
     rows: &[u16; BOARD_HEIGHT],
     choice: PieceChoice,
+    shape_index: usize,
     shape: Shape,
     x: i8,
     include_placement: bool,
 ) -> Option<PlacedBoard> {
     for y in 0..=(BOARD_HEIGHT as i8 - shape.height) {
         if can_place(rows, shape, x, y) && (y == 0 || !can_place(rows, shape, x, y - 1)) {
+            if !is_reachable_placement(rows, choice.piece, shape_index, x, y) {
+                continue;
+            }
+
             let mut placed = *rows;
             let mut cells = if include_placement {
                 Some(Vec::with_capacity(shape.cells.len()))
@@ -691,6 +762,155 @@ fn place_and_clear(
     None
 }
 
+fn is_reachable_placement(
+    rows: &[u16; BOARD_HEIGHT],
+    piece: Piece,
+    target_shape_index: usize,
+    target_x: i8,
+    target_y: i8,
+) -> bool {
+    let shapes = piece_shapes(piece);
+    let spawn_shape = shapes[0];
+    let spawn = MovementState {
+        shape_index: 0,
+        x: (BOARD_WIDTH as i8 - spawn_shape.width) / 2,
+        y: BOARD_HEIGHT as i8 - spawn_shape.height,
+    };
+
+    if !can_place(rows, spawn_shape, spawn.x, spawn.y) {
+        return false;
+    }
+
+    let target = MovementState {
+        shape_index: target_shape_index,
+        x: target_x,
+        y: target_y,
+    };
+    if has_clear_vertical_drop(rows, shapes[target_shape_index], target_x, target_y) {
+        return true;
+    }
+
+    let mut visited = HashSet::new();
+    let mut queue = VecDeque::from([spawn]);
+    visited.insert(spawn);
+
+    while let Some(state) = queue.pop_front() {
+        if state == target {
+            return true;
+        }
+
+        push_movement_state(
+            rows,
+            shapes,
+            state,
+            state.shape_index,
+            state.x - 1,
+            state.y,
+            &mut visited,
+            &mut queue,
+        );
+        push_movement_state(
+            rows,
+            shapes,
+            state,
+            state.shape_index,
+            state.x + 1,
+            state.y,
+            &mut visited,
+            &mut queue,
+        );
+        push_movement_state(
+            rows,
+            shapes,
+            state,
+            state.shape_index,
+            state.x,
+            state.y - 1,
+            &mut visited,
+            &mut queue,
+        );
+        push_rotation_states(rows, piece, shapes, state, 1, &mut visited, &mut queue);
+        push_rotation_states(rows, piece, shapes, state, -1, &mut visited, &mut queue);
+    }
+
+    false
+}
+
+fn has_clear_vertical_drop(rows: &[u16; BOARD_HEIGHT], shape: Shape, x: i8, target_y: i8) -> bool {
+    let spawn_y = BOARD_HEIGHT as i8 - shape.height;
+    if target_y > spawn_y {
+        return false;
+    }
+    for y in target_y..=spawn_y {
+        if !can_place(rows, shape, x, y) {
+            return false;
+        }
+    }
+    true
+}
+
+fn push_movement_state(
+    rows: &[u16; BOARD_HEIGHT],
+    shapes: &[Shape],
+    _from: MovementState,
+    shape_index: usize,
+    x: i8,
+    y: i8,
+    visited: &mut HashSet<MovementState>,
+    queue: &mut VecDeque<MovementState>,
+) {
+    if y < 0 {
+        return;
+    }
+    let shape = shapes[shape_index];
+    if !can_place(rows, shape, x, y) {
+        return;
+    }
+
+    let next = MovementState { shape_index, x, y };
+    if visited.insert(next) {
+        queue.push_back(next);
+    }
+}
+
+fn push_rotation_states(
+    rows: &[u16; BOARD_HEIGHT],
+    piece: Piece,
+    shapes: &[Shape],
+    state: MovementState,
+    direction: i8,
+    visited: &mut HashSet<MovementState>,
+    queue: &mut VecDeque<MovementState>,
+) {
+    if shapes.len() <= 1 {
+        return;
+    }
+
+    let next_shape_index = if direction > 0 {
+        (state.shape_index + 1) % shapes.len()
+    } else {
+        (state.shape_index + shapes.len() - 1) % shapes.len()
+    };
+    let from_rotation = shapes[state.shape_index].rotation;
+    let to_rotation = shapes[next_shape_index].rotation;
+    let next_shape = shapes[next_shape_index];
+
+    for kick in srs_plus_kicks(piece, from_rotation, to_rotation) {
+        let x = state.x + kick.x;
+        let y = state.y + kick.y;
+        if can_place(rows, next_shape, x, y) {
+            let next = MovementState {
+                shape_index: next_shape_index,
+                x,
+                y,
+            };
+            if visited.insert(next) {
+                queue.push_back(next);
+            }
+        }
+    }
+}
+
 fn can_place(rows: &[u16; BOARD_HEIGHT], shape: Shape, x: i8, y: i8) -> bool {
     for cell in shape.cells {
         let board_x = x + cell.x;
@@ -708,6 +928,68 @@ fn can_place(rows: &[u16; BOARD_HEIGHT], shape: Shape, x: i8, y: i8) -> bool {
     }
     true
 }
+
+fn srs_plus_kicks(piece: Piece, from_rotation: u8, to_rotation: u8) -> &'static [Cell] {
+    if piece == Piece::I {
+        match (from_rotation, to_rotation) {
+            (0, 1) => I_KICKS_01,
+            (1, 0) => I_KICKS_10,
+            _ => BASIC_KICKS,
+        }
+    } else {
+        match (from_rotation, to_rotation) {
+            (0, 1) | (2, 1) => JLSTZ_KICKS_01,
+            (1, 0) | (1, 2) => JLSTZ_KICKS_10,
+            (2, 3) | (0, 3) => JLSTZ_KICKS_23,
+            (3, 2) | (3, 0) => JLSTZ_KICKS_32,
+            _ => BASIC_KICKS,
+        }
+    }
+}
+
+const BASIC_KICKS: &[Cell] = &[Cell { x: 0, y: 0 }];
+const JLSTZ_KICKS_01: &[Cell] = &[
+    Cell { x: 0, y: 0 },
+    Cell { x: -1, y: 0 },
+    Cell { x: -1, y: -1 },
+    Cell { x: 0, y: 2 },
+    Cell { x: -1, y: 2 },
+];
+const JLSTZ_KICKS_10: &[Cell] = &[
+    Cell { x: 0, y: 0 },
+    Cell { x: 1, y: 0 },
+    Cell { x: 1, y: 1 },
+    Cell { x: 0, y: -2 },
+    Cell { x: 1, y: -2 },
+];
+const JLSTZ_KICKS_23: &[Cell] = &[
+    Cell { x: 0, y: 0 },
+    Cell { x: 1, y: 0 },
+    Cell { x: 1, y: -1 },
+    Cell { x: 0, y: 2 },
+    Cell { x: 1, y: 2 },
+];
+const JLSTZ_KICKS_32: &[Cell] = &[
+    Cell { x: 0, y: 0 },
+    Cell { x: -1, y: 0 },
+    Cell { x: -1, y: 1 },
+    Cell { x: 0, y: -2 },
+    Cell { x: -1, y: -2 },
+];
+const I_KICKS_01: &[Cell] = &[
+    Cell { x: 0, y: 0 },
+    Cell { x: 1, y: 0 },
+    Cell { x: -2, y: 0 },
+    Cell { x: -2, y: 1 },
+    Cell { x: 1, y: -2 },
+];
+const I_KICKS_10: &[Cell] = &[
+    Cell { x: 0, y: 0 },
+    Cell { x: -1, y: 0 },
+    Cell { x: 2, y: 0 },
+    Cell { x: -1, y: 2 },
+    Cell { x: 2, y: -1 },
+];
 
 fn clear_full_lines_array(rows: [u16; BOARD_HEIGHT]) -> [u16; BOARD_HEIGHT] {
     let mut output = [0_u16; BOARD_HEIGHT];

@@ -49,6 +49,7 @@ function createValidBinding(): NativeBinding {
     applyGarbage: (rows) => rows,
     rowsToFumenField: () => "",
     batchRowsToFumenFields: () => [],
+    canReachOpenerPlacement: () => false,
     searchOpenerBeam: () => [],
     searchOpenerBeamWithPlacements: () => []
   };
