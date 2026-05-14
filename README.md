@@ -65,3 +65,4 @@ Executable examples live in `tests/`.
 - [x] Model native HANDHELD non-T spins with 4-corner detection and halved attack
 - [x] Skip native T immobility checks for spin modes that cannot use immobile T minis
 - [x] Add fumen parity coverage for real native hold and line-clear placement histories
+- [x] Scan occupied row bits directly during native board evaluation

@@ -220,11 +220,7 @@ pub(crate) fn evaluate_board(rows: &[u16], row_offset: usize) -> Result<BoardEva
         if row == ROW_MASK {
             cleared_lines += 1;
         }
-        for (x, column_mask) in column_masks.iter_mut().enumerate() {
-            if row & (1_u16 << x) != 0 {
-                *column_mask |= 1_u32 << y;
-            }
-        }
+        add_row_to_column_masks(&mut column_masks, row, y);
     }
 
     Ok(evaluate_column_metrics(
@@ -244,11 +240,7 @@ pub(crate) fn evaluate_board_unchecked(rows: &BoardRows) -> BoardEvaluation {
         if row == ROW_MASK {
             cleared_lines += 1;
         }
-        for (x, column_mask) in column_masks.iter_mut().enumerate() {
-            if row & (1_u16 << x) != 0 {
-                *column_mask |= 1_u32 << y;
-            }
-        }
+        add_row_to_column_masks(&mut column_masks, row, y);
     }
 
     evaluate_column_metrics(occupied_cells, cleared_lines, column_masks)
@@ -304,4 +296,66 @@ fn evaluate_column_metrics(
         holes,
         bumpiness,
     ]
+}
+
+fn add_row_to_column_masks(column_masks: &mut [u32; BOARD_WIDTH], row: u16, y: usize) {
+    let mut bits = row;
+    let y_bit = 1_u32 << y;
+    while bits != 0 {
+        let x = bits.trailing_zeros() as usize;
+        column_masks[x] |= y_bit;
+        bits &= bits - 1;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn unchecked_board_evaluation_matches_validated_sparse_and_dense_rows() {
+        let mut rows = [0_u16; BOARD_HEIGHT];
+        rows[0] = 0b0000000001;
+        rows[1] = 0b0000100001;
+        rows[2] = 0b1111111111;
+        rows[7] = 0b1010101010;
+        rows[19] = 0b1111000000;
+
+        assert_eq!(evaluate_board_unchecked(&rows), slow_evaluate_board(&rows));
+    }
+
+    #[test]
+    fn unchecked_board_evaluation_handles_empty_and_full_columns() {
+        let mut rows = [0_u16; BOARD_HEIGHT];
+        rows[0] = 0b1000000001;
+        rows[1] = 0b1000000001;
+        rows[3] = 0b1000000001;
+
+        let evaluation = evaluate_board_unchecked(&rows);
+
+        assert_eq!(evaluation[0], 6);
+        assert_eq!(evaluation[1], 0);
+        assert_eq!(evaluation[2], 8);
+        assert_eq!(evaluation[3], 2);
+        assert_eq!(evaluation[4], 8);
+    }
+
+    fn slow_evaluate_board(rows: &BoardRows) -> BoardEvaluation {
+        let mut occupied_cells = 0;
+        let mut cleared_lines = 0;
+        let mut column_masks = [0_u32; BOARD_WIDTH];
+        for (y, row) in rows.iter().copied().enumerate() {
+            occupied_cells += row.count_ones();
+            if row == ROW_MASK {
+                cleared_lines += 1;
+            }
+            for (x, column_mask) in column_masks.iter_mut().enumerate() {
+                if row & (1_u16 << x) != 0 {
+                    *column_mask |= 1_u32 << y;
+                }
+            }
+        }
+
+        evaluate_column_metrics(occupied_cells, cleared_lines, column_masks)
+    }
 }
