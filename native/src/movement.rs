@@ -39,17 +39,17 @@ impl ReachabilityCache {
 impl ReachablePlacementSet {
     fn contains(
         &self,
+        piece: Piece,
         shapes: &[Shape],
         target_shape_index: usize,
         target_x: i8,
         target_y: i8,
     ) -> bool {
-        let target_shape = shapes[target_shape_index];
-        shapes
+        let target_rotation = shapes[target_shape_index].rotation;
+        equivalent_shape_indices(piece, target_rotation)
             .iter()
-            .enumerate()
-            .filter(|(_, shape)| same_shape_geometry(**shape, target_shape))
-            .any(|(shape_index, _)| {
+            .copied()
+            .any(|shape_index| {
                 movement_state_index(MovementState {
                     shape_index,
                     x: target_x,
@@ -102,10 +102,9 @@ pub(crate) fn is_reachable_placement_with_cache(
     if reachable_cache.reachable.is_none() {
         reachable_cache.reachable = Some(build_reachable_placement_set(rows, piece, kick_table));
     }
-    reachable_cache
-        .reachable
-        .as_ref()
-        .is_some_and(|reachable| reachable.contains(shapes, target_shape_index, target_x, target_y))
+    reachable_cache.reachable.as_ref().is_some_and(|reachable| {
+        reachable.contains(piece, shapes, target_shape_index, target_x, target_y)
+    })
 }
 
 fn build_reachable_placement_set(
@@ -199,8 +198,22 @@ fn build_reachable_placement_set(
     ReachablePlacementSet { visited }
 }
 
-fn same_shape_geometry(left: Shape, right: Shape) -> bool {
-    left.width == right.width && left.height == right.height && left.cells == right.cells
+fn equivalent_shape_indices(piece: Piece, rotation: u8) -> &'static [usize] {
+    match piece {
+        Piece::O => &[0, 1, 2, 3],
+        Piece::I | Piece::S | Piece::Z => match rotation {
+            0 | 2 => &[0, 2],
+            1 | 3 => &[1, 3],
+            _ => &[],
+        },
+        Piece::T | Piece::J | Piece::L => match rotation {
+            0 => &[0],
+            1 => &[1],
+            2 => &[2],
+            3 => &[3],
+            _ => &[],
+        },
+    }
 }
 
 pub(crate) fn has_clear_vertical_drop(rows: &BoardRows, shape: Shape, x: i8, target_y: i8) -> bool {
@@ -427,6 +440,17 @@ mod tests {
             &mut cache,
         ));
         assert!(cache.reachable.is_some());
+    }
+
+    #[test]
+    fn reachable_set_checks_equivalent_rotation_membership_directly() {
+        let rows = [0_u16; BOARD_HEIGHT];
+        let reachable = build_reachable_placement_set(&rows, Piece::I, KickTable::SrsPlus);
+        let shapes = piece_shapes(Piece::I);
+
+        assert!(reachable.contains(Piece::I, shapes, 0, 3, 0));
+        assert!(reachable.contains(Piece::I, shapes, 2, 3, 0));
+        assert!(!reachable.contains(Piece::I, shapes, 2, 10, 0));
     }
 }
 

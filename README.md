@@ -57,3 +57,4 @@ Executable examples live in `tests/`.
 - [x] Limit native continuation potential credit to T/I pieces reachable within remaining search depth
 - [x] Use native shape row masks for faster collision and lock operations
 - [x] Add regression tests for B2B carry/reset, empty-hold queue consumption, grounded placements, and TL non-T spin suppression
+- [x] Use static equivalent-rotation lookup for native reachability cache membership
