@@ -179,6 +179,7 @@ export interface OpenerScenarioReachableQuality {
   readonly tSpinClears: number;
   readonly tSpinAttack: number;
   readonly backToBackChain: number;
+  readonly tSpinPotential: number;
   readonly holes: number;
 }
 
@@ -1290,6 +1291,7 @@ function searchNodeQuality(node: SearchOpenerBeamNode, index: number): OpenerSce
     tSpinClears: node.tSpinClears,
     tSpinAttack: node.tSpinAttack,
     backToBackChain: node.backToBackChain,
+    tSpinPotential: node.tSpinPotential,
     holes: node.holes
   };
 }
@@ -1303,6 +1305,7 @@ function meetsReplayQuality(quality: OpenerScenarioReachableQuality, target: Ran
     quality.tSpinClears >= target.tSpinClears &&
     quality.tSpinAttack >= target.tSpinAttack &&
     quality.backToBackChain >= target.backToBackChain &&
+    quality.tSpinPotential >= target.tSpinPotential &&
     quality.holes <= target.holes
   );
 }

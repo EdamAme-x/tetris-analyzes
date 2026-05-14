@@ -107,3 +107,4 @@ Executable examples live in `tests/`.
 - [x] Exclude quality-gate failures from opener template replay pools
 - [x] Use placement-light native searches for template replay checks
 - [x] Reserve equivalent-firepower holeless candidates during native beam pruning
+- [x] Include continuation potential in replay quality matching

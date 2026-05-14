@@ -1035,6 +1035,46 @@ describe("opener experiment runner", () => {
     });
   });
 
+  test("requires replay quality hits to preserve continuation potential", () => {
+    const targetRows = [7, 11, 13, ...new Array(17).fill(0)];
+    const report = runOpenerExperiment({
+      scenarios: [{ ...rankingScenario("source", "TT"), rules: TETRIO_TL_OPENER_SEARCH_RULES }],
+      templateReplay: {
+        scenarios: [replayScenario("potential-miss", "JO"), replayScenario("potential-hit", "LO")],
+        topTemplates: 1
+      },
+      clock: createClock("2026-05-14T00:00:00.000Z", [0, 1]),
+      fumenCodec: fakeCodec,
+      search: (input) => {
+        const base = {
+          attack: 8,
+          difficultAttack: 8,
+          difficultClears: 2,
+          tSpinClears: 2,
+          tSpinAttack: 8,
+          backToBackChain: 2
+        };
+        if (input.queue === "TT") {
+          return [{ ...candidateNode("source"), ...base, rows: targetRows, tSpinPotential: 2 }];
+        }
+        return [
+          {
+            ...candidateNode(input.queue === "LO" ? "potential-hit" : "potential-miss"),
+            ...base,
+            rows: [3, 5, 9, ...new Array(17).fill(0)],
+            tSpinPotential: input.queue === "LO" ? 2 : 1
+          }
+        ];
+      }
+    });
+
+    expect(report.templateReplay?.templates[0]).toMatchObject({
+      replayHitCount: 0,
+      qualityReplayHitCount: 1,
+      qualityReplayHitRate: 0.5
+    });
+  });
+
   test("ranks replayed quality by reproducible B2B T-spin firepower", () => {
     const strongRows = [31, 7, 11, ...new Array(17).fill(0)];
     const broadRows = [3, 5, 9, ...new Array(17).fill(0)];
