@@ -1207,11 +1207,21 @@ struct SetupPotentialPruningBaseline {
     t_spin_attack: u32,
     difficult_attack: u32,
     back_to_back_chain: u32,
+    all_clears: u32,
 }
 
 fn setup_potential_pruning_baseline(beam: &[SearchState]) -> SetupPotentialPruningBaseline {
     let mut baseline = SetupPotentialPruningBaseline::default();
+    let min_all_clears = beam
+        .iter()
+        .map(|state| state.firepower.all_clears)
+        .min()
+        .unwrap_or(0);
+    baseline.all_clears = min_all_clears;
     for state in beam {
+        if state.firepower.all_clears != min_all_clears {
+            continue;
+        }
         baseline.t_spin_clears = baseline.t_spin_clears.max(state.firepower.t_spin_clears);
         baseline.t_spin_attack = baseline.t_spin_attack.max(state.firepower.t_spin_attack);
         baseline.difficult_attack = baseline
@@ -1229,7 +1239,8 @@ fn should_score_exact_t_spin_potential(
     baseline: SetupPotentialPruningBaseline,
 ) -> bool {
     baseline.t_spin_clears == 0
-        || (firepower.t_spin_clears.saturating_add(1) >= baseline.t_spin_clears
+        || (firepower.all_clears <= baseline.all_clears
+            && firepower.t_spin_clears.saturating_add(1) >= baseline.t_spin_clears
             && firepower.t_spin_attack.saturating_add(4) >= baseline.t_spin_attack
             && firepower.difficult_attack.saturating_add(4) >= baseline.difficult_attack
             && firepower.back_to_back_chain.saturating_add(1) >= baseline.back_to_back_chain)
@@ -1383,17 +1394,11 @@ fn compare_search_state(left: &SearchState, right: &SearchState) -> std::cmp::Or
     if ordering != std::cmp::Ordering::Equal {
         return ordering;
     }
-    let ordering = right
-        .firepower
-        .spin_clears
-        .cmp(&left.firepower.spin_clears);
+    let ordering = right.firepower.spin_clears.cmp(&left.firepower.spin_clears);
     if ordering != std::cmp::Ordering::Equal {
         return ordering;
     }
-    let ordering = right
-        .firepower
-        .spin_attack
-        .cmp(&left.firepower.spin_attack);
+    let ordering = right.firepower.spin_attack.cmp(&left.firepower.spin_attack);
     if ordering != std::cmp::Ordering::Equal {
         return ordering;
     }
@@ -1468,15 +1473,11 @@ fn compare_search_state_to_candidate(
     if ordering != std::cmp::Ordering::Equal {
         return ordering;
     }
-    let ordering = right_firepower
-        .spin_clears
-        .cmp(&left.firepower.spin_clears);
+    let ordering = right_firepower.spin_clears.cmp(&left.firepower.spin_clears);
     if ordering != std::cmp::Ordering::Equal {
         return ordering;
     }
-    let ordering = right_firepower
-        .spin_attack
-        .cmp(&left.firepower.spin_attack);
+    let ordering = right_firepower.spin_attack.cmp(&left.firepower.spin_attack);
     if ordering != std::cmp::Ordering::Equal {
         return ordering;
     }
@@ -1930,6 +1931,7 @@ mod tests {
             t_spin_attack: 12,
             difficult_attack: 12,
             back_to_back_chain: 3,
+            all_clears: 0,
         };
         let mut near = FirepowerState::empty();
         near.spin_clears = 2;
@@ -1951,6 +1953,38 @@ mod tests {
         assert!(should_score_exact_t_spin_potential(
             FirepowerState::empty(),
             SetupPotentialPruningBaseline::default(),
+        ));
+    }
+
+    #[test]
+    fn setup_potential_pruning_baseline_ignores_all_clear_boosted_attack() {
+        let mut clean = search_state_with_rows(
+            21,
+            Some(Piece::T),
+            [0_u16; BOARD_HEIGHT],
+            FirepowerState::empty(),
+        );
+        clean.firepower.t_spin_clears = 3;
+        clean.firepower.t_spin_attack = 14;
+        clean.firepower.difficult_attack = 14;
+        clean.firepower.back_to_back_chain = 3;
+
+        let mut boosted = clean.clone();
+        boosted.firepower.all_clears = 1;
+        boosted.firepower.t_spin_attack = 24;
+        boosted.firepower.difficult_attack = 24;
+
+        let baseline = setup_potential_pruning_baseline(&[boosted.clone(), clean.clone()]);
+
+        assert_eq!(baseline.all_clears, 0);
+        assert_eq!(baseline.t_spin_attack, 14);
+        assert!(should_score_exact_t_spin_potential(
+            clean.firepower,
+            baseline
+        ));
+        assert!(!should_score_exact_t_spin_potential(
+            boosted.firepower,
+            baseline
         ));
     }
 }
