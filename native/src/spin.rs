@@ -21,6 +21,7 @@ pub(crate) enum SpinKind {
     None,
     TSpin,
     TSpinMini,
+    #[allow(dead_code)]
     ImmobileSpin,
 }
 
@@ -38,6 +39,7 @@ pub(crate) enum SpinMode {
     None,
 }
 
+#[cfg(test)]
 pub(crate) fn detect_spin(
     locked_rows: &BoardRows,
     piece: Piece,
@@ -274,7 +276,6 @@ pub(crate) fn could_spin_for_mode(
         return true;
     }
 
-    let immobile = is_placement_immobile(locked_rows, shape, x, y);
     if piece == Piece::T {
         let corner_spin = count_t_occupied_corners(rows_before_lock, shape.rotation, x, y) >= 3;
         return match mode {
@@ -284,11 +285,12 @@ pub(crate) fn could_spin_for_mode(
             SpinMode::TSpinsPlus
             | SpinMode::AllSpinsPlus
             | SpinMode::AllMiniPlus
-            | SpinMode::MiniOnly => corner_spin || immobile,
+            | SpinMode::MiniOnly => corner_spin || is_placement_immobile(locked_rows, shape, x, y),
             SpinMode::Stupid | SpinMode::None => false,
         };
     }
 
+    let immobile = is_placement_immobile(locked_rows, shape, x, y);
     match mode {
         SpinMode::Handheld => {
             matches!(piece, Piece::S | Piece::Z | Piece::J | Piece::L)
@@ -375,6 +377,7 @@ fn detect_corner_spin_after_rotation(
     }
 }
 
+#[cfg(test)]
 fn detect_t_spin_corners(
     locked_rows: &BoardRows,
     rotation: u8,

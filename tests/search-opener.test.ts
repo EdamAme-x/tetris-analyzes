@@ -567,8 +567,8 @@ describe("native opener beam search", () => {
       kickTable: "SRS+",
       spinMode: "ALL-MINI+"
     } as const;
-    const [mediumTop] = searchOpenerBeam({ ...input, beamWidth: 128 });
-    const [wideTop] = searchOpenerBeam({ ...input, beamWidth: 256 });
+    const [mediumTop] = searchOpenerBeam({ ...input, beamWidth: 96 });
+    const [wideTop] = searchOpenerBeam({ ...input, beamWidth: 128 });
 
     expect(mediumTop).toMatchObject({
       queueIndex: 14,

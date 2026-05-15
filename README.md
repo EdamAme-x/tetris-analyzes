@@ -153,3 +153,4 @@ Executable examples live in `tests/`.
 - [x] Require a reachable final rotation before native opener search can score a spin clear
 - [x] Use extracted TETR.IO TL defaults for public ruleset helpers and native spin detection helpers
 - [x] Extract TETR.IO TL `allow180` and propagate it through native reachability, search, and opener reports
+- [x] Require reachable TETR.IO rotation semantics for native T-spin potential scoring

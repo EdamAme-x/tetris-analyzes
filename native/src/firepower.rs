@@ -2,10 +2,12 @@ use napi::bindgen_prelude::{Error, Result};
 
 use crate::board::{self, BoardEvaluation, BoardRows, BOARD_HEIGHT, BOARD_WIDTH};
 use crate::movement::{
-    can_place_in_bounds, is_reachable_placement_with_cache, lock_shape, ReachabilityCache,
+    can_place_in_bounds, find_reachable_rotation_entry, lock_shape, ReachabilityCache,
 };
 use crate::pieces::{piece_shapes, placement_shape_indices, Piece};
-use crate::spin::{detect_spin, SpinDetection, SpinKind};
+use crate::spin::{
+    could_spin_for_mode, detect_spin_for_mode_after_rotation, SpinDetection, SpinKind, SpinMode,
+};
 use crate::tetrio_tables::KickTable;
 use crate::tetrio_tables::{self, ClearKind, ComboTable};
 
@@ -193,24 +195,40 @@ pub(crate) fn estimate_t_spin_potential(
                     continue;
                 };
                 let cleared_lines = board::count_full_lines_array(&placed);
-                let spin = detect_spin(&placed, Piece::T, shape, x, y, cleared_lines);
+                if !could_spin_for_mode(rows, &placed, Piece::T, shape, x, y, SpinMode::TSpins) {
+                    can_place_below = can_place_here;
+                    continue;
+                }
+                let Some(rotation_kick_index) = find_reachable_rotation_entry(
+                    rows,
+                    Piece::T,
+                    shape_index,
+                    x,
+                    y,
+                    kick_table,
+                    allow_180,
+                    &mut reachable_cache,
+                ) else {
+                    can_place_below = can_place_here;
+                    continue;
+                };
+                let spin = detect_spin_for_mode_after_rotation(
+                    rows,
+                    &placed,
+                    Piece::T,
+                    shape,
+                    x,
+                    y,
+                    cleared_lines,
+                    SpinMode::TSpins,
+                    Some(rotation_kick_index),
+                );
                 let value = match spin.kind {
                     SpinKind::TSpin => 1 + cleared_lines,
                     SpinKind::TSpinMini if cleared_lines > 0 => 1,
                     SpinKind::None | SpinKind::TSpinMini | SpinKind::ImmobileSpin => 0,
                 };
-                if value > best
-                    && is_reachable_placement_with_cache(
-                        rows,
-                        Piece::T,
-                        shape_index,
-                        x,
-                        y,
-                        kick_table,
-                        allow_180,
-                        &mut reachable_cache,
-                    )
-                {
+                if value > best {
                     best = value;
                     if best == MAX_T_SPIN_POTENTIAL {
                         return best;
