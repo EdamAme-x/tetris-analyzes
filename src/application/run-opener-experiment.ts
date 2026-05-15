@@ -4,7 +4,6 @@ import type { FumenCodec, FumenUrls } from "../domain/fumen";
 import type { NativeComboTable, NativeKickTable, NativeSpinMode } from "../infrastructure/native/binding-types";
 import { createOpenerFumenPages } from "./create-opener-fumen";
 import {
-  searchOpenerBeam,
   searchOpenerBeamCompact,
   searchOpenerBeamWithPlacements,
   type SearchOpenerBeamInput,
@@ -419,7 +418,7 @@ export function runOpenerExperiment(input: RunOpenerExperimentInput): OpenerExpe
   }
 
   const clock = input.clock ?? systemClock;
-  const search = input.search ?? searchOpenerBeam;
+  const search = input.search ?? searchOpenerBeamCompact;
   const detailSearch = input.detailSearch ?? (input.search === undefined ? searchOpenerBeamWithPlacements : undefined);
   const replaySearch = input.replaySearch ?? (input.search === undefined ? searchOpenerBeamCompact : search);
   const fumenCodec = input.fumenCodec ?? createFumenCodec();
