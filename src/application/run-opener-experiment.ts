@@ -4,6 +4,7 @@ import type { FumenCodec, FumenUrls } from "../domain/fumen";
 import type { NativeComboTable, NativeKickTable, NativeSpinMode } from "../infrastructure/native/binding-types";
 import { createOpenerFumenPages } from "./create-opener-fumen";
 import {
+  searchOpenerBeam,
   searchOpenerBeamCompact,
   searchOpenerBeamWithPlacements,
   type SearchOpenerBeamInput,
@@ -291,7 +292,8 @@ const CONTINUATION_THREE_BAG_QUEUES = [
   ["discover-96", "OZSLTJIJLSZITOIOJTSLZ", 26],
   ["tl-3spin-01", "OISLJZTIJTSOZLSJZTIOL", 26],
   ["tl-3spin-02", "ZTSLOJIZJTILSOLTIZJSO", 18],
-  ["tl-3spin-03", "SZLITJOOZTLSIJJOSZTLI"]
+  ["tl-3spin-03", "SZLITJOOZTLSIJJOSZTLI"],
+  ["tl-3spin-04", "ISJZLOTZSJITOLZISJTLO", 18]
 ] as const;
 const DEFAULT_TWO_BAG_QUALITY_GATE = {
   minQueueIndex: 14,
@@ -418,7 +420,7 @@ export function runOpenerExperiment(input: RunOpenerExperimentInput): OpenerExpe
   }
 
   const clock = input.clock ?? systemClock;
-  const search = input.search ?? searchOpenerBeamCompact;
+  const search = input.search ?? searchOpenerBeam;
   const detailSearch = input.detailSearch ?? (input.search === undefined ? searchOpenerBeamWithPlacements : undefined);
   const replaySearch = input.replaySearch ?? (input.search === undefined ? searchOpenerBeamCompact : search);
   const fumenCodec = input.fumenCodec ?? createFumenCodec();
