@@ -1,20 +1,18 @@
-import {
-  CONTINUATION_OPENER_EXPERIMENT_SCENARIOS,
-  DEFAULT_OPENER_EXPERIMENT_SCENARIOS,
-  DISCOVERY_OPENER_EXPERIMENT_SCENARIOS,
-  SURVEY_OPENER_EXPERIMENT_SCENARIOS,
-  type OpenerExperimentScenario
-} from "./run-opener-experiment";
+import { createDistributionOpenerExperimentSplits, type OpenerExperimentScenario } from "./run-opener-experiment";
 
-export type OpenerExperimentPresetName = "default" | "survey" | "discovery" | "continuation";
+export type OpenerExperimentPresetName = "default" | "distribution" | "survey" | "discovery" | "continuation";
 
 export interface OpenerExperimentCliConfig {
   readonly outDir: string;
   readonly preset: OpenerExperimentPresetName;
+  readonly seed: string;
   readonly scenarios: readonly OpenerExperimentScenario[];
+  readonly validationScenarios: readonly OpenerExperimentScenario[];
+  readonly testScenarios: readonly OpenerExperimentScenario[];
   readonly displayTop: number;
   readonly experimentTop?: number;
   readonly survivabilityReplay: number;
+  readonly certificationReplay: number;
   readonly replayTopTemplates: number;
 }
 
@@ -24,46 +22,68 @@ export function createOpenerExperimentCliConfig(argv: readonly string[]): Opener
   const top = readNumberOption(args, "--top");
   const preset = readPreset(args.get("--preset") ?? "default");
   const setupPoolMultiplier = readNumberOption(args, "--setup-pool-multiplier");
-  const scenarios = scenarioPreset(preset).map((scenario) => ({
-    ...scenario,
-    ...(setupPoolMultiplier === undefined ? {} : { setupPoolMultiplier })
-  }));
-  const survivabilityReplay = readNonNegativeNumberOption(args, "--survivability-replay") ?? defaultSurvivabilityReplay(preset);
+  const seed = args.get("--seed") ?? defaultSeed(preset);
+  const bagCount = readNumberOption(args, "--bag-count") ?? defaultBagCount(preset);
+  const trainSamples = readNonNegativeNumberOption(args, "--train-samples") ?? defaultTrainSamples(preset);
+  const survivabilityReplay =
+    readNonNegativeNumberOption(args, "--validation-samples") ??
+    readNonNegativeNumberOption(args, "--survivability-replay") ??
+    defaultSurvivabilityReplay(preset);
+  const certificationReplay = readNonNegativeNumberOption(args, "--test-samples") ?? defaultCertificationReplay(preset);
+  const splits = createDistributionOpenerExperimentSplits({
+    seed,
+    bagCount,
+    trainSamples,
+    validationSamples: survivabilityReplay,
+    testSamples: certificationReplay,
+    ...(setupPoolMultiplier === undefined ? {} : { setupPoolMultiplier }),
+    beamWidth: defaultBeamWidth(bagCount),
+    maxDepth: bagCount * 7
+  });
   const displayTop = top ?? 5;
   const replayTopTemplates = readNumberOption(args, "--replay-top-templates") ?? defaultReplayTemplatePool(preset, displayTop);
-  const experimentTop = survivabilityReplay === 0 ? top : Math.max(displayTop, replayTopTemplates);
+  const experimentTop = survivabilityReplay === 0 && certificationReplay === 0 ? top : Math.max(displayTop, replayTopTemplates);
 
   return {
     outDir,
     preset,
-    scenarios,
+    seed,
+    scenarios: splits.train,
+    validationScenarios: splits.validation,
+    testScenarios: splits.test,
     displayTop,
     ...(experimentTop === undefined ? {} : { experimentTop }),
     survivabilityReplay,
+    certificationReplay,
     replayTopTemplates
   };
 }
 
-export function defaultSurvivabilityReplay(presetName: OpenerExperimentPresetName): number {
-  return presetName === "continuation" ? 16 : presetName === "discovery" ? 24 : 0;
+export function defaultTrainSamples(presetName: OpenerExperimentPresetName): number {
+  return presetName === "survey" ? 8 : 4;
+}
+
+export function defaultSurvivabilityReplay(_presetName: OpenerExperimentPresetName): number {
+  return 8;
+}
+
+export function defaultCertificationReplay(_presetName: OpenerExperimentPresetName): number {
+  return 16;
 }
 
 export function defaultReplayTemplatePool(presetName: OpenerExperimentPresetName, displayTop: number): number {
-  const minimum = presetName === "continuation" ? 512 : presetName === "discovery" ? 64 : 16;
+  const minimum = presetName === "survey" || presetName === "discovery" ? 32 : 64;
   return Math.max(displayTop, minimum);
 }
 
 export function scenarioPreset(name: OpenerExperimentPresetName): readonly OpenerExperimentScenario[] {
-  switch (name) {
-    case "default":
-      return DEFAULT_OPENER_EXPERIMENT_SCENARIOS;
-    case "survey":
-      return SURVEY_OPENER_EXPERIMENT_SCENARIOS;
-    case "discovery":
-      return DISCOVERY_OPENER_EXPERIMENT_SCENARIOS;
-    case "continuation":
-      return CONTINUATION_OPENER_EXPERIMENT_SCENARIOS;
-  }
+  return createDistributionOpenerExperimentSplits({
+    seed: defaultSeed(name),
+    bagCount: defaultBagCount(name),
+    trainSamples: defaultTrainSamples(name),
+    validationSamples: 0,
+    testSamples: 0
+  }).train;
 }
 
 function parseArgs(argv: readonly string[]): Map<string, string> {
@@ -71,6 +91,11 @@ function parseArgs(argv: readonly string[]): Map<string, string> {
     "--out-dir",
     "--top",
     "--preset",
+    "--seed",
+    "--bag-count",
+    "--train-samples",
+    "--validation-samples",
+    "--test-samples",
     "--survivability-replay",
     "--replay-top-templates",
     "--setup-pool-multiplier"
@@ -132,11 +157,24 @@ function readNonNegativeNumberOption(args: ReadonlyMap<string, string>, name: st
 function readPreset(raw: string): OpenerExperimentPresetName {
   switch (raw) {
     case "default":
+    case "distribution":
     case "survey":
     case "discovery":
     case "continuation":
       return raw;
     default:
-      throw new Error(`Unknown opener experiment preset ${raw}. Expected default, survey, discovery, or continuation.`);
+      throw new Error(`Unknown opener experiment preset ${raw}. Expected default, distribution, survey, discovery, or continuation.`);
   }
+}
+
+function defaultSeed(presetName: OpenerExperimentPresetName): string {
+  return `tl-distribution-v1:${presetName}`;
+}
+
+function defaultBagCount(presetName: OpenerExperimentPresetName): number {
+  return presetName === "survey" || presetName === "discovery" ? 2 : 3;
+}
+
+function defaultBeamWidth(bagCount: number): number {
+  return bagCount >= 3 ? 256 : 512;
 }

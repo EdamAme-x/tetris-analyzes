@@ -3,8 +3,10 @@ import type { FumenCodec, FumenUrls } from "../src/domain/fumen";
 import type { NativeBeamPlacement, NativeClearName } from "../src/infrastructure/native/binding-types";
 import {
   createOpenerExperimentCliConfig,
+  defaultCertificationReplay,
   defaultReplayTemplatePool,
-  defaultSurvivabilityReplay
+  defaultSurvivabilityReplay,
+  defaultTrainSamples
 } from "../src/application/opener-experiment-cli";
 import {
   CONTINUATION_OPENER_EXPERIMENT_SCENARIOS,
@@ -12,6 +14,7 @@ import {
   DISCOVERY_OPENER_EXPERIMENT_SCENARIOS,
   SURVEY_OPENER_EXPERIMENT_SCENARIOS,
   TETRIO_TL_OPENER_SEARCH_RULES,
+  createDistributionOpenerExperimentSplits,
   createTemplateReplayScenarios,
   rankOpenerCandidates,
   rankOpenerTemplates,
@@ -30,20 +33,25 @@ const urls: FumenUrls = {
 };
 
 describe("opener experiment runner", () => {
-  test("defaults to a two-bag T-spin-oriented opener search", () => {
+  test("defaults to generated three-bag distribution training scenarios", () => {
+    expect(DEFAULT_OPENER_EXPERIMENT_SCENARIOS).toHaveLength(24);
+    expect(new Set(DEFAULT_OPENER_EXPERIMENT_SCENARIOS.map((scenario) => scenario.queue)).size).toBe(
+      DEFAULT_OPENER_EXPERIMENT_SCENARIOS.length
+    );
+    expect(DEFAULT_OPENER_EXPERIMENT_SCENARIOS.every((scenario) => isThreeBagQueue(scenario.queue))).toBe(true);
     expect(DEFAULT_OPENER_EXPERIMENT_SCENARIOS[0]).toMatchObject({
-      name: "best-two-bag-tspin-openers",
-      queue: "SZILOJTSTOZLJI",
+      name: "train-001",
       hold: true,
-      beamWidth: 512,
-      maxDepth: 14,
+      beamWidth: 256,
+      maxDepth: 21,
       rules: TETRIO_TL_OPENER_SEARCH_RULES,
+      qualityGateRequired: false,
       qualityGate: {
-        minQueueIndex: 14,
+        minQueueIndex: 21,
         minAttack: 9,
         minDifficultAttack: 9,
         minTSpinClears: 2,
-        minTSpinAttack: 9,
+        minTSpinAttack: 7,
         minBackToBackChain: 2,
         maxAllClears: 0,
         maxHoles: 0
@@ -51,31 +59,31 @@ describe("opener experiment runner", () => {
     });
   });
 
-  test("provides a two-bag TL survey preset for comparing several opener seeds", () => {
-    expect(SURVEY_OPENER_EXPERIMENT_SCENARIOS).toHaveLength(7);
+  test("provides seed-generated two-bag survey scenarios without curated queues", () => {
+    expect(SURVEY_OPENER_EXPERIMENT_SCENARIOS).toHaveLength(16);
     expect(SURVEY_OPENER_EXPERIMENT_SCENARIOS.every((scenario) => scenario.rules === TETRIO_TL_OPENER_SEARCH_RULES)).toBe(true);
     expect(new Set(SURVEY_OPENER_EXPERIMENT_SCENARIOS.map((scenario) => scenario.queue)).size).toBe(
       SURVEY_OPENER_EXPERIMENT_SCENARIOS.length
     );
     expect(SURVEY_OPENER_EXPERIMENT_SCENARIOS.every((scenario) => isTwoBagQueue(scenario.queue))).toBe(true);
     expect(SURVEY_OPENER_EXPERIMENT_SCENARIOS.every((scenario) => scenario.beamWidth === 512)).toBe(true);
-    expect(SURVEY_OPENER_EXPERIMENT_SCENARIOS.every((scenario) => scenario.qualityGate?.minAttack === 4)).toBe(true);
-    expect(SURVEY_OPENER_EXPERIMENT_SCENARIOS.every((scenario) => scenario.tags?.includes("survey"))).toBe(true);
+    expect(SURVEY_OPENER_EXPERIMENT_SCENARIOS.every((scenario) => scenario.name.startsWith("train-"))).toBe(true);
+    expect(SURVEY_OPENER_EXPERIMENT_SCENARIOS.every((scenario) => scenario.tags?.includes("distribution"))).toBe(true);
   });
 
-  test("provides deterministic two-bag discovery queues beyond the named survey seeds", () => {
+  test("provides deterministic two-bag discovery queues from the seed distribution", () => {
     const queues = DISCOVERY_OPENER_EXPERIMENT_SCENARIOS.map((scenario) => scenario.queue);
 
     expect(DISCOVERY_OPENER_EXPERIMENT_SCENARIOS).toHaveLength(24);
     expect(new Set(queues).size).toBe(queues.length);
-    expect(DISCOVERY_OPENER_EXPERIMENT_SCENARIOS.every((scenario) => scenario.name.startsWith("discover-"))).toBe(true);
+    expect(DISCOVERY_OPENER_EXPERIMENT_SCENARIOS.every((scenario) => scenario.name.startsWith("train-"))).toBe(true);
     expect(DISCOVERY_OPENER_EXPERIMENT_SCENARIOS.every((scenario) => scenario.queue.length === 14)).toBe(true);
     expect(DISCOVERY_OPENER_EXPERIMENT_SCENARIOS.every((scenario) => scenario.rules === TETRIO_TL_OPENER_SEARCH_RULES)).toBe(true);
   });
 
-  test("provides a three-bag continuation preset for B2B T-spin chain experiments", () => {
-    expect(CONTINUATION_OPENER_EXPERIMENT_SCENARIOS).toHaveLength(27);
-    expect(CONTINUATION_OPENER_EXPERIMENT_SCENARIOS.every((scenario) => scenario.name.startsWith("continuation-"))).toBe(true);
+  test("provides three-bag continuation scenarios from the seed distribution", () => {
+    expect(CONTINUATION_OPENER_EXPERIMENT_SCENARIOS).toHaveLength(24);
+    expect(CONTINUATION_OPENER_EXPERIMENT_SCENARIOS.every((scenario) => scenario.name.startsWith("train-"))).toBe(true);
     expect(new Set(CONTINUATION_OPENER_EXPERIMENT_SCENARIOS.map((scenario) => scenario.queue)).size).toBe(
       CONTINUATION_OPENER_EXPERIMENT_SCENARIOS.length
     );
@@ -85,36 +93,61 @@ describe("opener experiment runner", () => {
     expect(CONTINUATION_OPENER_EXPERIMENT_SCENARIOS.every((scenario) => scenario.qualityGate?.minBackToBackChain === 2)).toBe(true);
     expect(CONTINUATION_OPENER_EXPERIMENT_SCENARIOS.every((scenario) => scenario.qualityGate?.maxAllClears === 0)).toBe(true);
     expect(CONTINUATION_OPENER_EXPERIMENT_SCENARIOS.every((scenario) => scenario.tags?.includes("three-bag"))).toBe(true);
-    expect(
-      CONTINUATION_OPENER_EXPERIMENT_SCENARIOS.filter((scenario) => scenario.name.startsWith("continuation-tl-3spin-")).map(
-        (scenario) => scenario.queue
-      )
-    ).toEqual(["OISLJZTIJTSOZLSJZTIOL", "ZTSLOJIZJTILSOLTIZJSO", "SZLITJOOZTLSIJJOSZTLI", "ISJZLOTZSJITOLZISJTLO"]);
-    expect(
-      Object.fromEntries(
-        CONTINUATION_OPENER_EXPERIMENT_SCENARIOS.filter((scenario) => scenario.setupPoolMultiplier !== undefined).map((scenario) => [
-          scenario.name,
-          scenario.setupPoolMultiplier
-        ])
-      )
-    ).toEqual({
-      "continuation-discover-96": 26,
-      "continuation-tl-3spin-01": 26,
-      "continuation-tl-3spin-02": 18,
-      "continuation-tl-3spin-04": 18
-    });
   });
 
-  test("defaults continuation CLI runs to wide template replay instead of firepower-only output", () => {
+  test("creates disjoint train validation and test splits from one seed", () => {
+    const splits = createDistributionOpenerExperimentSplits({
+      seed: "test-seed",
+      bagCount: 2,
+      trainSamples: 3,
+      validationSamples: 2,
+      testSamples: 2
+    });
+    const queues = [...splits.train, ...splits.validation, ...splits.test].map((scenario) => scenario.queue);
+
+    expect(splits.train.map((scenario) => scenario.name)).toEqual(["train-001", "train-002", "train-003"]);
+    expect(splits.validation.map((scenario) => scenario.name)).toEqual(["validation-001", "validation-002"]);
+    expect(splits.test.map((scenario) => scenario.name)).toEqual(["test-001", "test-002"]);
+    expect(new Set(queues).size).toBe(queues.length);
+    expect(queues.every(isTwoBagQueue)).toBe(true);
+    expect(createDistributionOpenerExperimentSplits({ seed: "test-seed", bagCount: 2, trainSamples: 3 }).train).toEqual(splits.train);
+    expect(createDistributionOpenerExperimentSplits({ seed: "other-seed", bagCount: 2, trainSamples: 3 }).train).not.toEqual(splits.train);
+  });
+
+  test("defaults continuation CLI runs to validation and certification replay", () => {
     const config = createOpenerExperimentCliConfig(["--preset=continuation", "--top=3"]);
 
-    expect(defaultSurvivabilityReplay("continuation")).toBe(16);
-    expect(defaultReplayTemplatePool("continuation", 3)).toBe(512);
+    expect(defaultTrainSamples("continuation")).toBe(4);
+    expect(defaultSurvivabilityReplay("continuation")).toBe(8);
+    expect(defaultCertificationReplay("continuation")).toBe(16);
+    expect(defaultReplayTemplatePool("continuation", 3)).toBe(64);
     expect(config.displayTop).toBe(3);
-    expect(config.survivabilityReplay).toBe(16);
-    expect(config.replayTopTemplates).toBe(512);
-    expect(config.experimentTop).toBe(512);
-    expect(config.scenarios).toHaveLength(CONTINUATION_OPENER_EXPERIMENT_SCENARIOS.length);
+    expect(config.survivabilityReplay).toBe(8);
+    expect(config.certificationReplay).toBe(16);
+    expect(config.replayTopTemplates).toBe(64);
+    expect(config.experimentTop).toBe(64);
+    expect(config.scenarios).toHaveLength(4);
+    expect(config.validationScenarios).toHaveLength(8);
+    expect(config.testScenarios).toHaveLength(16);
+  });
+
+  test("accepts explicit distribution CLI seed and split sizes", () => {
+    const config = createOpenerExperimentCliConfig([
+      "--preset=distribution",
+      "--seed=test-seed",
+      "--bag-count=2",
+      "--train-samples=2",
+      "--validation-samples=1",
+      "--test-samples=1"
+    ]);
+
+    expect(config.seed).toBe("test-seed");
+    expect(config.scenarios).toHaveLength(2);
+    expect(config.validationScenarios).toHaveLength(1);
+    expect(config.testScenarios).toHaveLength(1);
+    expect(
+      [...config.scenarios, ...config.validationScenarios, ...config.testScenarios].every((scenario) => isTwoBagQueue(scenario.queue))
+    ).toBe(true);
   });
 
   test("measures native search scenarios and keeps top candidates linkable", () => {
@@ -715,7 +748,7 @@ describe("opener experiment runner", () => {
     const scenarios = createTemplateReplayScenarios(3);
 
     expect(scenarios).toHaveLength(3);
-    expect(scenarios.map((scenario) => scenario.name)).toEqual(["replay-01", "replay-02", "replay-03"]);
+    expect(scenarios.map((scenario) => scenario.name)).toEqual(["validation-001", "validation-002", "validation-003"]);
     expect(scenarios.every((scenario) => isTwoBagQueue(scenario.queue))).toBe(true);
     expect(scenarios.every((scenario) => scenario.rules === TETRIO_TL_OPENER_SEARCH_RULES)).toBe(true);
     expect(createTemplateReplayScenarios(0)).toEqual([]);
@@ -792,9 +825,9 @@ describe("opener experiment runner", () => {
     });
 
     const summary = renderOpenerExperimentConsoleSummary(report, 1);
-    expect(summary).toContain("Best opener templates (replayed)");
+    expect(summary).toContain("Best opener templates (validated)");
     expect(summary).toContain("replay=1/2 (50.0%) phase=1/2 (50.0%) profile=1/2 (50.0%) quality=0/2 (0.0%) grouped=1/1 (100.0%)");
-    expect(renderOpenerExperimentMarkdown(report)).toContain("## Template replay");
+    expect(renderOpenerExperimentMarkdown(report)).toContain("## Template validation");
     expect(renderOpenerExperimentMarkdown(report)).toContain(
       "1/2 (50.0%) | 1/2 (50.0%) | 1/2 (50.0%) | 0/2 (0.0%) | 1/1 (100.0%) | source"
     );
@@ -884,7 +917,7 @@ describe("opener experiment runner", () => {
 
     expect(report.templateReplay?.templates.map((template) => template.sources[0])).toEqual(["stable", "strong"]);
     expect(report.templateReplay?.templates.map((template) => template.replayHitCount)).toEqual([1, 0]);
-    expect(renderOpenerExperimentConsoleSummary(report, 1)).toContain("#1 sources=strong");
+    expect(renderOpenerExperimentConsoleSummary(report, 1)).toContain("#1 sources=stable");
   });
 
   test("reuses full template indexes from already searched scenarios during replay", () => {

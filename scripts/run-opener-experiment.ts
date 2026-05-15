@@ -2,16 +2,13 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { createOpenerExperimentCliConfig } from "../src/application/opener-experiment-cli";
 import {
-  createTemplateReplayScenarios,
   renderOpenerExperimentConsoleSummary,
   renderOpenerExperimentMarkdown,
-  runOpenerExperiment,
-  type OpenerExperimentScenario
+  runOpenerExperiment
 } from "../src/application/run-opener-experiment";
 
-const { outDir, scenarios, survivabilityReplay, displayTop, replayTopTemplates, experimentTop } = createOpenerExperimentCliConfig(
-  process.argv.slice(2)
-);
+const { outDir, scenarios, validationScenarios, testScenarios, displayTop, replayTopTemplates, experimentTop } =
+  createOpenerExperimentCliConfig(process.argv.slice(2));
 const report = runOpenerExperiment({
   scenarios,
   environment: {
@@ -19,11 +16,19 @@ const report = runOpenerExperiment({
     nativeProfile: "release"
   },
   ...(experimentTop === undefined ? {} : { top: experimentTop }),
-  ...(survivabilityReplay === 0
+  ...(validationScenarios.length === 0
     ? {}
     : {
         templateReplay: {
-          scenarios: createTemplateReplayScenarios(survivabilityReplay, templateReplayOptions(scenarios)),
+          scenarios: validationScenarios,
+          topTemplates: replayTopTemplates
+        }
+      }),
+  ...(testScenarios.length === 0
+    ? {}
+    : {
+        certificationReplay: {
+          scenarios: testScenarios,
           topTemplates: replayTopTemplates
         }
       })
@@ -39,16 +44,3 @@ console.log(renderOpenerExperimentConsoleSummary(report, displayTop));
 console.log("");
 console.log(`full report: ${join(outDir, `${filenameBase}.md`)}`);
 console.log(`json: ${join(outDir, `${filenameBase}.json`)}`);
-
-function templateReplayOptions(scenarios: readonly OpenerExperimentScenario[]) {
-  const first = scenarios[0];
-  if (first === undefined) {
-    return {};
-  }
-  return {
-    bagCount: Math.max(1, Math.round(first.queue.length / 7)),
-    beamWidth: first.beamWidth,
-    maxDepth: first.maxDepth,
-    sampleOffset: scenarios.some((scenario) => scenario.tags?.includes("continuation")) ? Math.max(128, scenarios.length) : 0
-  };
-}

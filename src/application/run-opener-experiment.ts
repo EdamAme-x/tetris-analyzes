@@ -26,6 +26,7 @@ export interface OpenerExperimentScenario {
   readonly setupPoolMultiplier?: number;
   readonly rules?: OpenerExperimentSearchRules;
   readonly qualityGate?: OpenerExperimentQualityGate;
+  readonly qualityGateRequired?: boolean;
   readonly warmups?: number;
   readonly iterations?: number;
   readonly top?: number;
@@ -207,6 +208,7 @@ export interface OpenerExperimentReport {
   readonly environment: OpenerExperimentEnvironment;
   readonly scenarios: readonly OpenerExperimentScenarioResult[];
   readonly templateReplay?: OpenerTemplateReplayReport;
+  readonly certificationReplay?: OpenerTemplateReplayReport;
 }
 
 export interface OpenerExperimentClock {
@@ -244,6 +246,7 @@ export interface RunOpenerExperimentInput {
   readonly fumenCodec?: FumenCodec;
   readonly top?: number;
   readonly templateReplay?: OpenerTemplateReplayInput;
+  readonly certificationReplay?: OpenerTemplateReplayInput;
 }
 
 export interface OpenerTemplateReplayInput {
@@ -255,49 +258,33 @@ export interface TemplateReplayScenarioOptions {
   readonly bagCount?: number;
   readonly beamWidth?: number;
   readonly maxDepth?: number;
-  readonly sampleOffset?: number;
+  readonly seed?: string;
+  readonly split?: OpenerDistributionSplitName;
 }
 
-const TWO_BAG_TL_SURVEY_QUEUES = [
-  ["seed-szilojt", "SZILOJTSTOZLJI"],
-  ["seed-tiljszo", "TILJSZOTILJSZO"],
-  ["seed-tjlziso", "TJLZISOTJLZISO"],
-  ["seed-tsljzio", "TSLJZIOTSLJZIO"],
-  ["seed-jlstzio", "JLSTZIOJLSTZIO"],
-  ["seed-stziljo", "STZILJOSTZILJO"],
-  ["seed-lstzjio", "LSTZJIOOLSTZJI"]
-] as const;
-const DISCOVERY_TWO_BAG_SAMPLE_SIZE = 24;
-const DISCOVERY_BAG = "TIJLOSZ";
-const CONTINUATION_THREE_BAG_QUEUES = [
-  ["discover-01", "TIJLOSZTIZJLSOTJSZIOL"],
-  ["discover-02", "TJSIZOLTSILJOZITSOJLZ"],
-  ["discover-04", "TSZLJOIISLOZTJJSLZOTI"],
-  ["discover-06", "ILJTOZSJZTIOLSOJLISTZ"],
-  ["discover-09", "JITSZLOOJSLZITZSIJOLT"],
-  ["discover-11", "JSLTOIZSLITOZJIOTZLSJ"],
-  ["discover-13", "LISOTJZZLOJTSILITOJZS"],
-  ["discover-14", "LOISZJTTIZSJLOOTIJLSZ"],
-  ["discover-19", "OZJSTILJZTSIOLITSOJZL"],
-  ["discover-21", "SJZTOILLZOTSJIJSLZOIT"],
-  ["discover-23", "ZTIOLJSSTIOLZJOJLISZT"],
-  ["discover-24", "ZIOSTLJSLIZJTOSILTOJZ"],
-  ["discover-27", "TISLZJOTJIOZSLTSJIZOL"],
-  ["discover-28", "TLJSOZITSJOZILIOTZSJL"],
-  ["discover-71", "STZLJIOJZOLISTIZOJLST"],
-  ["discover-75", "ZILJSTOSTOJZLISILTZOJ"],
-  ["discover-77", "ZOLSITJZITSLOJZSILJOT"],
-  ["discover-83", "ILSTOJZJLSTOZIOSZLIJT"],
-  ["discover-86", "JIOSZLTOTJZILSTJZILOS"],
-  ["discover-88", "JSZTLOISTZIOJLIZOJSTL"],
-  ["discover-92", "LZISOJTTJZILOSSILJTOZ"],
-  ["discover-93", "OITJZLSTZIJSOLZTJSOLI"],
-  ["discover-96", "OZSLTJIJLSZITOIOJTSLZ", 26],
-  ["tl-3spin-01", "OISLJZTIJTSOZLSJZTIOL", 26],
-  ["tl-3spin-02", "ZTSLOJIZJTILSOLTIZJSO", 18],
-  ["tl-3spin-03", "SZLITJOOZTLSIJJOSZTLI"],
-  ["tl-3spin-04", "ISJZLOTZSJITOLZISJTLO", 18]
-] as const;
+export type OpenerDistributionSplitName = "train" | "validation" | "test";
+
+export interface OpenerDistributionConfig {
+  readonly seed?: string;
+  readonly bagCount?: number;
+  readonly trainSamples?: number;
+  readonly validationSamples?: number;
+  readonly testSamples?: number;
+  readonly beamWidth?: number;
+  readonly maxDepth?: number;
+  readonly setupPoolMultiplier?: number;
+}
+
+export interface OpenerDistributionSplits {
+  readonly seed: string;
+  readonly bagCount: number;
+  readonly train: readonly OpenerExperimentScenario[];
+  readonly validation: readonly OpenerExperimentScenario[];
+  readonly test: readonly OpenerExperimentScenario[];
+}
+
+const DISTRIBUTION_BAG = "IJLOSTZ";
+const DEFAULT_DISTRIBUTION_SEED = "tl-distribution-v1";
 const DEFAULT_TWO_BAG_QUALITY_GATE = {
   minQueueIndex: 14,
   minAttack: 9,
@@ -307,14 +294,6 @@ const DEFAULT_TWO_BAG_QUALITY_GATE = {
   minBackToBackChain: 2,
   maxAllClears: 0,
   maxHoles: 0
-} as const satisfies OpenerExperimentQualityGate;
-const SURVEY_TWO_BAG_QUALITY_GATE = {
-  minQueueIndex: 14,
-  minAttack: 4,
-  minDifficultAttack: 4,
-  minTSpinClears: 1,
-  minTSpinAttack: 2,
-  minBackToBackChain: 1
 } as const satisfies OpenerExperimentQualityGate;
 const CONTINUATION_QUALITY_GATE = {
   minQueueIndex: 21,
@@ -333,66 +312,73 @@ export const TETRIO_TL_OPENER_SEARCH_RULES = {
   kickTable: "SRS+"
 } as const satisfies OpenerExperimentSearchRules;
 
-export const DEFAULT_OPENER_EXPERIMENT_SCENARIOS: readonly OpenerExperimentScenario[] = [
-  {
-    name: "best-two-bag-tspin-openers",
-    queue: "SZILOJTSTOZLJI",
-    hold: true,
-    beamWidth: 512,
-    maxDepth: 14,
-    rules: TETRIO_TL_OPENER_SEARCH_RULES,
-    qualityGate: DEFAULT_TWO_BAG_QUALITY_GATE,
-    iterations: 1,
-    top: 8,
-    tags: ["best", "hold", "two-bag", "t-spin", "tetrio-tl"]
+export const DEFAULT_OPENER_EXPERIMENT_SCENARIOS: readonly OpenerExperimentScenario[] = createDistributionOpenerExperimentSplits({
+  seed: DEFAULT_DISTRIBUTION_SEED,
+  bagCount: 3,
+  trainSamples: 24,
+  validationSamples: 0,
+  testSamples: 0
+}).train;
+
+export const SURVEY_OPENER_EXPERIMENT_SCENARIOS: readonly OpenerExperimentScenario[] = createDistributionOpenerExperimentSplits({
+  seed: `${DEFAULT_DISTRIBUTION_SEED}:survey`,
+  bagCount: 2,
+  trainSamples: 16,
+  validationSamples: 0,
+  testSamples: 0,
+  beamWidth: 512,
+  maxDepth: 14
+}).train;
+
+export const DISCOVERY_OPENER_EXPERIMENT_SCENARIOS: readonly OpenerExperimentScenario[] = createDistributionOpenerExperimentSplits({
+  seed: `${DEFAULT_DISTRIBUTION_SEED}:discovery`,
+  bagCount: 2,
+  trainSamples: 24,
+  validationSamples: 0,
+  testSamples: 0,
+  beamWidth: 512,
+  maxDepth: 14
+}).train;
+
+export const CONTINUATION_OPENER_EXPERIMENT_SCENARIOS: readonly OpenerExperimentScenario[] = createDistributionOpenerExperimentSplits({
+  seed: `${DEFAULT_DISTRIBUTION_SEED}:continuation`,
+  bagCount: 3,
+  trainSamples: 24,
+  validationSamples: 0,
+  testSamples: 0,
+  beamWidth: 256,
+  maxDepth: 21
+}).train;
+
+export function createDistributionOpenerExperimentSplits(config: OpenerDistributionConfig = {}): OpenerDistributionSplits {
+  const seed = config.seed ?? DEFAULT_DISTRIBUTION_SEED;
+  const bagCount = config.bagCount ?? 3;
+  if (!Number.isInteger(bagCount) || bagCount <= 0) {
+    throw new Error("Distribution bagCount must be a positive integer.");
   }
-];
+  const trainSamples = config.trainSamples ?? 24;
+  const validationSamples = config.validationSamples ?? 64;
+  const testSamples = config.testSamples ?? 128;
+  assertNonNegativeInteger("Distribution trainSamples", trainSamples);
+  assertNonNegativeInteger("Distribution validationSamples", validationSamples);
+  assertNonNegativeInteger("Distribution testSamples", testSamples);
 
-export const SURVEY_OPENER_EXPERIMENT_SCENARIOS: readonly OpenerExperimentScenario[] = TWO_BAG_TL_SURVEY_QUEUES.map(([name, queue]) => ({
-  name,
-  queue,
-  hold: true,
-  beamWidth: 512,
-  maxDepth: 14,
-  rules: TETRIO_TL_OPENER_SEARCH_RULES,
-  qualityGate: SURVEY_TWO_BAG_QUALITY_GATE,
-  warmups: 0,
-  iterations: 1,
-  top: 3,
-  tags: ["survey", "hold", "two-bag", "t-spin", "tetrio-tl"]
-}));
-
-export const CONTINUATION_OPENER_EXPERIMENT_SCENARIOS: readonly OpenerExperimentScenario[] = CONTINUATION_THREE_BAG_QUEUES.map(
-  ([name, queue, setupPoolMultiplier]) => ({
-    name: `continuation-${name}`,
-    queue,
-    hold: true,
-    beamWidth: 256,
-    maxDepth: 21,
-    ...(setupPoolMultiplier === undefined ? {} : { setupPoolMultiplier }),
-    rules: TETRIO_TL_OPENER_SEARCH_RULES,
-    qualityGate: CONTINUATION_QUALITY_GATE,
-    warmups: 0,
-    iterations: 1,
-    top: 2,
-    tags: ["continuation", "hold", "three-bag", "t-spin", "tetrio-tl"]
-  })
-);
-
-export const DISCOVERY_OPENER_EXPERIMENT_SCENARIOS: readonly OpenerExperimentScenario[] = createDiscoveryTwoBagQueues(
-  DISCOVERY_TWO_BAG_SAMPLE_SIZE
-).map((queue, index) => ({
-  name: `discover-${String(index + 1).padStart(2, "0")}`,
-  queue,
-  hold: true,
-  beamWidth: 512,
-  maxDepth: 14,
-  rules: TETRIO_TL_OPENER_SEARCH_RULES,
-  warmups: 0,
-  iterations: 1,
-  top: 1,
-  tags: ["discovery", "hold", "two-bag", "t-spin", "tetrio-tl"]
-}));
+  const seenQueues = new Set<string>();
+  const shared = {
+    seed,
+    bagCount,
+    ...(config.beamWidth === undefined ? {} : { beamWidth: config.beamWidth }),
+    ...(config.maxDepth === undefined ? {} : { maxDepth: config.maxDepth }),
+    ...(config.setupPoolMultiplier === undefined ? {} : { setupPoolMultiplier: config.setupPoolMultiplier })
+  };
+  return {
+    seed,
+    bagCount,
+    train: createDistributionSplitScenarios({ ...shared, split: "train", sampleSize: trainSamples, seenQueues }),
+    validation: createDistributionSplitScenarios({ ...shared, split: "validation", sampleSize: validationSamples, seenQueues }),
+    test: createDistributionSplitScenarios({ ...shared, split: "test", sampleSize: testSamples, seenQueues })
+  };
+}
 
 export function createTemplateReplayScenarios(sampleSize: number, options: TemplateReplayScenarioOptions = {}): OpenerExperimentScenario[] {
   if (!Number.isInteger(sampleSize) || sampleSize < 0) {
@@ -402,21 +388,16 @@ export function createTemplateReplayScenarios(sampleSize: number, options: Templ
   if (!Number.isInteger(bagCount) || bagCount <= 0) {
     throw new Error("Template replay bagCount must be a positive integer.");
   }
-  const maxDepth = options.maxDepth ?? bagCount * DISCOVERY_BAG.length;
+  const maxDepth = options.maxDepth ?? bagCount * DISTRIBUTION_BAG.length;
   const beamWidth = options.beamWidth ?? (bagCount >= 3 ? 256 : 512);
-  const bagTag = bagCountTag(bagCount);
-  return createDiscoveryBagQueues(sampleSize, bagCount, options.sampleOffset ?? 0).map((queue, index) => ({
-    name: `replay-${String(index + 1).padStart(2, "0")}`,
-    queue,
-    hold: true,
+  return createDistributionSplitScenarios({
+    seed: options.seed ?? `${DEFAULT_DISTRIBUTION_SEED}:replay`,
+    split: options.split ?? "validation",
+    sampleSize,
+    bagCount,
     beamWidth,
-    maxDepth,
-    rules: TETRIO_TL_OPENER_SEARCH_RULES,
-    warmups: 0,
-    iterations: 1,
-    top: 1,
-    tags: ["replay", "hold", bagTag, "t-spin", "tetrio-tl"]
-  }));
+    maxDepth
+  });
 }
 
 export function runOpenerExperiment(input: RunOpenerExperimentInput): OpenerExperimentReport {
@@ -441,10 +422,18 @@ export function runOpenerExperiment(input: RunOpenerExperimentInput): OpenerExpe
     input.templateReplay === undefined
       ? undefined
       : replayOpenerTemplateSurvivability(reportWithoutReplay, input.templateReplay, replaySearch);
-
-  return {
+  const reportWithReplay = {
     ...reportWithoutReplay,
     ...(templateReplay === undefined ? {} : { templateReplay })
+  };
+  const certificationReplay =
+    input.certificationReplay === undefined
+      ? undefined
+      : replayOpenerTemplateSurvivability(reportWithReplay, input.certificationReplay, replaySearch);
+
+  return {
+    ...reportWithReplay,
+    ...(certificationReplay === undefined ? {} : { certificationReplay })
   };
 }
 
@@ -519,39 +508,8 @@ export function renderOpenerExperimentMarkdown(report: OpenerExperimentReport): 
     );
   }
 
-  if (report.templateReplay !== undefined) {
-    lines.push(
-      "",
-      "## Template replay",
-      "",
-      "| rank | replay hits | phase hits | profile hits | quality hits | grouped survival | sources | attack | difficult attack | spin | spin attack | tspin | tspin attack | b2b | all clears | best replay rank | clears | preview |",
-      "| ---: | ---: | ---: | ---: | ---: | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- |"
-    );
-    for (const template of report.templateReplay.templates.slice(0, 12)) {
-      lines.push(
-        [
-          String(template.rank),
-          formatReplaySurvival(template),
-          formatPhaseReplaySurvival(template),
-          formatPhaseProfileReplaySurvival(template),
-          formatQualityReplaySurvival(template),
-          formatGroupedReplaySurvival(template),
-          template.sources.join(" "),
-          String(template.best.attack),
-          String(template.best.difficultAttack),
-          String(template.best.spinClears),
-          String(template.best.spinAttack),
-          String(template.best.tSpinClears),
-          String(template.best.tSpinAttack),
-          String(template.best.backToBackChain),
-          String(template.best.allClears),
-          String(template.hits[0]?.rank ?? "-"),
-          formatClearSequence(template.best.clearSequence),
-          `[view](${template.best.previewUrl})`
-        ].join(" | ")
-      );
-    }
-  }
+  appendTemplateReplayMarkdown(lines, "Template validation", report.templateReplay);
+  appendTemplateReplayMarkdown(lines, "Template test replay", report.certificationReplay);
 
   lines.push(
     "",
@@ -626,10 +584,48 @@ export function renderOpenerExperimentMarkdown(report: OpenerExperimentReport): 
   return lines.join("\n");
 }
 
+function appendTemplateReplayMarkdown(lines: string[], heading: string, replay: OpenerTemplateReplayReport | undefined): void {
+  if (replay === undefined) {
+    return;
+  }
+  lines.push(
+    "",
+    `## ${heading}`,
+    "",
+    "| rank | replay hits | phase hits | profile hits | quality hits | grouped survival | sources | attack | difficult attack | spin | spin attack | tspin | tspin attack | b2b | all clears | best replay rank | clears | preview |",
+    "| ---: | ---: | ---: | ---: | ---: | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- |"
+  );
+  for (const template of replay.templates.slice(0, 12)) {
+    lines.push(
+      [
+        String(template.rank),
+        formatReplaySurvival(template),
+        formatPhaseReplaySurvival(template),
+        formatPhaseProfileReplaySurvival(template),
+        formatQualityReplaySurvival(template),
+        formatGroupedReplaySurvival(template),
+        template.sources.join(" "),
+        String(template.best.attack),
+        String(template.best.difficultAttack),
+        String(template.best.spinClears),
+        String(template.best.spinAttack),
+        String(template.best.tSpinClears),
+        String(template.best.tSpinAttack),
+        String(template.best.backToBackChain),
+        String(template.best.allClears),
+        String(template.hits[0]?.rank ?? "-"),
+        formatClearSequence(template.best.clearSequence),
+        `[view](${template.best.previewUrl})`
+      ].join(" | ")
+    );
+  }
+}
+
 export function renderOpenerExperimentConsoleSummary(report: OpenerExperimentReport, topCount = 5): string {
-  if (report.templateReplay !== undefined) {
-    const lines = ["Best opener templates (replayed)", ""];
-    for (const [index, template] of rankReplayTemplatesForConsole(report.templateReplay.templates).slice(0, topCount).entries()) {
+  const replay = report.certificationReplay ?? report.templateReplay;
+  if (replay !== undefined) {
+    const lines = [report.certificationReplay === undefined ? "Best opener templates (validated)" : "Best opener templates (tested)", ""];
+    for (const [index, template] of rankReplayTemplatesForConsole(replay.templates).slice(0, topCount).entries()) {
       const candidate = template.best;
       lines.push(
         `#${index + 1} sources=${template.sources.join(",")} replay=${formatReplaySurvival(template)} phase=${formatPhaseReplaySurvival(template)} profile=${formatPhaseProfileReplaySurvival(template)} quality=${formatQualityReplaySurvival(template)} grouped=${formatGroupedReplaySurvival(template)} queueIndex=${candidate.queueIndex} hold=${candidate.hold ?? "-"} attack=${candidate.attack} difficultAttack=${candidate.difficultAttack} otherAttack=${candidate.nonDifficultAttack} spin=${candidate.spinClears} spinAttack=${candidate.spinAttack} tspin=${candidate.tSpinClears} tspinAttack=${candidate.tSpinAttack} b2b=${candidate.backToBackChain} allClears=${candidate.allClears} tspinPotential=${candidate.tSpinPotential} points=${candidate.points} score=${candidate.score.toFixed(1)} holes=${candidate.holes} bump=${candidate.bumpiness}`,
@@ -657,7 +653,7 @@ export function renderOpenerExperimentConsoleSummary(report: OpenerExperimentRep
 }
 
 function rankReplayTemplatesForConsole(templates: readonly OpenerTemplateReplayEntry[]): OpenerTemplateReplayEntry[] {
-  return [...templates].sort(compareReplayTemplatesForConsole);
+  return [...templates].sort(compareReplayTemplates);
 }
 
 export function rankOpenerCandidates(report: OpenerExperimentReport, topCount: number): RankedOpenerCandidate[] {
@@ -926,7 +922,9 @@ function runScenario(
   const rules = scenarioRules(scenario);
   const detailedNodes = detailSearch === undefined ? lastNodes : detailSearch(searchInput(scenario));
   const topCandidates = createTopCandidates(detailedNodes, scenario, topOverride ?? scenario.top ?? 5, fumenCodec);
-  assertScenarioQualityGate(scenario, topCandidates[0]);
+  if (scenario.qualityGateRequired !== false) {
+    assertScenarioQualityGate(scenario, topCandidates[0]);
+  }
   return {
     name: scenario.name,
     queue: scenario.queue,
@@ -1226,18 +1224,6 @@ function compareReplayTemplates(left: OpenerTemplateReplayEntry, right: OpenerTe
     right.phaseProfileReplayHitCount - left.phaseProfileReplayHitCount ||
     templateReplayQualityFirepower(right) - templateReplayQualityFirepower(left) ||
     compareRankedOpenerCandidates(left.best, right.best) ||
-    right.qualityReplayHitCount - left.qualityReplayHitCount ||
-    right.groupedSurvivalCount - left.groupedSurvivalCount ||
-    left.key.localeCompare(right.key)
-  );
-}
-
-function compareReplayTemplatesForConsole(left: OpenerTemplateReplayEntry, right: OpenerTemplateReplayEntry): number {
-  return (
-    compareRankedOpenerCandidates(left.best, right.best) ||
-    right.replayHitCount - left.replayHitCount ||
-    right.phaseReplayHitCount - left.phaseReplayHitCount ||
-    right.phaseProfileReplayHitCount - left.phaseProfileReplayHitCount ||
     right.qualityReplayHitCount - left.qualityReplayHitCount ||
     right.groupedSurvivalCount - left.groupedSurvivalCount ||
     left.key.localeCompare(right.key)
@@ -1662,29 +1648,6 @@ function rulesEqual(left: OpenerExperimentSearchRules, right: OpenerExperimentSe
   return left.spinMode === right.spinMode && left.comboTable === right.comboTable && left.kickTable === right.kickTable;
 }
 
-function createDiscoveryTwoBagQueues(sampleSize: number): string[] {
-  return createDiscoveryBagQueues(sampleSize, 2, 0);
-}
-
-function createDiscoveryBagQueues(sampleSize: number, bagCount: number, sampleOffset: number): string[] {
-  const permutationCount = factorial(DISCOVERY_BAG.length);
-  const queues = new Set<string>();
-  for (let sample = 0; queues.size < sampleSize && sample < permutationCount * 2; sample += 1) {
-    let queue = "";
-    for (let bagIndex = 0; bagIndex < bagCount; bagIndex += 1) {
-      queue += nthPermutation(DISCOVERY_BAG, permutationIndex(sample + sampleOffset, bagIndex, permutationCount));
-    }
-    queues.add(queue);
-  }
-  return [...queues];
-}
-
-function permutationIndex(sample: number, bagIndex: number, permutationCount: number): number {
-  const multiplier = [197, 389, 593, 787, 991][bagIndex] ?? 197 + bagIndex * 211;
-  const offset = [0, 97, 211, 353, 557][bagIndex] ?? bagIndex * 131;
-  return (sample * multiplier + offset) % permutationCount;
-}
-
 function bagCountTag(bagCount: number): string {
   if (bagCount === 1) {
     return "one-bag";
@@ -1696,6 +1659,81 @@ function bagCountTag(bagCount: number): string {
     return "three-bag";
   }
   return `${bagCount}-bag`;
+}
+
+function createDistributionSplitScenarios(input: {
+  readonly seed: string;
+  readonly split: OpenerDistributionSplitName;
+  readonly sampleSize: number;
+  readonly bagCount: number;
+  readonly beamWidth?: number;
+  readonly maxDepth?: number;
+  readonly setupPoolMultiplier?: number;
+  readonly seenQueues?: Set<string>;
+}): OpenerExperimentScenario[] {
+  assertNonNegativeInteger(`Distribution ${input.split} sampleSize`, input.sampleSize);
+  const maxQueueCount = Math.pow(factorial(DISTRIBUTION_BAG.length), input.bagCount);
+  const seenQueues = input.seenQueues ?? new Set<string>();
+  if (input.sampleSize > maxQueueCount - seenQueues.size) {
+    throw new Error(`Distribution ${input.split} sampleSize exceeds the remaining ${input.bagCount}-bag queue space.`);
+  }
+
+  const queues: string[] = [];
+  let drawIndex = 0;
+  while (queues.length < input.sampleSize) {
+    const queue = seededBagQueue(input.seed, input.split, drawIndex, input.bagCount);
+    drawIndex += 1;
+    if (seenQueues.has(queue)) {
+      continue;
+    }
+    seenQueues.add(queue);
+    queues.push(queue);
+  }
+
+  const beamWidth = input.beamWidth ?? (input.bagCount >= 3 ? 256 : 512);
+  const maxDepth = input.maxDepth ?? input.bagCount * DISTRIBUTION_BAG.length;
+  const qualityGate = input.bagCount >= 3 ? CONTINUATION_QUALITY_GATE : DEFAULT_TWO_BAG_QUALITY_GATE;
+  const bagTag = bagCountTag(input.bagCount);
+  return queues.map((queue, index) => ({
+    name: `${input.split}-${String(index + 1).padStart(3, "0")}`,
+    queue,
+    hold: true,
+    beamWidth,
+    maxDepth,
+    ...(input.setupPoolMultiplier === undefined ? {} : { setupPoolMultiplier: input.setupPoolMultiplier }),
+    rules: TETRIO_TL_OPENER_SEARCH_RULES,
+    qualityGate,
+    qualityGateRequired: false,
+    warmups: 0,
+    iterations: 1,
+    top: input.split === "train" ? 8 : 1,
+    tags: ["distribution", input.split, "hold", bagTag, "t-spin", "tetrio-tl"]
+  }));
+}
+
+function seededBagQueue(seed: string, split: OpenerDistributionSplitName, drawIndex: number, bagCount: number): string {
+  const permutationCount = factorial(DISTRIBUTION_BAG.length);
+  let queue = "";
+  for (let bagIndex = 0; bagIndex < bagCount; bagIndex += 1) {
+    const permutationIndex = hashStringToUint32(`${seed}|${split}|${drawIndex}|${bagIndex}`) % permutationCount;
+    queue += nthPermutation(DISTRIBUTION_BAG, permutationIndex);
+  }
+  return queue;
+}
+
+function assertNonNegativeInteger(name: string, value: number): void {
+  if (!Number.isInteger(value) || value < 0) {
+    throw new Error(`${name} must be a non-negative integer.`);
+  }
+}
+
+function hashStringToUint32(input: string): number {
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < input.length; index += 1) {
+    hash ^= input.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return hash >>> 0;
 }
 
 function nthPermutation(input: string, index: number): string {

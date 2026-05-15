@@ -10,10 +10,9 @@ bun test
 bun run bench:release
 bun run bench:openers
 bun run experiment:opener
-bun run experiment:opener -- --preset=survey --top=5
-bun run experiment:opener -- --preset=discovery --top=5
+bun run experiment:opener -- --preset=distribution --top=3
+bun run experiment:opener -- --preset=distribution --seed=my-run --train-samples=24 --validation-samples=64 --test-samples=128 --top=3
 bun run experiment:opener -- --preset=continuation --top=3
-bun run experiment:opener -- --preset=continuation --top=1 --setup-pool-multiplier=26
 ```
 
 `experiment:opener` writes JSON/Markdown reports with fumen preview URLs under `experiments/runs/`.
@@ -38,12 +37,14 @@ Executable examples live in `tests/`.
 - [x] Native T-spin setup pruning filters unreachable continuation slots before beam ranking
 - [x] Opener reports show B2B chain, difficult attack, and fumen preview URLs
 - [x] Opener reports label non-T all-spin clears as I/J/L/O/S/Z spin clears instead of T-spins
-- [x] Broaden deterministic two-bag queue discovery beyond the current survey seeds
-- [x] Keep survey/discovery queues to valid two-bag inputs
+- [x] Generate deterministic seed-split 7-bag training queues instead of curated opener seeds
+- [x] Keep generated distribution queues to valid two-bag and three-bag inputs
 - [x] Native bag ranking exposes and prefers TL B2B/T-spin continuation metrics over perfect-clear bias
 - [x] Native pruning rewards B2B-preserving quad wells when a future I piece exists
 - [x] Add opener-template survivability grouping across experiment queue permutations
 - [x] Expand survivability from top-candidate grouping to full template replay across wider queues
+- [x] Add seed-based train/validation/test opener distribution splits
+- [x] Certify reported opener templates on a held-out generated test split
 - [x] Add a three-bag continuation preset for B2B T-spin chain experiments
 - [x] Add a bench regression gate for three-bag B2B T-spin continuation quality
 - [x] Reduce two-bag experiment beam width while preserving top B2B T-spin firepower
@@ -100,27 +101,27 @@ Executable examples live in `tests/`.
 - [x] Report normalized phase-profile replay hits separately from exact phase hits
 - [x] Add an opt-in native setup-pool multiplier for slower high-quality TL search passes
 - [x] Report replay firepower quality hits separately from exact template reconstruction
-- [x] Curate continuation source queues to TL-gated three-bag B2B/T-spin lines
+- [x] Retire curated continuation source queues from production presets
 - [x] Rank replay reports by reproducible B2B/T-spin firepower instead of brittle peak firepower
 - [x] Use compact native replay search to skip path and placement conversion during survivability checks
 - [x] Measure opener experiments with placement-light native search and fetch detailed fumen candidates once
 - [x] Include active combo state in TL template identity, phase replay, and replay-quality checks
 - [x] Rebuild replay phase prefix rows in place instead of allocating filtered row arrays
-- [x] Promote additional measured TL-gated three-bag queues into continuation discovery
+- [x] Replace promoted continuation queues with seed-generated distribution samples
 - [x] Replay continuation phase survivability against the native fourteen-piece frontier
 - [x] Preserve native continuation phase diversity by hold and B2B state
 - [x] Compute continuation phase frontiers lazily during replay instead of every source search
-- [x] Promote measured high-firepower 3T-spin/3B2B continuation queues into discovery
+- [x] Keep high-firepower continuation lines as regression fixtures instead of discovery inputs
 - [x] Prefer holeless candidates when B2B/T-spin firepower is equivalent in reports
 - [x] Exclude quality-gate failures from opener template replay pools
 - [x] Use placement-light native searches for template replay checks
 - [x] Reserve equivalent-firepower holeless candidates during native beam pruning
 - [x] Include continuation potential in replay quality matching
-- [x] Promote measured holeless 3T-spin/3B2B/12-attack continuation queues into the TL preset
+- [x] Remove measured holeless continuation queues from the TL production preset
 - [x] Skip native path-history cloning for compact replay and bag evaluation searches
-- [x] Use measured wider setup pools on TL continuation queues that unlock 14-attack holeless lines
+- [x] Keep setup-pool tuning as a CLI option instead of per-queue overrides
 - [x] Add a bench regression gate for holeless no-PC 14-attack triple T-spin continuation lines
-- [x] Promote another sampled holeless 14-attack triple T-spin continuation queue
+- [x] Stop promoting sampled continuation queues into production presets
 - [x] Demote all-clear-bonus inflated continuation queues from TL opener ranking
 - [x] Show peak TL firepower first in replayed console summaries while retaining replay metrics
 - [x] Penalize ALL CLEAR candidates in native opener scoring while preserving TETR.IO attack accounting
