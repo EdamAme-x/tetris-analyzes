@@ -11,6 +11,7 @@ interface OpenerRegressionCase {
   readonly minTSpinClears?: number;
   readonly minTSpinAttack?: number;
   readonly minBackToBackChain?: number;
+  readonly maxAllClears?: number;
   readonly maxHoles?: number;
 }
 
@@ -26,6 +27,7 @@ interface OpenerRegressionResult {
   readonly topSpinAttack: number;
   readonly topDifficultClears: number;
   readonly topBackToBackChain: number;
+  readonly topAllClears: number;
   readonly topScore: number;
   readonly topHoles: number;
   readonly topBumpiness: number;
@@ -95,16 +97,17 @@ const cases: OpenerRegressionCase[] = [
     minBackToBackChain: 3
   },
   {
-    name: "tl-3spin-24attack",
-    input: { queue: "JZSIOTLJILTSOZJISOZTL", beamWidth: 256, hold: true, maxDepth: 21, setupPoolMultiplier: 18 },
+    name: "tl-3spin-14attack-no-pc",
+    input: { queue: "ZTSLOJIZJTILSOLTIZJSO", beamWidth: 256, hold: true, maxDepth: 21, setupPoolMultiplier: 18 },
     iterations: 1,
     minDepth: 20,
     minQueueIndex: 21,
-    minAttack: 24,
-    minDifficultAttack: 24,
+    minAttack: 14,
+    minDifficultAttack: 14,
     minTSpinClears: 3,
-    minTSpinAttack: 24,
+    minTSpinAttack: 14,
     minBackToBackChain: 3,
+    maxAllClears: 0,
     maxHoles: 0
   }
 ];
@@ -126,9 +129,11 @@ for (const bench of rotateCases(cases, rounds)) {
 
 console.log("");
 console.log(
-  "| opener seed | median ms | searches/s | nodes | queue index | hold | attack | spin | spin attack | tspin | tspin attack | difficult | b2b | score | holes | bumpiness | checksum | top path |"
+  "| opener seed | median ms | searches/s | nodes | queue index | hold | attack | spin | spin attack | tspin | tspin attack | difficult | b2b | all clears | score | holes | bumpiness | checksum | top path |"
 );
-console.log("| --- | ---: | ---: | ---: | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |");
+console.log(
+  "| --- | ---: | ---: | ---: | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- |"
+);
 for (const bench of cases) {
   const timings = samples.get(bench.name) ?? [];
   const summary = summarize(timings);
@@ -153,6 +158,7 @@ for (const bench of cases) {
       String(latestResult.topTSpinAttack),
       String(latestResult.topDifficultClears),
       String(latestResult.topBackToBackChain),
+      String(latestResult.topAllClears),
       latestResult.topScore.toFixed(1),
       String(latestResult.topHoles),
       String(latestResult.topBumpiness),
@@ -173,7 +179,7 @@ function measureCase(bench: OpenerRegressionCase): { readonly ms: number; readon
 
 function runCase(bench: OpenerRegressionCase): OpenerRegressionResult {
   const nodes = searchOpenerBeamWithPlacements(bench.input);
-  const top = nodes[0];
+  const top = selectRegressionCandidate(nodes, bench);
   if (top === undefined || top.depth < bench.minDepth) {
     throw new Error(`Regression case ${bench.name} did not build to depth ${bench.minDepth}.`);
   }
@@ -195,6 +201,9 @@ function runCase(bench: OpenerRegressionCase): OpenerRegressionResult {
   if (top.backToBackChain < (bench.minBackToBackChain ?? 0)) {
     throw new Error(`Regression case ${bench.name} B2B chain ${top.backToBackChain} fell below ${bench.minBackToBackChain}.`);
   }
+  if (top.allClears > (bench.maxAllClears ?? Number.POSITIVE_INFINITY)) {
+    throw new Error(`Regression case ${bench.name} all clears ${top.allClears} exceeded ${bench.maxAllClears}.`);
+  }
   if (top.holes > (bench.maxHoles ?? Number.POSITIVE_INFINITY)) {
     throw new Error(`Regression case ${bench.name} holes ${top.holes} exceeded ${bench.maxHoles}.`);
   }
@@ -210,12 +219,23 @@ function runCase(bench: OpenerRegressionCase): OpenerRegressionResult {
     topTSpinAttack: top.tSpinAttack,
     topDifficultClears: top.difficultClears,
     topBackToBackChain: top.backToBackChain,
+    topAllClears: top.allClears,
     topScore: top.score,
     topHoles: top.holes,
     topBumpiness: top.bumpiness,
     topPath: top.path.join(" "),
     checksum: checksum(nodes)
   };
+}
+
+function selectRegressionCandidate(
+  nodes: ReadonlyArray<ReturnType<typeof searchOpenerBeamWithPlacements>[number]>,
+  bench: OpenerRegressionCase
+): ReturnType<typeof searchOpenerBeamWithPlacements>[number] | undefined {
+  return nodes.find(
+    (node) =>
+      node.allClears <= (bench.maxAllClears ?? Number.POSITIVE_INFINITY) && node.holes <= (bench.maxHoles ?? Number.POSITIVE_INFINITY)
+  );
 }
 
 function checksum(

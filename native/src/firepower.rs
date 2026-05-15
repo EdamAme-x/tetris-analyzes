@@ -9,6 +9,8 @@ use crate::spin::{detect_spin, SpinDetection, SpinKind};
 use crate::tetrio_tables::KickTable;
 use crate::tetrio_tables::{self, ClearKind, ComboTable};
 
+const ALL_CLEAR_OPENER_SCORE_PENALTY: f64 = 120_000.0;
+
 const MAX_T_SPIN_POTENTIAL: u32 = 4;
 
 #[derive(Clone, Copy)]
@@ -96,7 +98,7 @@ pub(crate) fn firepower_score(firepower: FirepowerState) -> f64 {
         + firepower.points as f64 * 0.05
         + firepower.max_combo as f64 * 20.0
         + b2b_chain_score(firepower.back_to_back_chain)
-        + firepower.all_clears as f64 * 500.0
+        - firepower.all_clears as f64 * ALL_CLEAR_OPENER_SCORE_PENALTY
 }
 
 pub(crate) fn quad_well_continuation_score(quad_well_potential: u32, back_to_back_chain: u32) -> f64 {
@@ -482,6 +484,35 @@ mod tests {
         assert_eq!(quad_event.attack, 4);
         assert_eq!(quad_state.difficult_attack, 4);
         assert!(firepower_score(quad_state) > firepower_score(double_state) * 4.0);
+    }
+
+    #[test]
+    fn all_clear_attack_is_tracked_but_penalized_for_opener_scoring() {
+        let (normal_state, normal_event) = advance_firepower_for_clear_with_combo_table(
+            FirepowerState::empty(),
+            ClearKind::TSpinDouble,
+            2,
+            false,
+            Some(Piece::T),
+            ComboTable::Multiplier,
+            false,
+            false,
+        );
+        let (all_clear_state, all_clear_event) = advance_firepower_for_clear_with_combo_table(
+            FirepowerState::empty(),
+            ClearKind::TSpinDouble,
+            2,
+            true,
+            Some(Piece::T),
+            ComboTable::Multiplier,
+            false,
+            false,
+        );
+
+        assert_eq!(normal_event.attack, 4);
+        assert_eq!(all_clear_event.attack, 14);
+        assert_eq!(all_clear_state.all_clears, 1);
+        assert!(firepower_score(all_clear_state) < firepower_score(normal_state));
     }
 
     #[test]

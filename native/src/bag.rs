@@ -314,6 +314,7 @@ fn opener_weighted_score(state: &SearchState, buildable: bool) -> f64 {
         + f64::from(state.firepower.back_to_back_chain) * 1_000.0
         + f64::from(state.t_spin_potential) * 800.0
         + state.depth as f64 * 250.0
+        - f64::from(state.firepower.all_clears) * 120_000.0
         - f64::from(state.metrics[3]) * 120.0
         - f64::from(state.metrics[4]) * 20.0
 }
@@ -344,6 +345,7 @@ fn dominates(left: &OpenerQueueEvaluation, right: &OpenerQueueEvaluation) -> boo
         && left.t_spin_potential >= right.t_spin_potential
         && left.attack >= right.attack
         && left.top_score >= right.top_score
+        && left.all_clears <= right.all_clears
         && left.holes <= right.holes
         && left.bumpiness <= right.bumpiness;
     let strictly_better = u8::from(left.buildable) > u8::from(right.buildable)
@@ -358,6 +360,7 @@ fn dominates(left: &OpenerQueueEvaluation, right: &OpenerQueueEvaluation) -> boo
         || left.t_spin_potential > right.t_spin_potential
         || left.attack > right.attack
         || left.top_score > right.top_score
+        || left.all_clears < right.all_clears
         || left.holes < right.holes
         || left.bumpiness < right.bumpiness;
     no_worse && strictly_better
@@ -371,6 +374,7 @@ fn compare_queue_evaluation(
         .pareto_front
         .cmp(&left.pareto_front)
         .then_with(|| left.dominated_by.cmp(&right.dominated_by))
+        .then_with(|| left.all_clears.cmp(&right.all_clears))
         .then_with(|| right.weighted_score.total_cmp(&left.weighted_score))
         .then_with(|| right.spin_clears.cmp(&left.spin_clears))
         .then_with(|| right.spin_attack.cmp(&left.spin_attack))

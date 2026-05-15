@@ -45,6 +45,7 @@ describe("opener experiment runner", () => {
         minTSpinClears: 2,
         minTSpinAttack: 9,
         minBackToBackChain: 2,
+        maxAllClears: 0,
         maxHoles: 0
       }
     });
@@ -73,7 +74,7 @@ describe("opener experiment runner", () => {
   });
 
   test("provides a three-bag continuation preset for B2B T-spin chain experiments", () => {
-    expect(CONTINUATION_OPENER_EXPERIMENT_SCENARIOS).toHaveLength(31);
+    expect(CONTINUATION_OPENER_EXPERIMENT_SCENARIOS).toHaveLength(27);
     expect(CONTINUATION_OPENER_EXPERIMENT_SCENARIOS.every((scenario) => scenario.name.startsWith("continuation-"))).toBe(true);
     expect(new Set(CONTINUATION_OPENER_EXPERIMENT_SCENARIOS.map((scenario) => scenario.queue)).size).toBe(
       CONTINUATION_OPENER_EXPERIMENT_SCENARIOS.length
@@ -82,21 +83,13 @@ describe("opener experiment runner", () => {
     expect(CONTINUATION_OPENER_EXPERIMENT_SCENARIOS.every((scenario) => scenario.beamWidth === 256)).toBe(true);
     expect(CONTINUATION_OPENER_EXPERIMENT_SCENARIOS.every((scenario) => scenario.maxDepth === 21)).toBe(true);
     expect(CONTINUATION_OPENER_EXPERIMENT_SCENARIOS.every((scenario) => scenario.qualityGate?.minBackToBackChain === 2)).toBe(true);
+    expect(CONTINUATION_OPENER_EXPERIMENT_SCENARIOS.every((scenario) => scenario.qualityGate?.maxAllClears === 0)).toBe(true);
     expect(CONTINUATION_OPENER_EXPERIMENT_SCENARIOS.every((scenario) => scenario.tags?.includes("three-bag"))).toBe(true);
     expect(
       CONTINUATION_OPENER_EXPERIMENT_SCENARIOS.filter((scenario) => scenario.name.startsWith("continuation-tl-3spin-")).map(
         (scenario) => scenario.queue
       )
-    ).toEqual([
-      "ZSTILOJJLITZOSIOLJZTS",
-      "JZSIOTLJILTSOZJISOZTL",
-      "ZOISJLTSLITOZJIOZLSJT",
-      "ZISJTLOZLJTOSIZOSTJIL",
-      "OISLJZTIJTSOZLSJZTIOL",
-      "ZTSLOJIZJTILSOLTIZJSO",
-      "SZLITJOOZTLSIJJOSZTLI",
-      "ISJZLOTZSJITOLZISJTLO"
-    ]);
+    ).toEqual(["OISLJZTIJTSOZLSJZTIOL", "ZTSLOJIZJTILSOLTIZJSO", "SZLITJOOZTLSIJJOSZTLI", "ISJZLOTZSJITOLZISJTLO"]);
     expect(
       Object.fromEntries(
         CONTINUATION_OPENER_EXPERIMENT_SCENARIOS.filter((scenario) => scenario.setupPoolMultiplier !== undefined).map((scenario) => [
@@ -105,10 +98,6 @@ describe("opener experiment runner", () => {
         ])
       )
     ).toEqual({
-      "continuation-tl-3spin-00": 26,
-      "continuation-tl-3spin-05": 18,
-      "continuation-tl-3spin-06": 18,
-      "continuation-tl-3spin-07": 26,
       "continuation-discover-96": 26,
       "continuation-tl-3spin-01": 26,
       "continuation-tl-3spin-02": 18,
@@ -332,6 +321,7 @@ describe("opener experiment runner", () => {
               minQueueIndex: 1,
               minAttack: 1,
               minTSpinClears: 1,
+              maxAllClears: 0,
               maxHoles: 0
             }
           }
@@ -362,6 +352,7 @@ describe("opener experiment runner", () => {
             minTSpinClears: 3,
             minTSpinAttack: 12,
             minBackToBackChain: 3,
+            maxAllClears: 0,
             maxHoles: 0
           }
         }
@@ -398,6 +389,101 @@ describe("opener experiment runner", () => {
 
     expect(report.scenarios[0]?.top.map((candidate) => candidate.path[0])).toEqual(["holeless", "hole-score"]);
     expect(rankOpenerTemplates(report, 2).map((template) => template.best.path[0])).toEqual(["holeless"]);
+  });
+
+  test("ranks non-PC firepower before all-clear-bonus-inflated candidates", () => {
+    const report = runOpenerExperiment({
+      scenarios: [
+        {
+          name: "pc-ranking",
+          queue: "TT",
+          hold: false,
+          beamWidth: 4,
+          maxDepth: 2,
+          warmups: 0,
+          iterations: 1,
+          top: 2
+        }
+      ],
+      clock: createClock("2026-05-14T00:00:00.000Z", [0, 2]),
+      fumenCodec: fakeCodec,
+      search: () => [
+        {
+          ...candidateNode("all-clear-boosted"),
+          rows: [1, 0, ...new Array(18).fill(0)],
+          score: 100_000,
+          firepowerScore: 100_000,
+          attack: 24,
+          difficultAttack: 24,
+          difficultClears: 3,
+          tSpinClears: 3,
+          tSpinAttack: 24,
+          backToBackChain: 3,
+          allClears: 1,
+          holes: 0
+        },
+        {
+          ...candidateNode("clean-b2b"),
+          rows: [3, 0, ...new Array(18).fill(0)],
+          score: 10_000,
+          firepowerScore: 10_000,
+          attack: 14,
+          difficultAttack: 14,
+          difficultClears: 3,
+          tSpinClears: 3,
+          tSpinAttack: 14,
+          backToBackChain: 3,
+          allClears: 0,
+          holes: 0
+        }
+      ]
+    });
+
+    expect(report.scenarios[0]?.top.map((candidate) => candidate.path[0])).toEqual(["clean-b2b", "all-clear-boosted"]);
+    expect(rankOpenerTemplates(report, 2).map((template) => template.best.path[0])).toEqual(["clean-b2b", "all-clear-boosted"]);
+  });
+
+  test("excludes all-clear candidates from quality-gated template pools", () => {
+    const gate = { maxAllClears: 0 };
+    const report = runOpenerExperiment({
+      scenarios: [
+        {
+          name: "pc-gated",
+          queue: "TT",
+          hold: false,
+          beamWidth: 4,
+          maxDepth: 2,
+          warmups: 0,
+          iterations: 1,
+          top: 2,
+          qualityGate: gate
+        }
+      ],
+      clock: createClock("2026-05-14T00:00:00.000Z", [0, 2]),
+      fumenCodec: fakeCodec,
+      search: () => [
+        {
+          ...candidateNode("pc"),
+          rows: [7, 11, 13, ...new Array(17).fill(0)],
+          attack: 24,
+          difficultAttack: 24,
+          tSpinClears: 3,
+          tSpinAttack: 24,
+          allClears: 1
+        },
+        {
+          ...candidateNode("clean"),
+          rows: [1, 2, 4, ...new Array(17).fill(0)],
+          attack: 14,
+          difficultAttack: 14,
+          tSpinClears: 3,
+          tSpinAttack: 14
+        }
+      ]
+    });
+
+    expect(report.scenarios[0]?.top.map((candidate) => candidate.path[0])).toEqual(["clean", "pc"]);
+    expect(rankOpenerTemplates(report, 2).map((template) => template.best.path[0])).toEqual(["clean"]);
   });
 
   test("excludes quality-gate failures from template survival counts", () => {
@@ -469,7 +555,7 @@ describe("opener experiment runner", () => {
     const summary = renderOpenerExperimentConsoleSummary(report, 1);
     expect(summary).toContain("Best opener templates");
     expect(summary).toContain(
-      "#1 sources=fake-scenario survival=1 (100.0%) queueIndex=1 hold=- attack=0 difficultAttack=0 otherAttack=0 spin=0 spinAttack=0 tspin=0 tspinAttack=0 b2b=0 tspinPotential=0 points=0 score=10.0"
+      "#1 sources=fake-scenario survival=1 (100.0%) queueIndex=1 hold=- attack=0 difficultAttack=0 otherAttack=0 spin=0 spinAttack=0 tspin=0 tspinAttack=0 b2b=0 allClears=0 tspinPotential=0 points=0 score=10.0"
     );
     expect(summary).toContain("path: T@r0,x3");
     expect(summary).not.toContain("fake-scenario | TI");

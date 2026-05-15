@@ -1379,6 +1379,10 @@ fn place_grounded_at_y(
 }
 
 fn compare_search_state(left: &SearchState, right: &SearchState) -> std::cmp::Ordering {
+    let ordering = left.firepower.all_clears.cmp(&right.firepower.all_clears);
+    if ordering != std::cmp::Ordering::Equal {
+        return ordering;
+    }
     let ordering = right
         .firepower
         .spin_clears
@@ -1460,6 +1464,10 @@ fn compare_search_state_to_candidate(
     right_firepower: FirepowerState,
     right_path_len: usize,
 ) -> std::cmp::Ordering {
+    let ordering = left.firepower.all_clears.cmp(&right_firepower.all_clears);
+    if ordering != std::cmp::Ordering::Equal {
+        return ordering;
+    }
     let ordering = right_firepower
         .spin_clears
         .cmp(&left.firepower.spin_clears);
