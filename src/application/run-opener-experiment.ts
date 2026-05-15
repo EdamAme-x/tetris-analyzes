@@ -289,6 +289,7 @@ const CONTINUATION_THREE_BAG_QUEUES = [
   ["discover-88", "JSZTLOISTZIOJLIZOJSTL"],
   ["discover-92", "LZISOJTTJZILOSSILJTOZ"],
   ["discover-93", "OITJZLSTZIJSOLZTJSOLI"],
+  ["tl-3spin-00", "ZSTILOJJLITZOSIOLJZTS", 26],
   ["discover-96", "OZSLTJIJLSZITOIOJTSLZ", 26],
   ["tl-3spin-01", "OISLJZTIJTSOZLSJZTIOL", 26],
   ["tl-3spin-02", "ZTSLOJIZJTILSOLTIZJSO", 18],
@@ -620,10 +621,10 @@ export function renderOpenerExperimentMarkdown(report: OpenerExperimentReport): 
 export function renderOpenerExperimentConsoleSummary(report: OpenerExperimentReport, topCount = 5): string {
   if (report.templateReplay !== undefined) {
     const lines = ["Best opener templates (replayed)", ""];
-    for (const template of report.templateReplay.templates.slice(0, topCount)) {
+    for (const [index, template] of rankReplayTemplatesForConsole(report.templateReplay.templates).slice(0, topCount).entries()) {
       const candidate = template.best;
       lines.push(
-        `#${template.rank} sources=${template.sources.join(",")} replay=${formatReplaySurvival(template)} phase=${formatPhaseReplaySurvival(template)} profile=${formatPhaseProfileReplaySurvival(template)} quality=${formatQualityReplaySurvival(template)} grouped=${formatGroupedReplaySurvival(template)} queueIndex=${candidate.queueIndex} hold=${candidate.hold ?? "-"} attack=${candidate.attack} difficultAttack=${candidate.difficultAttack} otherAttack=${candidate.nonDifficultAttack} spin=${candidate.spinClears} spinAttack=${candidate.spinAttack} tspin=${candidate.tSpinClears} tspinAttack=${candidate.tSpinAttack} b2b=${candidate.backToBackChain} tspinPotential=${candidate.tSpinPotential} points=${candidate.points} score=${candidate.score.toFixed(1)} holes=${candidate.holes} bump=${candidate.bumpiness}`,
+        `#${index + 1} sources=${template.sources.join(",")} replay=${formatReplaySurvival(template)} phase=${formatPhaseReplaySurvival(template)} profile=${formatPhaseProfileReplaySurvival(template)} quality=${formatQualityReplaySurvival(template)} grouped=${formatGroupedReplaySurvival(template)} queueIndex=${candidate.queueIndex} hold=${candidate.hold ?? "-"} attack=${candidate.attack} difficultAttack=${candidate.difficultAttack} otherAttack=${candidate.nonDifficultAttack} spin=${candidate.spinClears} spinAttack=${candidate.spinAttack} tspin=${candidate.tSpinClears} tspinAttack=${candidate.tSpinAttack} b2b=${candidate.backToBackChain} tspinPotential=${candidate.tSpinPotential} points=${candidate.points} score=${candidate.score.toFixed(1)} holes=${candidate.holes} bump=${candidate.bumpiness}`,
         `clears: ${formatClearSequence(candidate.clearSequence)}`,
         `path: ${candidate.path.join(" ")}`,
         `view: ${candidate.previewUrl}`,
@@ -645,6 +646,10 @@ export function renderOpenerExperimentConsoleSummary(report: OpenerExperimentRep
     );
   }
   return lines.join("\n").trimEnd();
+}
+
+function rankReplayTemplatesForConsole(templates: readonly OpenerTemplateReplayEntry[]): OpenerTemplateReplayEntry[] {
+  return [...templates].sort(compareReplayTemplatesForConsole);
 }
 
 export function rankOpenerCandidates(report: OpenerExperimentReport, topCount: number): RankedOpenerCandidate[] {
@@ -1209,6 +1214,18 @@ function compareReplayTemplates(left: OpenerTemplateReplayEntry, right: OpenerTe
     right.phaseProfileReplayHitCount - left.phaseProfileReplayHitCount ||
     templateReplayQualityFirepower(right) - templateReplayQualityFirepower(left) ||
     compareRankedOpenerCandidates(left.best, right.best) ||
+    right.qualityReplayHitCount - left.qualityReplayHitCount ||
+    right.groupedSurvivalCount - left.groupedSurvivalCount ||
+    left.key.localeCompare(right.key)
+  );
+}
+
+function compareReplayTemplatesForConsole(left: OpenerTemplateReplayEntry, right: OpenerTemplateReplayEntry): number {
+  return (
+    compareRankedOpenerCandidates(left.best, right.best) ||
+    right.replayHitCount - left.replayHitCount ||
+    right.phaseReplayHitCount - left.phaseReplayHitCount ||
+    right.phaseProfileReplayHitCount - left.phaseProfileReplayHitCount ||
     right.qualityReplayHitCount - left.qualityReplayHitCount ||
     right.groupedSurvivalCount - left.groupedSurvivalCount ||
     left.key.localeCompare(right.key)

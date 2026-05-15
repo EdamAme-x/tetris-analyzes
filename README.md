@@ -119,5 +119,7 @@ Executable examples live in `tests/`.
 - [x] Promote measured holeless 3T-spin/3B2B/12-attack continuation queues into the TL preset
 - [x] Skip native path-history cloning for compact replay and bag evaluation searches
 - [x] Use measured wider setup pools on TL continuation queues that unlock 14-attack holeless lines
-- [x] Add a bench regression gate for holeless 14-attack triple T-spin continuation lines
+- [x] Add a bench regression gate for holeless 24-attack triple T-spin continuation lines
 - [x] Promote another sampled holeless 14-attack triple T-spin continuation queue
+- [x] Promote a sampled holeless 24-attack triple T-spin continuation queue
+- [x] Show peak TL firepower first in replayed console summaries while retaining replay metrics

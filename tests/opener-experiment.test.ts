@@ -73,7 +73,7 @@ describe("opener experiment runner", () => {
   });
 
   test("provides a three-bag continuation preset for B2B T-spin chain experiments", () => {
-    expect(CONTINUATION_OPENER_EXPERIMENT_SCENARIOS).toHaveLength(27);
+    expect(CONTINUATION_OPENER_EXPERIMENT_SCENARIOS).toHaveLength(28);
     expect(CONTINUATION_OPENER_EXPERIMENT_SCENARIOS.every((scenario) => scenario.name.startsWith("continuation-"))).toBe(true);
     expect(new Set(CONTINUATION_OPENER_EXPERIMENT_SCENARIOS.map((scenario) => scenario.queue)).size).toBe(
       CONTINUATION_OPENER_EXPERIMENT_SCENARIOS.length
@@ -87,7 +87,13 @@ describe("opener experiment runner", () => {
       CONTINUATION_OPENER_EXPERIMENT_SCENARIOS.filter((scenario) => scenario.name.startsWith("continuation-tl-3spin-")).map(
         (scenario) => scenario.queue
       )
-    ).toEqual(["OISLJZTIJTSOZLSJZTIOL", "ZTSLOJIZJTILSOLTIZJSO", "SZLITJOOZTLSIJJOSZTLI", "ISJZLOTZSJITOLZISJTLO"]);
+    ).toEqual([
+      "ZSTILOJJLITZOSIOLJZTS",
+      "OISLJZTIJTSOZLSJZTIOL",
+      "ZTSLOJIZJTILSOLTIZJSO",
+      "SZLITJOOZTLSIJJOSZTLI",
+      "ISJZLOTZSJITOLZISJTLO"
+    ]);
     expect(
       Object.fromEntries(
         CONTINUATION_OPENER_EXPERIMENT_SCENARIOS.filter((scenario) => scenario.setupPoolMultiplier !== undefined).map((scenario) => [
@@ -96,6 +102,7 @@ describe("opener experiment runner", () => {
         ])
       )
     ).toEqual({
+      "continuation-tl-3spin-00": 26,
       "continuation-discover-96": 26,
       "continuation-tl-3spin-01": 26,
       "continuation-tl-3spin-02": 18,
@@ -785,6 +792,7 @@ describe("opener experiment runner", () => {
 
     expect(report.templateReplay?.templates.map((template) => template.sources[0])).toEqual(["stable", "strong"]);
     expect(report.templateReplay?.templates.map((template) => template.replayHitCount)).toEqual([1, 0]);
+    expect(renderOpenerExperimentConsoleSummary(report, 1)).toContain("#1 sources=strong");
   });
 
   test("reuses full template indexes from already searched scenarios during replay", () => {

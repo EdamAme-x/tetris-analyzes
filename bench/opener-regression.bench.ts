@@ -95,15 +95,15 @@ const cases: OpenerRegressionCase[] = [
     minBackToBackChain: 3
   },
   {
-    name: "tl-3spin-14attack",
-    input: { queue: "ZTSLOJIZJTILSOLTIZJSO", beamWidth: 256, hold: true, maxDepth: 21, setupPoolMultiplier: 18 },
+    name: "tl-3spin-24attack",
+    input: { queue: "ZSTILOJJLITZOSIOLJZTS", beamWidth: 256, hold: true, maxDepth: 21, setupPoolMultiplier: 26 },
     iterations: 1,
     minDepth: 20,
     minQueueIndex: 21,
-    minAttack: 14,
-    minDifficultAttack: 14,
+    minAttack: 24,
+    minDifficultAttack: 24,
     minTSpinClears: 3,
-    minTSpinAttack: 14,
+    minTSpinAttack: 24,
     minBackToBackChain: 3,
     maxHoles: 0
   }
