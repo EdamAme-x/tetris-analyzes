@@ -246,6 +246,7 @@ pub(crate) fn evaluate_board_unchecked(rows: &BoardRows) -> BoardEvaluation {
     evaluate_column_metrics(occupied_cells, cleared_lines, column_masks)
 }
 
+#[cfg(test)]
 pub(crate) fn is_empty_rows(rows: &BoardRows) -> bool {
     rows.iter().all(|row| *row == 0)
 }

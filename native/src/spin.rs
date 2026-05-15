@@ -31,7 +31,7 @@ impl SpinDetection {
     }
 }
 
-#[derive(Clone, Copy, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum SpinKind {
     None,
     TSpin,
@@ -159,7 +159,7 @@ pub(crate) fn detect_spin_for_mode(
 
 pub(crate) fn detect_spin_for_mode_after_rotation(
     rows_before_lock: &BoardRows,
-    locked_rows: &BoardRows,
+    _locked_rows: &BoardRows,
     piece: Piece,
     shape: Shape,
     x: i8,
@@ -168,7 +168,7 @@ pub(crate) fn detect_spin_for_mode_after_rotation(
     mode: SpinMode,
     rotation_kick_index: Option<usize>,
 ) -> SpinDetection {
-    let immobile = is_placement_immobile(locked_rows, shape, x, y);
+    let immobile = is_placement_immobile_before_lock(rows_before_lock, shape, x, y);
     let Some(raw_kick_index) = rotation_kick_index else {
         return SpinDetection {
             kind: SpinKind::None,
@@ -278,6 +278,200 @@ pub(crate) fn detect_spin_for_mode_after_rotation(
     }
 }
 
+pub(crate) fn detect_spin_for_mode_after_grounded_rotation(
+    rows_before_lock: &BoardRows,
+    piece: Piece,
+    shape: Shape,
+    x: i8,
+    y: i8,
+    cleared_lines: u32,
+    mode: SpinMode,
+    rotation_kick_index: Option<usize>,
+    include_immobile: bool,
+) -> SpinDetection {
+    let Some(raw_kick_index) = rotation_kick_index else {
+        return SpinDetection {
+            kind: SpinKind::None,
+            spin: false,
+            mini: false,
+            immobile: include_immobile
+                && is_grounded_placement_immobile_before_lock(rows_before_lock, shape, x, y),
+            force_back_to_back: false,
+            halve_attack: false,
+            occupied_corners: if piece == Piece::T {
+                count_t_occupied_corners(rows_before_lock, shape.rotation, x, y)
+            } else {
+                0
+            },
+            cleared_lines,
+        };
+    };
+    if mode == SpinMode::None {
+        return SpinDetection::none(cleared_lines);
+    }
+
+    if piece == Piece::T {
+        let occupied_corners = count_t_occupied_corners(rows_before_lock, shape.rotation, x, y);
+        if occupied_corners >= 3 {
+            let front_corners = count_t_front_corners(rows_before_lock, shape.rotation, x, y);
+            let mini = mode == SpinMode::MiniOnly || (front_corners != 2 && raw_kick_index != 4);
+            return SpinDetection {
+                kind: if mini {
+                    SpinKind::TSpinMini
+                } else {
+                    SpinKind::TSpin
+                },
+                spin: true,
+                mini,
+                immobile: include_immobile
+                    && is_grounded_placement_immobile_before_lock(rows_before_lock, shape, x, y),
+                force_back_to_back: false,
+                halve_attack: false,
+                occupied_corners,
+                cleared_lines,
+            };
+        }
+
+        let fallback_spin = match mode {
+            SpinMode::TSpinsPlus | SpinMode::AllMiniPlus | SpinMode::MiniOnly => {
+                Some((SpinKind::TSpinMini, true))
+            }
+            SpinMode::AllSpinsPlus => Some((SpinKind::TSpin, false)),
+            _ => None,
+        };
+        let Some((kind, mini)) = fallback_spin else {
+            return SpinDetection {
+                kind: SpinKind::None,
+                spin: false,
+                mini: false,
+                immobile: include_immobile
+                    && is_grounded_placement_immobile_before_lock(rows_before_lock, shape, x, y),
+                force_back_to_back: false,
+                halve_attack: false,
+                occupied_corners,
+                cleared_lines,
+            };
+        };
+        let immobile = is_grounded_placement_immobile_before_lock(rows_before_lock, shape, x, y);
+        return if immobile {
+            SpinDetection {
+                kind,
+                spin: true,
+                mini,
+                immobile,
+                force_back_to_back: false,
+                halve_attack: false,
+                occupied_corners,
+                cleared_lines,
+            }
+        } else {
+            SpinDetection {
+                kind: SpinKind::None,
+                spin: false,
+                mini: false,
+                immobile: include_immobile && immobile,
+                force_back_to_back: false,
+                halve_attack: false,
+                occupied_corners,
+                cleared_lines,
+            }
+        };
+    }
+
+    let occupied_corners = if matches!(piece, Piece::S | Piece::Z | Piece::J | Piece::L) {
+        count_handheld_occupied_corners(rows_before_lock, piece, shape.rotation, x, y)
+    } else {
+        0
+    };
+    let halve_attack = occupied_corners >= 3;
+
+    if mode == SpinMode::Stupid {
+        return SpinDetection {
+            kind: SpinKind::TSpin,
+            spin: true,
+            mini: false,
+            immobile: include_immobile
+                && is_grounded_placement_immobile_before_lock(rows_before_lock, shape, x, y),
+            force_back_to_back: false,
+            halve_attack,
+            occupied_corners,
+            cleared_lines,
+        };
+    }
+
+    if mode == SpinMode::Handheld {
+        return if occupied_corners >= 3 {
+            SpinDetection {
+                kind: SpinKind::TSpin,
+                spin: true,
+                mini: false,
+                immobile: include_immobile
+                    && is_grounded_placement_immobile_before_lock(rows_before_lock, shape, x, y),
+                force_back_to_back: false,
+                halve_attack: true,
+                occupied_corners,
+                cleared_lines,
+            }
+        } else {
+            SpinDetection {
+                kind: SpinKind::None,
+                spin: false,
+                mini: false,
+                immobile: include_immobile
+                    && is_grounded_placement_immobile_before_lock(rows_before_lock, shape, x, y),
+                force_back_to_back: false,
+                halve_attack: false,
+                occupied_corners,
+                cleared_lines,
+            }
+        };
+    }
+
+    let immobile_spin_mode = matches!(
+        mode,
+        SpinMode::AllSpins
+            | SpinMode::AllSpinsPlus
+            | SpinMode::AllMini
+            | SpinMode::AllMiniPlus
+            | SpinMode::MiniOnly
+    );
+    let immobile = if immobile_spin_mode || include_immobile {
+        is_grounded_placement_immobile_before_lock(rows_before_lock, shape, x, y)
+    } else {
+        false
+    };
+    if !immobile_spin_mode || !immobile {
+        return SpinDetection {
+            kind: SpinKind::None,
+            spin: false,
+            mini: false,
+            immobile,
+            force_back_to_back: false,
+            halve_attack: false,
+            occupied_corners,
+            cleared_lines,
+        };
+    }
+    let mini = matches!(
+        mode,
+        SpinMode::AllMini | SpinMode::AllMiniPlus | SpinMode::MiniOnly
+    );
+    SpinDetection {
+        kind: if mini {
+            SpinKind::TSpinMini
+        } else {
+            SpinKind::TSpin
+        },
+        spin: true,
+        mini,
+        immobile,
+        force_back_to_back: mini && cleared_lines > 0,
+        halve_attack,
+        occupied_corners,
+        cleared_lines,
+    }
+}
+
 pub(crate) fn could_spin_for_mode(
     rows_before_lock: &BoardRows,
     locked_rows: &BoardRows,
@@ -288,6 +482,21 @@ pub(crate) fn could_spin_for_mode(
     mode: SpinMode,
 ) -> bool {
     if mode == SpinMode::None || !is_grounded(rows_before_lock, shape, x, y) {
+        return false;
+    }
+    could_spin_grounded_for_mode(rows_before_lock, locked_rows, piece, shape, x, y, mode)
+}
+
+pub(crate) fn could_spin_grounded_for_mode(
+    rows_before_lock: &BoardRows,
+    _locked_rows: &BoardRows,
+    piece: Piece,
+    shape: Shape,
+    x: i8,
+    y: i8,
+    mode: SpinMode,
+) -> bool {
+    if mode == SpinMode::None {
         return false;
     }
     if mode == SpinMode::Stupid {
@@ -303,12 +512,15 @@ pub(crate) fn could_spin_for_mode(
             SpinMode::TSpinsPlus
             | SpinMode::AllSpinsPlus
             | SpinMode::AllMiniPlus
-            | SpinMode::MiniOnly => corner_spin || is_placement_immobile(locked_rows, shape, x, y),
+            | SpinMode::MiniOnly => {
+                corner_spin
+                    || is_grounded_placement_immobile_before_lock(rows_before_lock, shape, x, y)
+            }
             SpinMode::Stupid | SpinMode::None => false,
         };
     }
 
-    let immobile = is_placement_immobile(locked_rows, shape, x, y);
+    let immobile = is_grounded_placement_immobile_before_lock(rows_before_lock, shape, x, y);
     match mode {
         SpinMode::Handheld => {
             matches!(piece, Piece::S | Piece::Z | Piece::J | Piece::L)
@@ -536,18 +748,40 @@ fn without_spin(detection: SpinDetection) -> SpinDetection {
     }
 }
 
+#[cfg(test)]
 pub(crate) fn is_placement_immobile(locked_rows: &BoardRows, shape: Shape, x: i8, y: i8) -> bool {
     let board_without_piece = remove_shape_cells(locked_rows, shape, x, y);
-    !can_place(&board_without_piece, shape, x - 1, y)
-        && !can_place(&board_without_piece, shape, x + 1, y)
-        && !can_place(&board_without_piece, shape, x, y - 1)
-        && !can_place(&board_without_piece, shape, x, y + 1)
+    is_placement_immobile_before_lock(&board_without_piece, shape, x, y)
+}
+
+fn is_placement_immobile_before_lock(
+    rows_before_lock: &BoardRows,
+    shape: Shape,
+    x: i8,
+    y: i8,
+) -> bool {
+    !can_place(rows_before_lock, shape, x - 1, y)
+        && !can_place(rows_before_lock, shape, x + 1, y)
+        && !can_place(rows_before_lock, shape, x, y - 1)
+        && !can_place(rows_before_lock, shape, x, y + 1)
+}
+
+fn is_grounded_placement_immobile_before_lock(
+    rows_before_lock: &BoardRows,
+    shape: Shape,
+    x: i8,
+    y: i8,
+) -> bool {
+    !can_place(rows_before_lock, shape, x - 1, y)
+        && !can_place(rows_before_lock, shape, x + 1, y)
+        && !can_place(rows_before_lock, shape, x, y + 1)
 }
 
 fn is_grounded(rows_before_lock: &BoardRows, shape: Shape, x: i8, y: i8) -> bool {
     !can_place(rows_before_lock, shape, x, y - 1)
 }
 
+#[cfg(test)]
 pub(crate) fn remove_shape_cells(rows: &BoardRows, shape: Shape, x: i8, y: i8) -> BoardRows {
     let mut output = *rows;
     if x < 0
@@ -798,5 +1032,76 @@ mod tests {
         );
         assert!(t_spins.kind == SpinKind::None);
         assert!(!t_spins.spin);
+    }
+
+    #[test]
+    fn grounded_fast_spin_detection_matches_full_detector() {
+        let mut t_rows = [0_u16; BOARD_HEIGHT];
+        t_rows[1] = (1 << 3) | (1 << 5);
+        assert_grounded_fast_spin_matches_full(&t_rows, Piece::T, 0, 3, 0, 2);
+
+        let mut s_rows = [0_u16; BOARD_HEIGHT];
+        s_rows[1] = (1 << 0) | (1 << 3);
+        assert_grounded_fast_spin_matches_full(&s_rows, Piece::S, 0, 0, 0, 2);
+    }
+
+    fn assert_grounded_fast_spin_matches_full(
+        rows: &BoardRows,
+        piece: Piece,
+        shape_index: usize,
+        x: i8,
+        y: i8,
+        cleared_lines: u32,
+    ) {
+        let shape = piece_shapes(piece)[shape_index];
+        let locked = lock_shape(rows, shape, x, y).expect("test piece should lock");
+        for mode in [
+            SpinMode::TSpins,
+            SpinMode::TSpinsPlus,
+            SpinMode::AllSpins,
+            SpinMode::AllSpinsPlus,
+            SpinMode::AllMini,
+            SpinMode::AllMiniPlus,
+            SpinMode::MiniOnly,
+            SpinMode::Handheld,
+            SpinMode::Stupid,
+        ] {
+            let full = detect_spin_for_mode_after_rotation(
+                rows,
+                &locked,
+                piece,
+                shape,
+                x,
+                y,
+                cleared_lines,
+                mode,
+                Some(0),
+            );
+            let fast = detect_spin_for_mode_after_grounded_rotation(
+                rows,
+                piece,
+                shape,
+                x,
+                y,
+                cleared_lines,
+                mode,
+                Some(0),
+                true,
+            );
+            assert_eq!(spin_signature(full), spin_signature(fast));
+        }
+    }
+
+    fn spin_signature(spin: SpinDetection) -> (SpinKind, bool, bool, bool, bool, bool, u32, u32) {
+        (
+            spin.kind,
+            spin.spin,
+            spin.mini,
+            spin.immobile,
+            spin.force_back_to_back,
+            spin.halve_attack,
+            spin.occupied_corners,
+            spin.cleared_lines,
+        )
     }
 }

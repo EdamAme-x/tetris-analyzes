@@ -18,7 +18,7 @@ use bag::{
 };
 use board::{BoardEvaluation, BoardRows, BOARD_HEIGHT, BOARD_WIDTH};
 use firepower::{
-    advance_firepower_for_clear_with_combo_table, advance_firepower_with_combo_table,
+    advance_firepower_for_clear_with_combo_table, advance_firepower_with_known_all_clear,
     clear_kind_cleared_lines, clear_kind_name, estimate_quad_well_potential,
     estimate_t_spin_potential, firepower_score, parse_clear_kind, parse_combo_table,
     quad_well_continuation_score, score_state, FirepowerEvent, FirepowerState,
@@ -33,8 +33,9 @@ use pieces::{
     placement_shape_indices, Piece, Shape,
 };
 use spin::{
-    could_spin_for_mode, detect_spin_for_mode_after_rotation, parse_spin_mode, spin_kind_name,
-    SpinDetection, SpinMode,
+    could_spin_for_mode, could_spin_grounded_for_mode,
+    detect_spin_for_mode_after_grounded_rotation, detect_spin_for_mode_after_rotation,
+    parse_spin_mode, spin_kind_name, SpinDetection, SpinMode,
 };
 use tetrio_tables::{ComboTable, KickTable};
 
@@ -217,6 +218,7 @@ struct Placement {
     x: i8,
     y: i8,
     used_hold: bool,
+    shape_index: usize,
     spin: SpinDetection,
     firepower: FirepowerEvent,
 }
@@ -995,6 +997,9 @@ pub(crate) fn search_opener_states(
                 let shapes = piece_shapes(choice.piece);
                 let mut reachable_cache =
                     ReachabilityCache::new(&state.rows, choice.piece, kick_table);
+                if !reachable_cache.spawn_open() {
+                    continue;
+                }
                 for shape_index in placement_shape_indices(choice.piece).iter().copied() {
                     let shape = shapes[shape_index];
                     for x in 0..=(BOARD_WIDTH as i8 - shape.width) {
@@ -1020,12 +1025,13 @@ pub(crate) fn search_opener_states(
                                 };
                                 let rows = placed.rows;
                                 let metrics = board::evaluate_board_unchecked(&rows);
+                                let all_clear = placed.spin.cleared_lines > 0 && metrics[0] == 0;
                                 let (firepower, firepower_event) =
-                                    advance_firepower_with_combo_table(
+                                    advance_firepower_with_known_all_clear(
                                         state.firepower,
                                         choice.piece,
                                         placed.spin,
-                                        &rows,
+                                        all_clear,
                                         combo_table,
                                     );
                                 let t_spin_potential = 0;
@@ -1124,7 +1130,7 @@ pub(crate) fn search_opener_states(
         }
     }
 
-    beam.sort_by(compare_search_state);
+    beam.sort_unstable_by(compare_search_state);
     beam
 }
 
@@ -1187,13 +1193,13 @@ fn build_next_search_state(
 
 fn retain_best_search_states(beam: &mut Vec<SearchState>, beam_width: usize) {
     if beam.len() <= beam_width {
-        beam.sort_by(compare_search_state);
+        beam.sort_unstable_by(compare_search_state);
         return;
     }
 
     {
         let (retained, _, _) = beam.select_nth_unstable_by(beam_width, compare_search_state);
-        retained.sort_by(compare_search_state);
+        retained.sort_unstable_by(compare_search_state);
     }
     beam.truncate(beam_width);
 }
@@ -1235,7 +1241,7 @@ fn retain_diverse_search_states(
         return;
     }
 
-    beam.sort_by(compare_search_state);
+    beam.sort_unstable_by(compare_search_state);
     let sorted = std::mem::take(beam);
     let mut selected_flags = vec![false; sorted.len()];
     let best_state = &sorted[0];
@@ -1657,7 +1663,8 @@ fn place_grounded_at_y(
         placed[base_y + dy] |= shape.row_masks[dy] << x_shift;
     }
     let (cleared_rows, cleared_lines) = board::clear_full_lines_array_with_count(placed);
-    let spin = if could_spin_for_mode(rows, &placed, choice.piece, shape, x, y, spin_mode) {
+    let spin = if could_spin_grounded_for_mode(rows, &placed, choice.piece, shape, x, y, spin_mode)
+    {
         let rotation_kick_index = find_reachable_rotation_entry(
             rows,
             choice.piece,
@@ -1668,9 +1675,8 @@ fn place_grounded_at_y(
             allow_180,
             reachable_cache,
         );
-        detect_spin_for_mode_after_rotation(
+        detect_spin_for_mode_after_grounded_rotation(
             rows,
-            &placed,
             choice.piece,
             shape,
             x,
@@ -1678,6 +1684,7 @@ fn place_grounded_at_y(
             cleared_lines,
             spin_mode,
             rotation_kick_index,
+            include_placement,
         )
     } else {
         SpinDetection::none(cleared_lines)
@@ -1692,6 +1699,7 @@ fn place_grounded_at_y(
             x,
             y,
             used_hold: choice.used_hold,
+            shape_index,
             spin,
             firepower: FirepowerEvent::empty(),
         }),
@@ -1935,10 +1943,7 @@ impl From<Placement> for BeamPlacement {
             placement.y,
             placement.used_hold,
         );
-        let shape = piece_shapes(placement.piece)
-            .iter()
-            .find(|shape| shape.rotation == placement.rotation)
-            .expect("placement rotation must match a declared shape");
+        let shape = piece_shapes(placement.piece)[placement.shape_index];
         Self {
             piece: piece_name(placement.piece).to_string(),
             rotation: u32::from(placement.rotation),

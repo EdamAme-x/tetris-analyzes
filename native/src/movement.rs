@@ -49,6 +49,10 @@ impl ReachabilityCache {
             reachable_allow_180: None,
         }
     }
+
+    pub(crate) fn spawn_open(&self) -> bool {
+        self.spawn_open
+    }
 }
 
 impl ReachablePlacementSet {
@@ -138,6 +142,12 @@ pub(crate) fn is_reachable_placement_with_cache(
 
     let shapes = piece_shapes(piece);
     let target_shape = shapes[target_shape_index];
+    if reachable_cache.reachable_allow_180 == Some(allow_180) {
+        if let Some(reachable) = reachable_cache.reachable.as_ref() {
+            return reachable.contains(piece, shapes, target_shape_index, target_x, target_y);
+        }
+    }
+
     if has_clear_horizontal_entry_drop(
         rows,
         piece,

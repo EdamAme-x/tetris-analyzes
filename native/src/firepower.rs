@@ -1,12 +1,11 @@
 use napi::bindgen_prelude::{Error, Result};
 
-use crate::board::{self, BoardEvaluation, BoardRows, BOARD_HEIGHT, BOARD_WIDTH};
-use crate::movement::{
-    can_place_in_bounds, find_reachable_rotation_entry, lock_shape, ReachabilityCache,
-};
-use crate::pieces::{piece_shapes, placement_shape_indices, Piece};
+use crate::board::{BoardEvaluation, BoardRows, BOARD_HEIGHT, BOARD_WIDTH, ROW_MASK};
+use crate::movement::{can_place_in_bounds, find_reachable_rotation_entry, ReachabilityCache};
+use crate::pieces::{piece_shapes, placement_shape_indices, Piece, Shape};
 use crate::spin::{
-    could_spin_for_mode, detect_spin_for_mode_after_rotation, SpinDetection, SpinKind, SpinMode,
+    could_spin_grounded_for_mode, detect_spin_for_mode_after_grounded_rotation, SpinDetection,
+    SpinKind, SpinMode,
 };
 use crate::tetrio_tables::KickTable;
 use crate::tetrio_tables::{self, ClearKind, ComboTable};
@@ -178,6 +177,7 @@ pub(crate) fn estimate_t_spin_potential(
     allow_180: bool,
 ) -> u32 {
     let mut best = 0_u32;
+    let existing_full_lines = crate::board::count_full_lines_array(rows);
     let shapes = piece_shapes(Piece::T);
     let mut reachable_cache = ReachabilityCache::new(rows, Piece::T, kick_table);
     for shape_index in placement_shape_indices(Piece::T).iter().copied() {
@@ -190,15 +190,20 @@ pub(crate) fn estimate_t_spin_potential(
                     can_place_below = can_place_here;
                     continue;
                 }
-                let Some(placed) = lock_shape(rows, shape, x, y) else {
-                    can_place_below = can_place_here;
-                    continue;
-                };
-                let cleared_lines = board::count_full_lines_array(&placed);
-                if !could_spin_for_mode(rows, &placed, Piece::T, shape, x, y, SpinMode::TSpins) {
+                if !could_spin_grounded_for_mode(
+                    rows,
+                    rows,
+                    Piece::T,
+                    shape,
+                    x,
+                    y,
+                    SpinMode::TSpins,
+                ) {
                     can_place_below = can_place_here;
                     continue;
                 }
+                let cleared_lines =
+                    count_full_lines_after_lock(rows, shape, x, y, existing_full_lines);
                 let Some(rotation_kick_index) = find_reachable_rotation_entry(
                     rows,
                     Piece::T,
@@ -212,9 +217,8 @@ pub(crate) fn estimate_t_spin_potential(
                     can_place_below = can_place_here;
                     continue;
                 };
-                let spin = detect_spin_for_mode_after_rotation(
+                let spin = detect_spin_for_mode_after_grounded_rotation(
                     rows,
-                    &placed,
                     Piece::T,
                     shape,
                     x,
@@ -222,6 +226,7 @@ pub(crate) fn estimate_t_spin_potential(
                     cleared_lines,
                     SpinMode::TSpins,
                     Some(rotation_kick_index),
+                    false,
                 );
                 let value = match spin.kind {
                     SpinKind::TSpin => 1 + cleared_lines,
@@ -241,6 +246,26 @@ pub(crate) fn estimate_t_spin_potential(
     best
 }
 
+fn count_full_lines_after_lock(
+    rows: &BoardRows,
+    shape: Shape,
+    x: i8,
+    y: i8,
+    existing_full_lines: u32,
+) -> u32 {
+    let x_shift = x as u32;
+    let base_y = y as usize;
+    let shape_height = shape.height as usize;
+    let mut cleared_lines = existing_full_lines;
+    for dy in 0..shape_height {
+        let row_y = base_y + dy;
+        if (rows[row_y] | (shape.row_masks[dy] << x_shift)) == ROW_MASK {
+            cleared_lines += 1;
+        }
+    }
+    cleared_lines
+}
+
 pub(crate) fn estimate_quad_well_potential(rows: &BoardRows) -> u32 {
     let mut best = 0_u32;
     for well_x in 0..BOARD_WIDTH {
@@ -256,6 +281,7 @@ pub(crate) fn estimate_quad_well_potential(rows: &BoardRows) -> u32 {
     best
 }
 
+#[cfg(test)]
 pub(crate) fn advance_firepower_with_combo_table(
     previous: FirepowerState,
     piece: Piece,
@@ -263,8 +289,18 @@ pub(crate) fn advance_firepower_with_combo_table(
     rows_after_clear: &BoardRows,
     combo_table: ComboTable,
 ) -> (FirepowerState, FirepowerEvent) {
+    let all_clear = spin.cleared_lines > 0 && crate::board::is_empty_rows(rows_after_clear);
+    advance_firepower_with_known_all_clear(previous, piece, spin, all_clear, combo_table)
+}
+
+pub(crate) fn advance_firepower_with_known_all_clear(
+    previous: FirepowerState,
+    piece: Piece,
+    spin: SpinDetection,
+    all_clear: bool,
+    combo_table: ComboTable,
+) -> (FirepowerState, FirepowerEvent) {
     let clear_kind = classify_clear(spin.kind, spin.cleared_lines);
-    let all_clear = spin.cleared_lines > 0 && board::is_empty_rows(rows_after_clear);
     advance_firepower_for_clear_with_combo_table(
         previous,
         clear_kind,
