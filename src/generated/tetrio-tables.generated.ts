@@ -7376,6 +7376,7 @@ export const TETRIO_KICK_TABLES = {
 } as const;
 
 export const TETRIO_TL_OPTIONS = {
+  "allow180": true,
   "spinbonuses": "all-mini+",
   "kickset": "SRS+",
   "combotable": "multiplier",

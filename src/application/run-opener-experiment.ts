@@ -15,6 +15,7 @@ export interface OpenerExperimentSearchRules {
   readonly spinMode: NativeSpinMode;
   readonly comboTable: NativeComboTable;
   readonly kickTable: NativeKickTable;
+  readonly allow180: boolean;
 }
 
 export interface OpenerExperimentScenario {
@@ -24,7 +25,7 @@ export interface OpenerExperimentScenario {
   readonly beamWidth: number;
   readonly maxDepth: number;
   readonly setupPoolMultiplier?: number;
-  readonly rules?: OpenerExperimentSearchRules;
+  readonly rules?: Partial<OpenerExperimentSearchRules>;
   readonly qualityGate?: OpenerExperimentQualityGate;
   readonly qualityGateRequired?: boolean;
   readonly warmups?: number;
@@ -311,7 +312,8 @@ const CONTINUATION_QUALITY_GATE = {
 export const TETRIO_TL_OPENER_SEARCH_RULES = {
   spinMode: "ALL-MINI+",
   comboTable: "MULTIPLIER",
-  kickTable: "SRS+"
+  kickTable: "SRS+",
+  allow180: true
 } as const satisfies OpenerExperimentSearchRules;
 
 export const DEFAULT_OPENER_EXPERIMENT_SCENARIOS: readonly OpenerExperimentScenario[] = createDistributionOpenerExperimentSplits({
@@ -524,8 +526,8 @@ export function renderOpenerExperimentMarkdown(report: OpenerExperimentReport): 
     "",
     "## Search run",
     "",
-    "| name | queue | hold | spins | combo | kicks | beam | depth | setup pool | median ms | searches/s | nodes | quality gate |",
-    "| --- | --- | ---: | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |"
+    "| name | queue | hold | spins | combo | kicks | 180 | beam | depth | setup pool | median ms | searches/s | nodes | quality gate |",
+    "| --- | --- | ---: | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |"
   );
 
   for (const scenario of report.scenarios) {
@@ -537,6 +539,7 @@ export function renderOpenerExperimentMarkdown(report: OpenerExperimentReport): 
         scenario.rules.spinMode,
         scenario.rules.comboTable,
         scenario.rules.kickTable,
+        formatBooleanRule(scenario.rules.allow180),
         String(scenario.beamWidth),
         String(scenario.maxDepth),
         String(scenario.setupPoolMultiplier ?? NATIVE_DEFAULT_SETUP_POOL_MULTIPLIER),
@@ -1027,12 +1030,13 @@ function searchInput(scenario: OpenerExperimentScenario): SearchOpenerBeamInput 
     spinMode: rules.spinMode,
     comboTable: rules.comboTable,
     kickTable: rules.kickTable,
+    allow180: rules.allow180,
     ...(scenario.setupPoolMultiplier === undefined ? {} : { setupPoolMultiplier: scenario.setupPoolMultiplier })
   };
 }
 
 function scenarioRules(scenario: OpenerExperimentScenario): OpenerExperimentSearchRules {
-  return scenario.rules ?? TETRIO_TL_OPENER_SEARCH_RULES;
+  return { ...TETRIO_TL_OPENER_SEARCH_RULES, ...scenario.rules };
 }
 
 function scenarioSignature(scenario: OpenerExperimentScenario): string {
@@ -1685,7 +1689,11 @@ function formatClearSequence(clearSequence: readonly string[]): string {
 }
 
 function formatRules(rules: OpenerExperimentSearchRules): string {
-  return `spins=${rules.spinMode}, combo=${rules.comboTable}, kicks=${rules.kickTable}`;
+  return `spins=${rules.spinMode}, combo=${rules.comboTable}, kicks=${rules.kickTable}, 180=${formatBooleanRule(rules.allow180)}`;
+}
+
+function formatBooleanRule(value: boolean): "on" | "off" {
+  return value ? "on" : "off";
 }
 
 function formatReportRules(scenarios: readonly OpenerExperimentScenarioResult[]): string {
@@ -1700,7 +1708,12 @@ function formatReportRules(scenarios: readonly OpenerExperimentScenarioResult[])
 }
 
 function rulesEqual(left: OpenerExperimentSearchRules, right: OpenerExperimentSearchRules): boolean {
-  return left.spinMode === right.spinMode && left.comboTable === right.comboTable && left.kickTable === right.kickTable;
+  return (
+    left.spinMode === right.spinMode &&
+    left.comboTable === right.comboTable &&
+    left.kickTable === right.kickTable &&
+    left.allow180 === right.allow180
+  );
 }
 
 function bagCountTag(bagCount: number): string {

@@ -163,6 +163,7 @@ export interface GarbageRules {
 export interface Ruleset {
   readonly baseBoard: Uint16Array;
   readonly hold: HoldRules;
+  readonly allow180: boolean;
   readonly spins: SpinMode;
   readonly comboTable: ComboTable;
   readonly kickTable: KickTable;
@@ -174,6 +175,7 @@ export interface RulesetInput {
   readonly baseBoard?: ArrayLike<number>;
   readonly hold?: HoldMode | boolean | HoldRulesInput;
   readonly infiniteHold?: HoldMode | boolean;
+  readonly allow180?: boolean;
   readonly spins?: SpinMode | string;
   readonly comboTable?: ComboTable | string;
   readonly kickTable?: KickTable | string;
@@ -201,6 +203,7 @@ export interface GarbageRulesInput {
 export interface TetrioConfig {
   readonly hold: "on" | "off";
   readonly infinite_hold: "on" | "off";
+  readonly allow180: "on" | "off";
   readonly spins: string;
   readonly combotable: string;
   readonly kickset: string;

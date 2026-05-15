@@ -14,6 +14,7 @@ export interface GenerateOpenersRules {
   readonly spinMode: NativeSpinMode;
   readonly comboTable: NativeComboTable;
   readonly kickTable: NativeKickTable;
+  readonly allow180: boolean;
 }
 
 export interface GenerateOpenersInput {
@@ -81,7 +82,8 @@ export interface GeneratedOpenersReport {
 export const DEFAULT_GENERATE_OPENERS_RULES = {
   spinMode: "ALL-MINI+",
   comboTable: "MULTIPLIER",
-  kickTable: "SRS+"
+  kickTable: "SRS+",
+  allow180: true
 } as const satisfies GenerateOpenersRules;
 
 export function generateOpeners(input: GenerateOpenersInput = {}): GeneratedOpenersReport {
@@ -104,7 +106,8 @@ export function generateOpeners(input: GenerateOpenersInput = {}): GeneratedOpen
     includePath: input.includePath ?? true,
     comboTable: rules.comboTable,
     kickTable: rules.kickTable,
-    spinMode: rules.spinMode
+    spinMode: rules.spinMode,
+    allow180: rules.allow180
   });
   const detailedNodesByPreviewKey = new Map<string, readonly SearchOpenerBeamNode[]>();
 
@@ -176,7 +179,7 @@ export function generateOpeners(input: GenerateOpenersInput = {}): GeneratedOpen
 export function renderGeneratedOpenersConsole(report: GeneratedOpenersReport, top = report.templates.length): string {
   const lines = [
     `generated openers: bag=${report.bag} depth=${report.maxDepth} beam=${report.beamWidth} queues=${report.mining.searchedQueues}/${report.mining.totalQueues}`,
-    `rules: spins=${report.rules.spinMode} combo=${report.rules.comboTable} kicks=${report.rules.kickTable}`
+    `rules: spins=${report.rules.spinMode} combo=${report.rules.comboTable} kicks=${report.rules.kickTable} 180=${formatBooleanRule(report.rules.allow180)}`
   ];
   for (const template of report.templates.slice(0, top)) {
     lines.push(
@@ -210,7 +213,7 @@ export function renderGeneratedOpenersMarkdown(report: GeneratedOpenersReport): 
     `Depth: ${report.maxDepth}`,
     `Queues: ${report.mining.searchedQueues}/${report.mining.totalQueues}`,
     `Preview: ${report.previewMode}`,
-    `Rules: spins=${report.rules.spinMode}, combo=${report.rules.comboTable}, kicks=${report.rules.kickTable}`,
+    `Rules: spins=${report.rules.spinMode}, combo=${report.rules.comboTable}, kicks=${report.rules.kickTable}, 180=${formatBooleanRule(report.rules.allow180)}`,
     "",
     "| rank | support | queue | hold | attack | difficult attack | spin | spin attack | tspin | tspin attack | b2b | combo | all clears | tspin potential | holes | bumpiness | pages | path | preview |",
     "| ---: | ---: | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- |"
@@ -295,7 +298,8 @@ function findDetailedTemplateNode(
     options.maxDepth,
     options.rules.comboTable,
     options.rules.kickTable,
-    options.rules.spinMode
+    options.rules.spinMode,
+    options.rules.allow180
   ].join("|");
   let nodes = options.detailedNodesByPreviewKey.get(cacheKey);
   if (nodes === undefined) {
@@ -306,11 +310,16 @@ function findDetailedTemplateNode(
       maxDepth: options.maxDepth,
       comboTable: options.rules.comboTable,
       kickTable: options.rules.kickTable,
-      spinMode: options.rules.spinMode
+      spinMode: options.rules.spinMode,
+      allow180: options.rules.allow180
     });
     options.detailedNodesByPreviewKey.set(cacheKey, nodes);
   }
   return nodes.find((node) => matchesTemplateNode(template, node));
+}
+
+function formatBooleanRule(value: boolean): "on" | "off" {
+  return value ? "on" : "off";
 }
 
 function matchesTemplateNode(template: OpenerBagTemplateMining["topTemplates"][number], node: SearchOpenerBeamNode): boolean {

@@ -182,6 +182,7 @@ describe("opener experiment runner", () => {
           spinMode: "ALL-MINI+",
           comboTable: "MULTIPLIER",
           kickTable: "SRS+",
+          allow180: true,
           setupPoolMultiplier: 26
         });
         return [
@@ -306,7 +307,7 @@ describe("opener experiment runner", () => {
     expect(markdown).toContain("Rules: spins=ALL-MINI+, combo=MULTIPLIER, kicks=SRS+");
     expect(markdown).toContain("## Best openers");
     expect(markdown).toContain("## Template survivability");
-    expect(markdown).toContain("fake-scenario | TI | false | ALL-MINI+ | MULTIPLIER | SRS+ | 4 | 1 | 14 | 2.000");
+    expect(markdown).toContain("fake-scenario | TI | false | ALL-MINI+ | MULTIPLIER | SRS+ | on | 4 | 1 | 14 | 2.000");
     expect(markdown).toContain("quality gate");
     expect(markdown).toContain("## Candidate details");
     expect(markdown).toContain("[view](https://fumen.zui.jp/?m115@test)");
@@ -338,7 +339,7 @@ describe("opener experiment runner", () => {
 
     const markdown = renderOpenerExperimentMarkdown(report);
     expect(markdown).toContain("Rules: spins=NONE, combo=NONE, kicks=NONE");
-    expect(markdown).toContain("custom-rules | TI | false | NONE | NONE | NONE | 4 | 1 | 14 | 2.000");
+    expect(markdown).toContain("custom-rules | TI | false | NONE | NONE | NONE | on | 4 | 1 | 14 | 2.000");
   });
 
   test("fails opener experiments when a scenario quality gate is missed", () => {

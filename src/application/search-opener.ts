@@ -22,6 +22,7 @@ export interface SearchOpenerBeamInput {
   readonly comboTable?: NativeComboTable;
   readonly kickTable?: NativeKickTable;
   readonly spinMode?: NativeSpinMode;
+  readonly allow180?: boolean;
   readonly setupPoolMultiplier?: number;
 }
 
@@ -35,6 +36,7 @@ export interface EvaluateOpenerBagInput {
   readonly comboTable?: NativeComboTable;
   readonly kickTable?: NativeKickTable;
   readonly spinMode?: NativeSpinMode;
+  readonly allow180?: boolean;
 }
 
 export interface MineOpenerBagTemplatesInput {
@@ -48,6 +50,7 @@ export interface MineOpenerBagTemplatesInput {
   readonly comboTable?: NativeComboTable;
   readonly kickTable?: NativeKickTable;
   readonly spinMode?: NativeSpinMode;
+  readonly allow180?: boolean;
 }
 
 export type SearchOpenerBeamNode = NativeBeamSearchNode;
@@ -62,6 +65,7 @@ export interface OpenerPlacementReachabilityInput {
   readonly y: number;
   readonly kickTable?: NativeKickTable;
   readonly spinMode?: NativeSpinMode;
+  readonly allow180?: boolean;
 }
 
 export interface OpenerRotationResolutionInput {
@@ -72,6 +76,7 @@ export interface OpenerRotationResolutionInput {
   readonly y: number;
   readonly direction: -1 | 1 | 2;
   readonly kickTable?: NativeKickTable;
+  readonly allow180?: boolean;
 }
 
 export function searchOpenerBeam(input: SearchOpenerBeamInput): SearchOpenerBeamNode[] {
@@ -84,7 +89,8 @@ export function searchOpenerBeam(input: SearchOpenerBeamInput): SearchOpenerBeam
     input.comboTable,
     input.kickTable,
     input.spinMode,
-    input.setupPoolMultiplier
+    input.setupPoolMultiplier,
+    input.allow180
   );
 }
 
@@ -98,7 +104,8 @@ export function searchOpenerBeamCompact(input: SearchOpenerBeamInput): SearchOpe
     input.comboTable,
     input.kickTable,
     input.spinMode,
-    input.setupPoolMultiplier
+    input.setupPoolMultiplier,
+    input.allow180
   );
 }
 
@@ -112,7 +119,8 @@ export function searchOpenerBeamWithPlacements(input: SearchOpenerBeamInput): Se
     input.comboTable,
     input.kickTable,
     input.spinMode,
-    input.setupPoolMultiplier
+    input.setupPoolMultiplier,
+    input.allow180
   );
 }
 
@@ -127,7 +135,8 @@ export function evaluateOpenerBag(input: EvaluateOpenerBagInput = {}): OpenerBag
     input.topQueueCount ?? 16,
     input.comboTable,
     input.kickTable,
-    input.spinMode
+    input.spinMode,
+    input.allow180
   );
 }
 
@@ -143,12 +152,21 @@ export function mineOpenerBagTemplates(input: MineOpenerBagTemplatesInput = {}):
     input.includePath ?? false,
     input.comboTable,
     input.kickTable,
-    input.spinMode
+    input.spinMode,
+    input.allow180
   );
 }
 
 export function canReachOpenerPlacement(input: OpenerPlacementReachabilityInput): boolean {
-  return loadNativeBinding().canReachOpenerPlacement(input.rows, input.piece, input.rotation, input.x, input.y, input.kickTable);
+  return loadNativeBinding().canReachOpenerPlacement(
+    input.rows,
+    input.piece,
+    input.rotation,
+    input.x,
+    input.y,
+    input.kickTable,
+    input.allow180
+  );
 }
 
 export function resolveOpenerRotation(input: OpenerRotationResolutionInput): NativeRotationResolution {
@@ -159,16 +177,26 @@ export function resolveOpenerRotation(input: OpenerRotationResolutionInput): Nat
     input.x,
     input.y,
     input.direction,
-    input.kickTable
+    input.kickTable,
+    input.allow180
   );
 }
 
 export function detectOpenerSpin(input: OpenerPlacementReachabilityInput): NativeSpinDetection {
-  return loadNativeBinding().detectOpenerSpin(input.rows, input.piece, input.rotation, input.x, input.y, input.spinMode, input.kickTable);
+  return loadNativeBinding().detectOpenerSpin(
+    input.rows,
+    input.piece,
+    input.rotation,
+    input.x,
+    input.y,
+    input.spinMode,
+    input.kickTable,
+    input.allow180
+  );
 }
 
-export function estimateOpenerTSpinPotential(rows: Uint16Array, kickTable?: NativeKickTable): number {
-  return loadNativeBinding().estimateOpenerTSpinPotential(rows, kickTable);
+export function estimateOpenerTSpinPotential(rows: Uint16Array, kickTable?: NativeKickTable, allow180?: boolean): number {
+  return loadNativeBinding().estimateOpenerTSpinPotential(rows, kickTable, allow180);
 }
 
 export function evaluateOpenerFirepower(events: readonly NativeFirepowerInput[]): NativeFirepowerSummary {

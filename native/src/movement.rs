@@ -27,6 +27,7 @@ pub(crate) struct ReachablePlacementSet {
 pub(crate) struct ReachabilityCache {
     spawn_open: bool,
     reachable: Option<ReachablePlacementSet>,
+    reachable_allow_180: Option<bool>,
 }
 
 pub(crate) struct RotationResolution {
@@ -45,6 +46,7 @@ impl ReachabilityCache {
         Self {
             spawn_open: can_place_for_movement(rows, shapes[spawn.shape_index], spawn.x, spawn.y),
             reachable: None,
+            reachable_allow_180: None,
         }
     }
 }
@@ -83,12 +85,16 @@ impl ReachabilityCache {
         rows: &BoardRows,
         piece: Piece,
         kick_table: KickTable,
+        allow_180: bool,
     ) -> Option<&ReachablePlacementSet> {
         if !self.spawn_open {
             return None;
         }
-        if self.reachable.is_none() {
-            self.reachable = Some(build_reachable_placement_set(rows, piece, kick_table));
+        if self.reachable.is_none() || self.reachable_allow_180 != Some(allow_180) {
+            self.reachable = Some(build_reachable_placement_set(
+                rows, piece, kick_table, allow_180,
+            ));
+            self.reachable_allow_180 = Some(allow_180);
         }
         self.reachable.as_ref()
     }
@@ -101,6 +107,7 @@ pub(crate) fn is_reachable_placement(
     target_x: i8,
     target_y: i8,
     kick_table: KickTable,
+    allow_180: bool,
 ) -> bool {
     let mut reachable_cache = ReachabilityCache::new(rows, piece, kick_table);
     is_reachable_placement_with_cache(
@@ -110,6 +117,7 @@ pub(crate) fn is_reachable_placement(
         target_x,
         target_y,
         kick_table,
+        allow_180,
         &mut reachable_cache,
     )
 }
@@ -121,6 +129,7 @@ pub(crate) fn is_reachable_placement_with_cache(
     target_x: i8,
     target_y: i8,
     kick_table: KickTable,
+    allow_180: bool,
     reachable_cache: &mut ReachabilityCache,
 ) -> bool {
     if !reachable_cache.spawn_open {
@@ -141,8 +150,12 @@ pub(crate) fn is_reachable_placement_with_cache(
         return true;
     }
 
-    if reachable_cache.reachable.is_none() {
-        reachable_cache.reachable = Some(build_reachable_placement_set(rows, piece, kick_table));
+    if reachable_cache.reachable.is_none() || reachable_cache.reachable_allow_180 != Some(allow_180)
+    {
+        reachable_cache.reachable = Some(build_reachable_placement_set(
+            rows, piece, kick_table, allow_180,
+        ));
+        reachable_cache.reachable_allow_180 = Some(allow_180);
     }
     reachable_cache.reachable.as_ref().is_some_and(|reachable| {
         reachable.contains(piece, shapes, target_shape_index, target_x, target_y)
@@ -153,6 +166,7 @@ fn build_reachable_placement_set(
     rows: &BoardRows,
     piece: Piece,
     kick_table: KickTable,
+    allow_180: bool,
 ) -> ReachablePlacementSet {
     let shapes = piece_shapes(piece);
     let spawn = movement_spawn_state(
@@ -223,17 +237,19 @@ fn build_reachable_placement_set(
             &mut queue,
             &mut tail,
         );
-        push_rotation_states(
-            rows,
-            piece,
-            shapes,
-            state,
-            2,
-            kick_table,
-            &mut visited,
-            &mut queue,
-            &mut tail,
-        );
+        if allow_180 {
+            push_rotation_states(
+                rows,
+                piece,
+                shapes,
+                state,
+                2,
+                kick_table,
+                &mut visited,
+                &mut queue,
+                &mut tail,
+            );
+        }
     }
 
     ReachablePlacementSet { visited }
@@ -416,6 +432,7 @@ pub(crate) fn find_reachable_rotation_entry(
     target_x: i8,
     target_y: i8,
     kick_table: KickTable,
+    allow_180: bool,
     reachable_cache: &mut ReachabilityCache,
 ) -> Option<usize> {
     let shapes = piece_shapes(piece);
@@ -424,12 +441,15 @@ pub(crate) fn find_reachable_rotation_entry(
         return None;
     }
 
-    let reachable = reachable_cache.reachable_set(rows, piece, kick_table)?;
+    let reachable = reachable_cache.reachable_set(rows, piece, kick_table, allow_180)?;
     let to_rotation = target_shape.rotation;
     let (to_anchor_x, to_anchor_y) = shape_anchor_offset(piece, target_shape_index);
     let to_offset = kick_table_piece_offset(kick_table, piece, to_rotation);
 
     for direction in [-1_i8, 1_i8, 2_i8] {
+        if direction == 2 && !allow_180 {
+            continue;
+        }
         let from_rotation = (i16::from(to_rotation) - i16::from(direction)).rem_euclid(4) as u8;
         let from_shape_index = from_rotation as usize;
         let from_shape = *shapes.get(from_shape_index)?;
@@ -660,6 +680,7 @@ mod tests {
             3,
             0,
             KickTable::SrsPlus,
+            true,
             &mut cache,
         ));
         assert!(cache.reachable.is_none());
@@ -678,6 +699,7 @@ mod tests {
             0,
             0,
             KickTable::SrsPlus,
+            true,
             &mut cache,
         ));
         assert!(cache.reachable.is_some());
@@ -790,7 +812,7 @@ mod tests {
     #[test]
     fn reachable_set_checks_equivalent_rotation_membership_directly() {
         let rows = [0_u16; BOARD_HEIGHT];
-        let reachable = build_reachable_placement_set(&rows, Piece::I, KickTable::SrsPlus);
+        let reachable = build_reachable_placement_set(&rows, Piece::I, KickTable::SrsPlus, true);
         let shapes = piece_shapes(Piece::I);
 
         assert!(reachable.contains(Piece::I, shapes, 0, 3, 0));

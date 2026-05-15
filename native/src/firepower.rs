@@ -170,7 +170,11 @@ fn t_spin_setup_score(t_spin_potential: u32, back_to_back_chain: u32) -> f64 {
     base + potential * (1_800.0 + chain_bonus)
 }
 
-pub(crate) fn estimate_t_spin_potential(rows: &BoardRows, kick_table: KickTable) -> u32 {
+pub(crate) fn estimate_t_spin_potential(
+    rows: &BoardRows,
+    kick_table: KickTable,
+    allow_180: bool,
+) -> u32 {
     let mut best = 0_u32;
     let shapes = piece_shapes(Piece::T);
     let mut reachable_cache = ReachabilityCache::new(rows, Piece::T, kick_table);
@@ -203,6 +207,7 @@ pub(crate) fn estimate_t_spin_potential(rows: &BoardRows, kick_table: KickTable)
                         x,
                         y,
                         kick_table,
+                        allow_180,
                         &mut reachable_cache,
                     )
                 {

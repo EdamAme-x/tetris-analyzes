@@ -239,7 +239,15 @@ export interface NativeBinding {
   applyGarbage(rows: Uint16Array, holes: Uint8Array): Uint16Array;
   rowsToFumenField(rows: Uint16Array): string;
   batchRowsToFumenFields(rows: Uint16Array, boardCount: number): string[];
-  canReachOpenerPlacement(rows: Uint16Array, piece: string, rotation: number, x: number, y: number, kickTable?: NativeKickTable): boolean;
+  canReachOpenerPlacement(
+    rows: Uint16Array,
+    piece: string,
+    rotation: number,
+    x: number,
+    y: number,
+    kickTable?: NativeKickTable,
+    allow180?: boolean
+  ): boolean;
   resolveOpenerRotation(
     rows: Uint16Array,
     piece: string,
@@ -247,7 +255,8 @@ export interface NativeBinding {
     x: number,
     y: number,
     direction: number,
-    kickTable?: NativeKickTable
+    kickTable?: NativeKickTable,
+    allow180?: boolean
   ): NativeRotationResolution;
   detectOpenerSpin(
     rows: Uint16Array,
@@ -256,9 +265,10 @@ export interface NativeBinding {
     x: number,
     y: number,
     spinMode?: NativeSpinMode,
-    kickTable?: NativeKickTable
+    kickTable?: NativeKickTable,
+    allow180?: boolean
   ): NativeSpinDetection;
-  estimateOpenerTSpinPotential(rows: Uint16Array, kickTable?: NativeKickTable): number;
+  estimateOpenerTSpinPotential(rows: Uint16Array, kickTable?: NativeKickTable, allow180?: boolean): number;
   evaluateOpenerFirepower(events: NativeFirepowerInput[]): NativeFirepowerSummary;
   searchOpenerBeam(
     queue: string,
@@ -268,7 +278,8 @@ export interface NativeBinding {
     comboTable?: NativeComboTable,
     kickTable?: NativeKickTable,
     spinMode?: NativeSpinMode,
-    setupPoolMultiplier?: number
+    setupPoolMultiplier?: number,
+    allow180?: boolean
   ): NativeBeamSearchNode[];
   searchOpenerBeamCompact(
     queue: string,
@@ -278,7 +289,8 @@ export interface NativeBinding {
     comboTable?: NativeComboTable,
     kickTable?: NativeKickTable,
     spinMode?: NativeSpinMode,
-    setupPoolMultiplier?: number
+    setupPoolMultiplier?: number,
+    allow180?: boolean
   ): NativeBeamSearchNode[];
   searchOpenerBeamWithPlacements(
     queue: string,
@@ -288,7 +300,8 @@ export interface NativeBinding {
     comboTable?: NativeComboTable,
     kickTable?: NativeKickTable,
     spinMode?: NativeSpinMode,
-    setupPoolMultiplier?: number
+    setupPoolMultiplier?: number,
+    allow180?: boolean
   ): NativeBeamSearchNode[];
   evaluateOpenerBag(
     bag: string,
@@ -299,7 +312,8 @@ export interface NativeBinding {
     topQueueCount: number,
     comboTable?: NativeComboTable,
     kickTable?: NativeKickTable,
-    spinMode?: NativeSpinMode
+    spinMode?: NativeSpinMode,
+    allow180?: boolean
   ): NativeOpenerBagEvaluation;
   mineOpenerBagTemplates(
     bag: string,
@@ -311,6 +325,7 @@ export interface NativeBinding {
     includePaths: boolean,
     comboTable?: NativeComboTable,
     kickTable?: NativeKickTable,
-    spinMode?: NativeSpinMode
+    spinMode?: NativeSpinMode,
+    allow180?: boolean
   ): NativeOpenerBagTemplateMining;
 }

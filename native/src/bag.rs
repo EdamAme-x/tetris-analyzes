@@ -126,6 +126,7 @@ pub(crate) fn evaluate_opener_bag_internal(
     combo_table: ComboTable,
     kick_table: KickTable,
     spin_mode: SpinMode,
+    allow_180: bool,
 ) -> Result<OpenerBagEvaluation> {
     let pieces = parse_unique_bag(bag)?;
     let total_queues = factorial(pieces.len());
@@ -161,6 +162,7 @@ pub(crate) fn evaluate_opener_bag_internal(
             kick_table,
             spin_mode,
             DEFAULT_SETUP_CANDIDATE_POOL_MULTIPLIER,
+            allow_180,
         );
         evaluations.push(evaluate_queue(
             queue_to_string(&queue),
@@ -251,6 +253,7 @@ pub(crate) fn mine_opener_bag_templates_internal(
     combo_table: ComboTable,
     kick_table: KickTable,
     spin_mode: SpinMode,
+    allow_180: bool,
 ) -> Result<OpenerBagTemplateMining> {
     let pieces = parse_unique_bag(bag)?;
     let total_queues = factorial(pieces.len());
@@ -290,6 +293,7 @@ pub(crate) fn mine_opener_bag_templates_internal(
             kick_table,
             spin_mode,
             DEFAULT_SETUP_CANDIDATE_POOL_MULTIPLIER,
+            allow_180,
         );
 
         queue_template_keys.clear();
@@ -351,6 +355,7 @@ pub(crate) fn mine_opener_bag_templates_internal(
             combo_table,
             kick_table,
             spin_mode,
+            allow_180,
         )?;
     }
 
@@ -660,6 +665,7 @@ fn hydrate_template_paths(
     combo_table: ComboTable,
     kick_table: KickTable,
     spin_mode: SpinMode,
+    allow_180: bool,
 ) -> Result<()> {
     let mut hydrated = vec![false; templates.len()];
     for index in 0..templates.len() {
@@ -680,6 +686,7 @@ fn hydrate_template_paths(
             kick_table,
             spin_mode,
             DEFAULT_SETUP_CANDIDATE_POOL_MULTIPLIER,
+            allow_180,
         );
 
         for state in states {
@@ -845,6 +852,7 @@ mod tests {
             ComboTable::Multiplier,
             KickTable::SrsPlus,
             SpinMode::TSpins,
+            true,
         )
         .expect("template mining should succeed");
 

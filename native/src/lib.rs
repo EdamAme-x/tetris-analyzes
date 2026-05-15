@@ -427,6 +427,7 @@ pub fn can_reach_opener_placement(
     x: i32,
     y: i32,
     kick_table: Option<String>,
+    allow_180: Option<bool>,
 ) -> Result<bool> {
     let board = board::rows_to_array(rows.as_ref())?;
     let piece = parse_piece_string(&piece)?;
@@ -447,10 +448,11 @@ pub fn can_reach_opener_placement(
         i8::try_from(y).map_err(|_| Error::from_reason(format!("y must fit in i8, got {y}.")))?;
     let shape = piece_shapes(piece)[shape_index];
     let kick_table = parse_optional_kick_table(kick_table.as_deref())?;
+    let allow_180 = parse_optional_allow_180(allow_180);
 
     Ok(can_place(&board, shape, x, y)
         && (y == 0 || !can_place(&board, shape, x, y - 1))
-        && is_reachable_placement(&board, piece, shape_index, x, y, kick_table))
+        && is_reachable_placement(&board, piece, shape_index, x, y, kick_table, allow_180))
 }
 
 #[napi(js_name = "resolveOpenerRotation")]
@@ -462,6 +464,7 @@ pub fn resolve_opener_rotation(
     y: i32,
     direction: i32,
     kick_table: Option<String>,
+    allow_180: Option<bool>,
 ) -> Result<BeamRotationResolution> {
     let board = board::rows_to_array(rows.as_ref())?;
     let piece = parse_piece_string(&piece)?;
@@ -488,6 +491,16 @@ pub fn resolve_opener_rotation(
         )));
     }
     let kick_table = parse_optional_kick_table(kick_table.as_deref())?;
+    let allow_180 = parse_optional_allow_180(allow_180);
+    if direction == 2 && !allow_180 {
+        return Ok(BeamRotationResolution {
+            success: false,
+            rotation: None,
+            x: None,
+            y: None,
+            kick_index: None,
+        });
+    }
     let shapes = piece_shapes(piece);
     let state = MovementState { shape_index, x, y };
 
@@ -521,6 +534,7 @@ pub fn detect_opener_spin(
     y: i32,
     spin_mode: Option<String>,
     kick_table: Option<String>,
+    allow_180: Option<bool>,
 ) -> Result<BeamSpinDetection> {
     let board = board::rows_to_array(rows.as_ref())?;
     let piece = parse_piece_string(&piece)?;
@@ -548,6 +562,7 @@ pub fn detect_opener_spin(
     };
     let cleared_lines = board::count_full_lines_array(&locked);
     let kick_table = parse_optional_kick_table(kick_table.as_deref())?;
+    let allow_180 = parse_optional_allow_180(allow_180);
     let mut reachable_cache = ReachabilityCache::new(&board, piece, kick_table);
     let spin_mode = parse_optional_spin_mode(spin_mode.as_deref())?;
     let rotation_kick_index = if could_spin_for_mode(&board, &locked, piece, shape, x, y, spin_mode)
@@ -559,6 +574,7 @@ pub fn detect_opener_spin(
             x,
             y,
             kick_table,
+            allow_180,
             &mut reachable_cache,
         )
     } else {
@@ -582,10 +598,12 @@ pub fn detect_opener_spin(
 pub fn estimate_opener_t_spin_potential(
     rows: Uint16Array,
     kick_table: Option<String>,
+    allow_180: Option<bool>,
 ) -> Result<u32> {
     let board = board::rows_to_array(rows.as_ref())?;
     let kick_table = parse_optional_kick_table(kick_table.as_deref())?;
-    Ok(estimate_t_spin_potential(&board, kick_table))
+    let allow_180 = parse_optional_allow_180(allow_180);
+    Ok(estimate_t_spin_potential(&board, kick_table, allow_180))
 }
 
 #[napi(js_name = "evaluateOpenerFirepower")]
@@ -644,6 +662,7 @@ pub fn search_opener_beam(
     kick_table: Option<String>,
     spin_mode: Option<String>,
     setup_pool_multiplier: Option<u32>,
+    allow_180: Option<bool>,
 ) -> Result<Vec<BeamSearchNode>> {
     search_opener_beam_internal(
         queue,
@@ -656,6 +675,7 @@ pub fn search_opener_beam(
         kick_table,
         spin_mode,
         setup_pool_multiplier,
+        allow_180,
     )
 }
 
@@ -669,6 +689,7 @@ pub fn search_opener_beam_compact(
     kick_table: Option<String>,
     spin_mode: Option<String>,
     setup_pool_multiplier: Option<u32>,
+    allow_180: Option<bool>,
 ) -> Result<Vec<BeamSearchNode>> {
     search_opener_beam_internal(
         queue,
@@ -681,6 +702,7 @@ pub fn search_opener_beam_compact(
         kick_table,
         spin_mode,
         setup_pool_multiplier,
+        allow_180,
     )
 }
 
@@ -694,6 +716,7 @@ pub fn search_opener_beam_with_placements(
     kick_table: Option<String>,
     spin_mode: Option<String>,
     setup_pool_multiplier: Option<u32>,
+    allow_180: Option<bool>,
 ) -> Result<Vec<BeamSearchNode>> {
     search_opener_beam_internal(
         queue,
@@ -706,6 +729,7 @@ pub fn search_opener_beam_with_placements(
         kick_table,
         spin_mode,
         setup_pool_multiplier,
+        allow_180,
     )
 }
 
@@ -720,10 +744,12 @@ pub fn evaluate_opener_bag(
     combo_table: Option<String>,
     kick_table: Option<String>,
     spin_mode: Option<String>,
+    allow_180: Option<bool>,
 ) -> Result<OpenerBagEvaluation> {
     let combo_table = parse_optional_combo_table(combo_table.as_deref())?;
     let kick_table = parse_optional_kick_table(kick_table.as_deref())?;
     let spin_mode = parse_optional_spin_mode(spin_mode.as_deref())?;
+    let allow_180 = parse_optional_allow_180(allow_180);
     evaluate_opener_bag_internal(
         &bag,
         beam_width,
@@ -734,6 +760,7 @@ pub fn evaluate_opener_bag(
         combo_table,
         kick_table,
         spin_mode,
+        allow_180,
     )
 }
 
@@ -749,10 +776,12 @@ pub fn mine_opener_bag_templates(
     combo_table: Option<String>,
     kick_table: Option<String>,
     spin_mode: Option<String>,
+    allow_180: Option<bool>,
 ) -> Result<OpenerBagTemplateMining> {
     let combo_table = parse_optional_combo_table(combo_table.as_deref())?;
     let kick_table = parse_optional_kick_table(kick_table.as_deref())?;
     let spin_mode = parse_optional_spin_mode(spin_mode.as_deref())?;
+    let allow_180 = parse_optional_allow_180(allow_180);
     mine_opener_bag_templates_internal(
         &bag,
         beam_width,
@@ -764,6 +793,7 @@ pub fn mine_opener_bag_templates(
         combo_table,
         kick_table,
         spin_mode,
+        allow_180,
     )
 }
 
@@ -778,6 +808,7 @@ fn search_opener_beam_internal(
     kick_table: Option<String>,
     spin_mode: Option<String>,
     setup_pool_multiplier: Option<u32>,
+    allow_180: Option<bool>,
 ) -> Result<Vec<BeamSearchNode>> {
     let pieces = parse_queue(&queue)?;
     let max_depth = usize::min(max_depth as usize, pieces.len());
@@ -786,6 +817,7 @@ fn search_opener_beam_internal(
     let kick_table = parse_optional_kick_table(kick_table.as_deref())?;
     let spin_mode = parse_optional_spin_mode(spin_mode.as_deref())?;
     let setup_pool_multiplier = validate_setup_candidate_pool_multiplier(setup_pool_multiplier)?;
+    let allow_180 = parse_optional_allow_180(allow_180);
 
     Ok(search_opener_states(
         &pieces,
@@ -798,6 +830,7 @@ fn search_opener_beam_internal(
         kick_table,
         spin_mode,
         setup_pool_multiplier,
+        allow_180,
     )
     .into_iter()
     .map(|state| BeamSearchNode::from_search_state(state, include_path))
@@ -815,6 +848,7 @@ pub(crate) fn search_opener_states(
     kick_table: KickTable,
     spin_mode: SpinMode,
     setup_pool_multiplier: usize,
+    allow_180: bool,
 ) -> Vec<SearchState> {
     let future_pieces_by_queue_index = build_future_pieces_by_queue_index(pieces);
     let empty_rows = [0_u16; BOARD_HEIGHT];
@@ -868,6 +902,7 @@ pub(crate) fn search_opener_states(
                                     y,
                                     include_placements,
                                     kick_table,
+                                    allow_180,
                                     &mut reachable_cache,
                                     spin_mode,
                                 ) else {
@@ -963,6 +998,7 @@ pub(crate) fn search_opener_states(
             max_depth,
             kick_table,
             spin_mode,
+            allow_180,
         );
         let preserve_holeless = matches!(
             holeless_diversity_start_depth,
@@ -1293,6 +1329,7 @@ fn score_t_spin_setup_potential(
     max_depth: usize,
     kick_table: KickTable,
     spin_mode: SpinMode,
+    allow_180: bool,
 ) {
     let mut potential_by_rows = FastHashMap::<BoardRows, u32>::default();
     let mut quad_well_by_rows = FastHashMap::<BoardRows, u32>::default();
@@ -1322,7 +1359,7 @@ fn score_t_spin_setup_potential(
         state.t_spin_potential = if should_score_t_spin_potential {
             *potential_by_rows
                 .entry(state.rows)
-                .or_insert_with(|| estimate_t_spin_potential(&state.rows, kick_table))
+                .or_insert_with(|| estimate_t_spin_potential(&state.rows, kick_table, allow_180))
         } else {
             0
         };
@@ -1487,6 +1524,7 @@ fn place_grounded_at_y(
     y: i8,
     include_placement: bool,
     kick_table: KickTable,
+    allow_180: bool,
     reachable_cache: &mut ReachabilityCache,
     spin_mode: SpinMode,
 ) -> Option<PlacedBoard> {
@@ -1497,6 +1535,7 @@ fn place_grounded_at_y(
         x,
         y,
         kick_table,
+        allow_180,
         reachable_cache,
     ) {
         return None;
@@ -1518,6 +1557,7 @@ fn place_grounded_at_y(
                 x,
                 y,
                 kick_table,
+                allow_180,
                 reachable_cache,
             )
         } else {
@@ -1718,6 +1758,10 @@ fn parse_optional_kick_table(input: Option<&str>) -> Result<KickTable> {
         .map(parse_kick_table)
         .transpose()
         .map(|kick_table| kick_table.unwrap_or(KickTable::SrsPlus))
+}
+
+fn parse_optional_allow_180(input: Option<bool>) -> bool {
+    input.unwrap_or(tetrio_tables::TL_ALLOW_180)
 }
 
 fn parse_optional_spin_mode(input: Option<&str>) -> Result<SpinMode> {
@@ -2083,6 +2127,7 @@ mod tests {
             1,
             KickTable::SrsPlus,
             SpinMode::TSpins,
+            true,
         );
 
         assert!(beam[0].score > base_score);

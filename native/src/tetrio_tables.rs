@@ -73,6 +73,7 @@ pub const COMBO_MINIFIER_LOG: f64 = 1.25_f64;
 pub const ALL_CLEAR_ATTACK: u32 = 10_u32;
 pub const ALL_CLEAR_POINTS: u32 = 3500_u32;
 
+pub const TL_ALLOW_180: bool = true;
 pub const TL_SPIN_BONUSES: &str = "all-mini+";
 pub const TL_KICKSET: &str = "SRS+";
 pub const TL_COMBO_TABLE: &str = "multiplier";

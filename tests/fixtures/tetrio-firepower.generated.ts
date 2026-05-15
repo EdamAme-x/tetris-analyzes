@@ -5,6 +5,7 @@ export const TETRIO_FIREPOWER_SNAPSHOT = {
     asset: "https://tetr.io/js/tetrio.js?hv=7eebfc9cd.987f91854aad.20260504T210001",
     lastModified: "Fri, 15 May 2026 05:42:44 GMT",
     tlOptions: {
+      allow180: true,
       spinbonuses: "all-mini+",
       kickset: "SRS+",
       combotable: "multiplier",

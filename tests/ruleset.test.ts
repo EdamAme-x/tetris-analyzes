@@ -94,6 +94,7 @@ describe("TETR.IO-derived ruleset helpers", () => {
     expect(usesStaticGravity(ruleset)).toBe(true);
     expect(ruleset).toMatchObject({
       hold: { mode: "ON", infinite: "OFF" },
+      allow180: true,
       spins: "ALL-MINI+",
       comboTable: "MULTIPLIER",
       kickTable: "SRS+",
@@ -101,6 +102,7 @@ describe("TETR.IO-derived ruleset helpers", () => {
       garbage: { mode: "OFF", cheeseLayerHeight: 6, cheeseTimerInterval: 4, cheeseMessinessPercent: 100 }
     });
     expect(toTetrioConfig(ruleset)).toMatchObject({
+      allow180: "on",
       spins: TETRIO_TL_OPTIONS.spinbonuses,
       combotable: TETRIO_TL_OPTIONS.combotable,
       kickset: TETRIO_TL_OPTIONS.kickset
@@ -124,6 +126,7 @@ describe("TETR.IO-derived ruleset helpers", () => {
   test("accepts TETR.IO internal values and exports custom-room config keys", () => {
     const ruleset = createRuleset({
       hold: { mode: "ON", infinite: "ON" },
+      allow180: false,
       spins: "all-mini+",
       comboTable: "classic guideline",
       kickTable: "SRS-X",
@@ -139,6 +142,7 @@ describe("TETR.IO-derived ruleset helpers", () => {
     expect(toTetrioConfig(ruleset)).toEqual({
       hold: "on",
       infinite_hold: "on",
+      allow180: "off",
       spins: "all-mini+",
       combotable: "classic guideline",
       kickset: "SRS-X",
@@ -161,6 +165,7 @@ describe("TETR.IO-derived ruleset helpers", () => {
   test("models TETR.IO combo garbage from the extracted client tables", () => {
     expect(TETRIO_TABLE_SOURCE.asset).toContain("/js/tetrio.js?hv=7eebfc9cd.987f91854aad.20260504T210001");
     expect(TETRIO_TL_OPTIONS).toMatchObject({
+      allow180: true,
       spinbonuses: "all-mini+",
       kickset: "SRS+",
       combotable: "multiplier",
@@ -219,6 +224,6 @@ describe("TETR.IO-derived ruleset helpers", () => {
       tl: TETRIO_TL_OPTIONS
     });
 
-    expect(createHash("sha256").update(payload).digest("hex")).toBe("e1513987cfb839736ecd0afee2f86aede1b58d37467f25f3bc84c9741e259663");
+    expect(createHash("sha256").update(payload).digest("hex")).toBe("a63a33ab6e64345e1d0275c6f19b2a0f72e67659ae2bf265c3a6c9999d675f1d");
   });
 });

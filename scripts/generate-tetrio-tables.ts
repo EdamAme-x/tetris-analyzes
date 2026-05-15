@@ -38,6 +38,7 @@ const RUST_PIECES = [
 const ZERO_KICK: RustKick = { x: 0, y: 0 };
 const TETRIO_TL_PRESET = "tetra league";
 const TETRIO_TL_OPTION_DEFINITIONS = [
+  { key: "allow180", type: "boolean" },
   { key: "spinbonuses", type: "string" },
   { key: "kickset", type: "string" },
   { key: "combotable", type: "string" },
@@ -532,6 +533,7 @@ function formatGeneratedRustModule(source: BundleSource, tables: Record<string, 
     `pub const ALL_CLEAR_ATTACK: u32 = ${formatRustU32(readInteger(garbage, "ALL_CLEAR", "TETRIO_GARBAGE_ATTACK_TABLE"))};`,
     `pub const ALL_CLEAR_POINTS: u32 = ${formatRustU32(readInteger(scoring, "ALL_CLEAR", "TETRIO_SCORING_TABLE"))};`,
     "",
+    `pub const TL_ALLOW_180: bool = ${formatRustBool(readBoolean(tlOptions, "allow180", "TETRIO_TL_OPTIONS"))};`,
     `pub const TL_SPIN_BONUSES: &str = ${formatRustString(readString(tlOptions, "spinbonuses", "TETRIO_TL_OPTIONS"))};`,
     `pub const TL_KICKSET: &str = ${formatRustString(readString(tlOptions, "kickset", "TETRIO_TL_OPTIONS"))};`,
     `pub const TL_COMBO_TABLE: &str = ${formatRustString(readString(tlOptions, "combotable", "TETRIO_TL_OPTIONS"))};`,

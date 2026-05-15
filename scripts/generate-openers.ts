@@ -53,7 +53,8 @@ function createGenerateOpenersCliConfig(argv: readonly string[]): GenerateOpener
     rules: {
       ...(args.has("--spin-mode") ? { spinMode: args.get("--spin-mode") as GenerateOpenersRules["spinMode"] } : {}),
       ...(args.has("--combo-table") ? { comboTable: args.get("--combo-table") as GenerateOpenersRules["comboTable"] } : {}),
-      ...(args.has("--kick-table") ? { kickTable: args.get("--kick-table") as GenerateOpenersRules["kickTable"] } : {})
+      ...(args.has("--kick-table") ? { kickTable: args.get("--kick-table") as GenerateOpenersRules["kickTable"] } : {}),
+      ...(args.has("--allow-180") ? { allow180: readBooleanOption(args, "--allow-180") ?? true } : {})
     }
   };
 }
@@ -72,7 +73,8 @@ function parseArgs(argv: readonly string[]): Map<string, string> {
     "--preview-mode",
     "--spin-mode",
     "--combo-table",
-    "--kick-table"
+    "--kick-table",
+    "--allow-180"
   ]);
   const parsed = new Map<string, string>();
   for (let index = 0; index < argv.length; index += 1) {

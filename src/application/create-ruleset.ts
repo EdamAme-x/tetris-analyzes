@@ -41,6 +41,7 @@ export function createRuleset(input: RulesetInput = {}): Ruleset {
   return {
     baseBoard: input.baseBoard === undefined ? createEmptyBitBoard() : bitBoardFromRows(input.baseBoard),
     hold: normalizeHold(input.hold, input.infiniteHold),
+    allow180: input.allow180 ?? TETRIO_TL_OPTIONS.allow180,
     spins: normalizeOption(input.spins ?? TETRIO_TL_OPTIONS.spinbonuses, SPIN_OPTIONS, "spins"),
     comboTable: normalizeOption(input.comboTable ?? TETRIO_TL_OPTIONS.combotable, COMBO_TABLE_OPTIONS, "comboTable"),
     kickTable: normalizeOption(input.kickTable ?? TETRIO_TL_OPTIONS.kickset, KICK_TABLE_OPTIONS, "kickTable"),
@@ -61,6 +62,7 @@ export function toTetrioConfig(ruleset: Ruleset): TetrioConfig {
   return {
     hold: toOnOffValue(ruleset.hold.mode),
     infinite_hold: toOnOffValue(ruleset.hold.infinite),
+    allow180: toOnOffValue(ruleset.allow180),
     spins: getTetrioValue(ruleset.spins, SPIN_OPTIONS, "spins"),
     combotable: getTetrioValue(ruleset.comboTable, COMBO_TABLE_OPTIONS, "comboTable"),
     kickset: getTetrioValue(ruleset.kickTable, KICK_TABLE_OPTIONS, "kickTable"),
@@ -213,8 +215,8 @@ function getTetrioValue<T extends string>(
   return option.tetrioValue;
 }
 
-function toOnOffValue(value: HoldMode): "on" | "off" {
-  return value === "ON" ? "on" : "off";
+function toOnOffValue(value: HoldMode | boolean): "on" | "off" {
+  return value === "ON" || value === true ? "on" : "off";
 }
 
 function toComboTableKey(comboTable: Exclude<ComboTable, "MULTIPLIER">): TetrioComboTableKey {

@@ -6,6 +6,7 @@ import {
   evaluateOpenerBag,
   evaluateOpenerFirepower,
   mineOpenerBagTemplates,
+  resolveOpenerRotation,
   searchOpenerBeam,
   searchOpenerBeamCompact,
   searchOpenerBeamWithPlacements,
@@ -144,6 +145,17 @@ describe("native opener beam search", () => {
 
     expect(canReachOpenerPlacement({ rows: board, piece: "T", rotation: 1, x: 0, y: 0, kickTable: "SRS+" })).toBe(true);
     expect(canReachOpenerPlacement({ rows: board, piece: "T", rotation: 1, x: 0, y: 0, kickTable: "NONE" })).toBe(false);
+    expect(
+      resolveOpenerRotation({ rows: board, piece: "T", rotation: 0, x: 3, y: 0, direction: 2, kickTable: "SRS+", allow180: false })
+    ).toMatchObject({
+      success: false
+    });
+    expect(
+      resolveOpenerRotation({ rows: board, piece: "T", rotation: 0, x: 3, y: 0, direction: 2, kickTable: "SRS+", allow180: true })
+    ).toMatchObject({
+      success: true,
+      rotation: 2
+    });
     const parserSmoke = { queue: "TIL", beamWidth: 4, maxDepth: 1 } as const;
     expect(() => searchOpenerBeam({ ...parserSmoke, kickTable: "SRS-X" })).not.toThrow();
     expect(() => searchOpenerBeam({ ...parserSmoke, kickTable: "TETRA-X" })).not.toThrow();
