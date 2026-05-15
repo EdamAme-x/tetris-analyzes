@@ -188,6 +188,7 @@ export interface OpenerScenarioReachablePhaseFrontier {
 export interface OpenerScenarioReachableQuality {
   readonly rank: number;
   readonly queueIndex: number;
+  readonly attack: number;
   readonly difficultAttack: number;
   readonly spinClears: number;
   readonly spinAttack: number;
@@ -1406,6 +1407,7 @@ function searchNodeQuality(node: SearchOpenerBeamNode, index: number): OpenerSce
   return {
     rank: index + 1,
     queueIndex: node.queueIndex,
+    attack: node.attack,
     difficultAttack: node.difficultAttack,
     spinClears: nodeSpinClears(node),
     spinAttack: nodeSpinAttack(node),
@@ -1424,6 +1426,7 @@ function meetsReplayQuality(quality: OpenerScenarioReachableQuality, target: Ran
   return (
     hasFirepowerTarget &&
     quality.queueIndex >= target.queueIndex &&
+    quality.attack >= target.attack &&
     quality.difficultAttack >= target.difficultAttack &&
     quality.spinClears >= target.spinClears &&
     quality.spinAttack >= target.spinAttack &&

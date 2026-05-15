@@ -1342,6 +1342,53 @@ describe("opener experiment runner", () => {
     });
   });
 
+  test("requires replay quality hits to preserve total attack", () => {
+    const targetRows = [7, 11, 13, ...new Array(17).fill(0)];
+    const hitRows = [3, 5, 9, ...new Array(17).fill(0)];
+    const report = runOpenerExperiment({
+      scenarios: [rankingScenario("source", "TI")],
+      templateReplay: {
+        scenarios: [replayScenario("attack-miss", "JO")],
+        topTemplates: 1
+      },
+      clock: createClock("2026-05-14T00:00:00.000Z", [0, 1]),
+      fumenCodec: fakeCodec,
+      search: (input) => {
+        if (input.queue === "TI") {
+          return [
+            {
+              ...candidateNode("source"),
+              rows: targetRows,
+              attack: 15,
+              difficultAttack: 14,
+              difficultClears: 3,
+              tSpinClears: 3,
+              tSpinAttack: 14,
+              backToBackChain: 3
+            }
+          ];
+        }
+        return [
+          {
+            ...candidateNode("attack-miss"),
+            rows: hitRows,
+            attack: 14,
+            difficultAttack: 14,
+            difficultClears: 3,
+            tSpinClears: 3,
+            tSpinAttack: 14,
+            backToBackChain: 3
+          }
+        ];
+      }
+    });
+
+    expect(report.templateReplay?.templates[0]).toMatchObject({
+      replayHitCount: 0,
+      qualityReplayHitCount: 0
+    });
+  });
+
   test("requires replay quality hits to preserve continuation potential", () => {
     const targetRows = [7, 11, 13, ...new Array(17).fill(0)];
     const report = runOpenerExperiment({
