@@ -17,7 +17,7 @@
     "format:check": "prettier --check .",
     "generate:tetrio-tables": "bun run scripts/generate-tetrio-tables.ts",
     "lint": "eslint .",
-    "test:native": "cargo test --manifest-path native/Cargo.toml",
+    "test:native": "cargo test --manifest-path native/Cargo.toml --features napi/noop,napi-derive/noop",
     "test": "bun test",
     "verify": "bun run build:native:debug && bun run check && bun run lint && bun run format:check && bun run test:native && bun test"
   },

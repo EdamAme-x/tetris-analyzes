@@ -6,6 +6,7 @@ import type {
   NativeFirepowerSummary,
   NativeKickTable,
   NativeOpenerBagEvaluation,
+  NativeOpenerBagTemplateMining,
   NativeSpinMode,
   NativeSpinDetection
 } from "../infrastructure/native/binding-types";
@@ -35,8 +36,22 @@ export interface EvaluateOpenerBagInput {
   readonly spinMode?: NativeSpinMode;
 }
 
+export interface MineOpenerBagTemplatesInput {
+  readonly bag?: string | readonly SearchPiece[];
+  readonly beamWidth?: number;
+  readonly hold?: boolean;
+  readonly maxDepth?: number;
+  readonly maxQueues?: number;
+  readonly topTemplateCount?: number;
+  readonly includePath?: boolean;
+  readonly comboTable?: NativeComboTable;
+  readonly kickTable?: NativeKickTable;
+  readonly spinMode?: NativeSpinMode;
+}
+
 export type SearchOpenerBeamNode = NativeBeamSearchNode;
 export type OpenerBagEvaluation = NativeOpenerBagEvaluation;
+export type OpenerBagTemplateMining = NativeOpenerBagTemplateMining;
 
 export interface OpenerPlacementReachabilityInput {
   readonly rows: Uint16Array;
@@ -99,6 +114,22 @@ export function evaluateOpenerBag(input: EvaluateOpenerBagInput = {}): OpenerBag
     input.maxDepth ?? Math.min(4, bag.length),
     input.maxQueues ?? 0,
     input.topQueueCount ?? 16,
+    input.comboTable,
+    input.kickTable,
+    input.spinMode
+  );
+}
+
+export function mineOpenerBagTemplates(input: MineOpenerBagTemplatesInput = {}): OpenerBagTemplateMining {
+  const bag = input.bag === undefined ? "TIJLOSZ" : typeof input.bag === "string" ? input.bag : input.bag.join("");
+  return loadNativeBinding().mineOpenerBagTemplates(
+    bag,
+    input.beamWidth ?? 64,
+    input.hold ?? true,
+    input.maxDepth ?? Math.min(4, bag.length),
+    input.maxQueues ?? 0,
+    input.topTemplateCount ?? 16,
+    input.includePath ?? false,
     input.comboTable,
     input.kickTable,
     input.spinMode

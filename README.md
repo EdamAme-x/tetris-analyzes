@@ -18,6 +18,17 @@ bun run experiment:opener -- --preset=continuation --top=3
 `experiment:opener` writes JSON/Markdown reports with fumen preview URLs under `experiments/runs/`.
 Executable examples live in `tests/`.
 
+## Next Tasks
+
+- [x] Remove curated opener queues from production experiment presets
+- [x] Add seed-based train/validation/test distribution splits
+- [x] Add native bag-1 all-queue template mining and reproducibility ranking
+- [ ] Add exact placement frontier enumeration for bag-1 templates
+- [ ] Add known-opener fumen fixtures and recall@K benchmarks
+- [ ] Confirm the current TETR.IO TL spin/B2B profile from extracted client tables
+- [ ] Add column-major board storage for search hot paths
+- [ ] Add optional DAG/BMCTS continuation search for bag-2+
+
 ## Progress
 
 - [x] Native bitboard, line clear, garbage, and fumen field helpers

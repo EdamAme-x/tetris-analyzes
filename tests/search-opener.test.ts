@@ -5,6 +5,7 @@ import {
   estimateOpenerTSpinPotential,
   evaluateOpenerBag,
   evaluateOpenerFirepower,
+  mineOpenerBagTemplates,
   searchOpenerBeam,
   searchOpenerBeamCompact,
   searchOpenerBeamWithPlacements,
@@ -383,6 +384,51 @@ describe("native opener beam search", () => {
     expect(typeof evaluation.topQueues[0]?.tSpinAttack).toBe("number");
     expect(typeof evaluation.topQueues[0]?.backToBackChain).toBe("number");
     expect(typeof evaluation.topQueues[0]?.tSpinPotential).toBe("number");
+  });
+
+  test("mines opener templates across all bag orders in native code", () => {
+    const mining = mineOpenerBagTemplates({ bag: "TIO", beamWidth: 32, hold: true, maxDepth: 3, topTemplateCount: 4, includePath: true });
+    const [topTemplate] = mining.topTemplates;
+
+    expect(mining.bag).toBe("TIO");
+    expect(mining.totalQueues).toBe(6);
+    expect(mining.searchedQueues).toBe(6);
+    expect(mining.exact).toBe(true);
+    expect(mining.buildableQueues).toBe(6);
+    expect(mining.templateCount).toBeGreaterThan(0);
+    expect(topTemplate).toBeDefined();
+    expect(topTemplate?.supportQueues).toBeGreaterThan(0);
+    expect(topTemplate?.supportRate).toBeGreaterThan(0);
+    expect(topTemplate?.bestQueue).toHaveLength(3);
+    expect(topTemplate?.rows).toHaveLength(20);
+    expect(topTemplate?.path).toHaveLength(3);
+
+    expect(
+      mineOpenerBagTemplates({ bag: "TIO", beamWidth: 32, hold: true, maxDepth: 3, topTemplateCount: 1 }).topTemplates[0]?.path
+    ).toHaveLength(0);
+  });
+
+  test("passes rules into native template mining and rejects invalid options", () => {
+    expect(() =>
+      mineOpenerBagTemplates({
+        bag: "TIO",
+        beamWidth: 8,
+        maxDepth: 2,
+        maxQueues: 2,
+        comboTable: "CLASSIC GUIDELINE",
+        kickTable: "SRS-X",
+        spinMode: "ALL-SPINS"
+      })
+    ).not.toThrow();
+    expect(() => mineOpenerBagTemplates({ bag: "TIO", comboTable: "BAD TABLE" as "MODERN GUIDELINE", maxQueues: 1 })).toThrow(
+      "Unknown opener firepower combo table"
+    );
+    expect(() => mineOpenerBagTemplates({ bag: "TIO", kickTable: "BAD KICKS" as "SRS", maxQueues: 1 })).toThrow(
+      "Unsupported native opener kick table"
+    );
+    expect(() => mineOpenerBagTemplates({ bag: "TIO", spinMode: "BAD SPINS" as "T-SPINS", maxQueues: 1 })).toThrow(
+      "Unsupported native opener spin mode"
+    );
   });
 
   test("can sample a capped number of 7-bag queue branches", () => {

@@ -1,6 +1,6 @@
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
-use std::collections::{hash_map::Entry, HashMap};
+use std::collections::{hash_map::Entry, HashMap, HashSet};
 use std::hash::{BuildHasherDefault, Hash, Hasher};
 
 mod bag;
@@ -12,7 +12,10 @@ mod pieces;
 mod spin;
 mod tetrio_tables;
 
-use bag::{evaluate_opener_bag_internal, OpenerBagEvaluation};
+use bag::{
+    evaluate_opener_bag_internal, mine_opener_bag_templates_internal, OpenerBagEvaluation,
+    OpenerBagTemplateMining,
+};
 use board::{BoardEvaluation, BoardRows, BOARD_HEIGHT, BOARD_WIDTH};
 use firepower::{
     advance_firepower_for_clear_with_combo_table, advance_firepower_with_combo_table,
@@ -33,12 +36,13 @@ use spin::{
 };
 use tetrio_tables::{ComboTable, KickTable};
 
-type FastHashMap<K, V> = HashMap<K, V, BuildHasherDefault<FastHasher>>;
+pub(crate) type FastHashMap<K, V> = HashMap<K, V, BuildHasherDefault<FastHasher>>;
+pub(crate) type FastHashSet<K> = HashSet<K, BuildHasherDefault<FastHasher>>;
 pub(crate) const DEFAULT_SETUP_CANDIDATE_POOL_MULTIPLIER: usize = 14;
 const MAX_SETUP_CANDIDATE_POOL_MULTIPLIER: usize = 64;
 
 #[derive(Default)]
-struct FastHasher {
+pub(crate) struct FastHasher {
     hash: u64,
 }
 
@@ -91,12 +95,12 @@ impl Hasher for FastHasher {
 
 #[derive(Clone)]
 pub(crate) struct SearchState {
-    rows: BoardRows,
-    hold: Option<Piece>,
-    queue_index: usize,
+    pub(crate) rows: BoardRows,
+    pub(crate) hold: Option<Piece>,
+    pub(crate) queue_index: usize,
     pub(crate) depth: usize,
     pub(crate) path: Vec<PlacementStep>,
-    path_tie_breaker: u64,
+    pub(crate) path_tie_breaker: u64,
     placements: Vec<Placement>,
     pub(crate) score: f64,
     pub(crate) metrics: BoardEvaluation,
@@ -158,7 +162,7 @@ pub(crate) struct PlacementStep {
 }
 
 impl PlacementStep {
-    fn format(self) -> String {
+    pub(crate) fn format(self) -> String {
         format_placement(self.piece, self.rotation, self.x, self.y, self.used_hold)
     }
 }
@@ -625,6 +629,36 @@ pub fn evaluate_opener_bag(
         max_depth,
         max_queues,
         top_queue_count,
+        combo_table,
+        kick_table,
+        spin_mode,
+    )
+}
+
+#[napi(js_name = "mineOpenerBagTemplates")]
+pub fn mine_opener_bag_templates(
+    bag: String,
+    beam_width: u32,
+    hold_enabled: bool,
+    max_depth: u32,
+    max_queues: u32,
+    top_template_count: u32,
+    include_paths: bool,
+    combo_table: Option<String>,
+    kick_table: Option<String>,
+    spin_mode: Option<String>,
+) -> Result<OpenerBagTemplateMining> {
+    let combo_table = parse_optional_combo_table(combo_table.as_deref())?;
+    let kick_table = parse_optional_kick_table(kick_table.as_deref())?;
+    let spin_mode = parse_optional_spin_mode(spin_mode.as_deref())?;
+    mine_opener_bag_templates_internal(
+        &bag,
+        beam_width,
+        hold_enabled,
+        max_depth,
+        max_queues,
+        top_template_count,
+        include_paths,
         combo_table,
         kick_table,
         spin_mode,

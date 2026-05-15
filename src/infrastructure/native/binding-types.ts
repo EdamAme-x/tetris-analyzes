@@ -171,6 +171,44 @@ export interface NativeOpenerBagEvaluation {
   topQueues: NativeOpenerQueueEvaluation[];
 }
 
+export interface NativeOpenerBagTemplate {
+  key: string;
+  supportQueues: number;
+  supportRate: number;
+  bestQueue: string;
+  bestScore: number;
+  weightedScore: number;
+  rows: number[];
+  hold?: string | null;
+  queueIndex: number;
+  depth: number;
+  path: string[];
+  attack: number;
+  difficultAttack: number;
+  points: number;
+  allClears: number;
+  difficultClears: number;
+  spinClears?: number;
+  spinAttack?: number;
+  tSpinClears: number;
+  tSpinAttack: number;
+  combo: number;
+  backToBackChain: number;
+  tSpinPotential: number;
+  holes: number;
+  bumpiness: number;
+}
+
+export interface NativeOpenerBagTemplateMining {
+  bag: string;
+  totalQueues: number;
+  searchedQueues: number;
+  exact: boolean;
+  buildableQueues: number;
+  templateCount: number;
+  topTemplates: NativeOpenerBagTemplate[];
+}
+
 export interface NativeBinding {
   createEmptyBoard(): Uint16Array;
   copyBoardRows(rows: Uint16Array): Uint16Array;
@@ -236,4 +274,16 @@ export interface NativeBinding {
     kickTable?: NativeKickTable,
     spinMode?: NativeSpinMode
   ): NativeOpenerBagEvaluation;
+  mineOpenerBagTemplates(
+    bag: string,
+    beamWidth: number,
+    holdEnabled: boolean,
+    maxDepth: number,
+    maxQueues: number,
+    topTemplateCount: number,
+    includePaths: boolean,
+    comboTable?: NativeComboTable,
+    kickTable?: NativeKickTable,
+    spinMode?: NativeSpinMode
+  ): NativeOpenerBagTemplateMining;
 }

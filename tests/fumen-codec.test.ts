@@ -139,6 +139,15 @@ describe("TetrisFumenCodec", () => {
         bestScore: 0,
         paretoFront: [],
         topQueues: []
+      }),
+      mineOpenerBagTemplates: () => ({
+        bag: "TIJLOSZ",
+        totalQueues: 0,
+        searchedQueues: 0,
+        exact: true,
+        buildableQueues: 0,
+        templateCount: 0,
+        topTemplates: []
       })
     };
 
