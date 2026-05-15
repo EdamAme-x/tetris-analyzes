@@ -7,8 +7,11 @@ interface OpenerRegressionCase {
   readonly minDepth: number;
   readonly minQueueIndex?: number;
   readonly minAttack?: number;
+  readonly minDifficultAttack?: number;
   readonly minTSpinClears?: number;
+  readonly minTSpinAttack?: number;
   readonly minBackToBackChain?: number;
+  readonly maxHoles?: number;
 }
 
 interface OpenerRegressionResult {
@@ -90,6 +93,19 @@ const cases: OpenerRegressionCase[] = [
     minAttack: 12,
     minTSpinClears: 3,
     minBackToBackChain: 3
+  },
+  {
+    name: "tl-3spin-14attack",
+    input: { queue: "ZTSLOJIZJTILSOLTIZJSO", beamWidth: 256, hold: true, maxDepth: 21, setupPoolMultiplier: 18 },
+    iterations: 1,
+    minDepth: 20,
+    minQueueIndex: 21,
+    minAttack: 14,
+    minDifficultAttack: 14,
+    minTSpinClears: 3,
+    minTSpinAttack: 14,
+    minBackToBackChain: 3,
+    maxHoles: 0
   }
 ];
 
@@ -167,11 +183,20 @@ function runCase(bench: OpenerRegressionCase): OpenerRegressionResult {
   if (top.attack < (bench.minAttack ?? 0)) {
     throw new Error(`Regression case ${bench.name} attack ${top.attack} fell below ${bench.minAttack}.`);
   }
+  if (top.difficultAttack < (bench.minDifficultAttack ?? 0)) {
+    throw new Error(`Regression case ${bench.name} difficult attack ${top.difficultAttack} fell below ${bench.minDifficultAttack}.`);
+  }
   if (top.tSpinClears < (bench.minTSpinClears ?? 0)) {
     throw new Error(`Regression case ${bench.name} T-spin clears ${top.tSpinClears} fell below ${bench.minTSpinClears}.`);
   }
+  if (top.tSpinAttack < (bench.minTSpinAttack ?? 0)) {
+    throw new Error(`Regression case ${bench.name} T-spin attack ${top.tSpinAttack} fell below ${bench.minTSpinAttack}.`);
+  }
   if (top.backToBackChain < (bench.minBackToBackChain ?? 0)) {
     throw new Error(`Regression case ${bench.name} B2B chain ${top.backToBackChain} fell below ${bench.minBackToBackChain}.`);
+  }
+  if (top.holes > (bench.maxHoles ?? Number.POSITIVE_INFINITY)) {
+    throw new Error(`Regression case ${bench.name} holes ${top.holes} exceeded ${bench.maxHoles}.`);
   }
   return {
     name: bench.name,

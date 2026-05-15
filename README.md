@@ -120,3 +120,4 @@ Executable examples live in `tests/`.
 - [x] Skip native path-history cloning for compact replay and bag evaluation searches
 - [x] Use measured wider setup pools on TL continuation queues that unlock 14-attack holeless lines
 - [x] Measure opener experiments with compact native searches while keeping detailed fumen generation separate
+- [x] Add a bench regression gate for holeless 14-attack triple T-spin continuation lines
