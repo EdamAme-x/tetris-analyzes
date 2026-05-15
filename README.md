@@ -13,6 +13,7 @@ bun run experiment:opener
 bun run experiment:opener -- --preset=distribution --top=3
 bun run experiment:opener -- --preset=distribution --seed=my-run --train-samples=24 --validation-samples=64 --test-samples=128 --top=3
 bun run experiment:opener -- --preset=continuation --top=3
+bun run generate:openers -- --top=3
 ```
 
 `experiment:opener` writes JSON/Markdown reports with fumen preview URLs under `experiments/runs/`.
@@ -23,6 +24,7 @@ Executable examples live in `tests/`.
 - [x] Remove curated opener queues from production experiment presets
 - [x] Add seed-based train/validation/test distribution splits
 - [x] Add native bag-1 all-queue template mining and reproducibility ranking
+- [x] Add a fumen-ready opener generation command from native mining
 - [ ] Add exact placement frontier enumeration for bag-1 templates
 - [ ] Add known-opener fumen fixtures and recall@K benchmarks
 - [ ] Confirm the current TETR.IO TL spin/B2B profile from extracted client tables
