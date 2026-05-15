@@ -42,18 +42,18 @@ describe("opener experiment runner", () => {
     expect(DEFAULT_OPENER_EXPERIMENT_SCENARIOS[0]).toMatchObject({
       name: "train-001",
       hold: true,
-      beamWidth: 256,
+      beamWidth: 512,
       maxDepth: 21,
-      setupPoolMultiplier: 32,
+      setupPoolMultiplier: 64,
       rules: TETRIO_TL_OPENER_SEARCH_RULES,
       qualityGateRequired: false,
       qualityGate: {
         minQueueIndex: 21,
         minAttack: 9,
         minDifficultAttack: 9,
-        minTSpinClears: 2,
-        minTSpinAttack: 7,
-        minBackToBackChain: 2,
+        minTSpinClears: 3,
+        minTSpinAttack: 8,
+        minBackToBackChain: 3,
         maxAllClears: 0,
         maxHoles: 0
       }
@@ -89,10 +89,11 @@ describe("opener experiment runner", () => {
       CONTINUATION_OPENER_EXPERIMENT_SCENARIOS.length
     );
     expect(CONTINUATION_OPENER_EXPERIMENT_SCENARIOS.every((scenario) => isThreeBagQueue(scenario.queue))).toBe(true);
-    expect(CONTINUATION_OPENER_EXPERIMENT_SCENARIOS.every((scenario) => scenario.beamWidth === 256)).toBe(true);
+    expect(CONTINUATION_OPENER_EXPERIMENT_SCENARIOS.every((scenario) => scenario.beamWidth === 512)).toBe(true);
     expect(CONTINUATION_OPENER_EXPERIMENT_SCENARIOS.every((scenario) => scenario.maxDepth === 21)).toBe(true);
-    expect(CONTINUATION_OPENER_EXPERIMENT_SCENARIOS.every((scenario) => scenario.setupPoolMultiplier === 32)).toBe(true);
-    expect(CONTINUATION_OPENER_EXPERIMENT_SCENARIOS.every((scenario) => scenario.qualityGate?.minBackToBackChain === 2)).toBe(true);
+    expect(CONTINUATION_OPENER_EXPERIMENT_SCENARIOS.every((scenario) => scenario.setupPoolMultiplier === 64)).toBe(true);
+    expect(CONTINUATION_OPENER_EXPERIMENT_SCENARIOS.every((scenario) => scenario.qualityGate?.minTSpinClears === 3)).toBe(true);
+    expect(CONTINUATION_OPENER_EXPERIMENT_SCENARIOS.every((scenario) => scenario.qualityGate?.minBackToBackChain === 3)).toBe(true);
     expect(CONTINUATION_OPENER_EXPERIMENT_SCENARIOS.every((scenario) => scenario.qualityGate?.maxAllClears === 0)).toBe(true);
     expect(CONTINUATION_OPENER_EXPERIMENT_SCENARIOS.every((scenario) => scenario.tags?.includes("three-bag"))).toBe(true);
   });
@@ -119,19 +120,20 @@ describe("opener experiment runner", () => {
   test("defaults continuation CLI runs to validation and certification replay", () => {
     const config = createOpenerExperimentCliConfig(["--preset=continuation", "--top=3"]);
 
-    expect(defaultTrainSamples("continuation")).toBe(4);
-    expect(defaultSurvivabilityReplay("continuation")).toBe(8);
-    expect(defaultCertificationReplay("continuation")).toBe(16);
-    expect(defaultReplayTemplatePool("continuation", 3)).toBe(64);
+    expect(defaultTrainSamples("continuation")).toBe(8);
+    expect(defaultSurvivabilityReplay("continuation")).toBe(16);
+    expect(defaultCertificationReplay("continuation")).toBe(64);
+    expect(defaultReplayTemplatePool("continuation", 3)).toBe(128);
     expect(config.displayTop).toBe(3);
-    expect(config.survivabilityReplay).toBe(8);
-    expect(config.certificationReplay).toBe(16);
-    expect(config.replayTopTemplates).toBe(64);
-    expect(config.experimentTop).toBe(64);
-    expect(config.scenarios).toHaveLength(4);
-    expect(config.scenarios.every((scenario) => scenario.setupPoolMultiplier === 32)).toBe(true);
-    expect(config.validationScenarios).toHaveLength(8);
-    expect(config.testScenarios).toHaveLength(16);
+    expect(config.survivabilityReplay).toBe(16);
+    expect(config.certificationReplay).toBe(64);
+    expect(config.replayTopTemplates).toBe(128);
+    expect(config.experimentTop).toBe(128);
+    expect(config.scenarios).toHaveLength(8);
+    expect(config.scenarios.every((scenario) => scenario.beamWidth === 512)).toBe(true);
+    expect(config.scenarios.every((scenario) => scenario.setupPoolMultiplier === 64)).toBe(true);
+    expect(config.validationScenarios).toHaveLength(16);
+    expect(config.testScenarios).toHaveLength(64);
   });
 
   test("accepts explicit distribution CLI seed and split sizes", () => {

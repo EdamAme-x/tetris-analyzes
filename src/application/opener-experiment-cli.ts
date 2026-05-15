@@ -60,19 +60,19 @@ export function createOpenerExperimentCliConfig(argv: readonly string[]): Opener
 }
 
 export function defaultTrainSamples(presetName: OpenerExperimentPresetName): number {
-  return presetName === "survey" ? 8 : 4;
+  return presetName === "survey" || presetName === "discovery" ? 16 : 8;
 }
 
 export function defaultSurvivabilityReplay(_presetName: OpenerExperimentPresetName): number {
-  return 8;
-}
-
-export function defaultCertificationReplay(_presetName: OpenerExperimentPresetName): number {
   return 16;
 }
 
+export function defaultCertificationReplay(_presetName: OpenerExperimentPresetName): number {
+  return 64;
+}
+
 export function defaultReplayTemplatePool(presetName: OpenerExperimentPresetName, displayTop: number): number {
-  const minimum = presetName === "survey" || presetName === "discovery" ? 32 : 64;
+  const minimum = presetName === "survey" || presetName === "discovery" ? 64 : 128;
   return Math.max(displayTop, minimum);
 }
 
@@ -175,6 +175,6 @@ function defaultBagCount(presetName: OpenerExperimentPresetName): number {
   return presetName === "survey" || presetName === "discovery" ? 2 : 3;
 }
 
-function defaultBeamWidth(bagCount: number): number {
-  return bagCount >= 3 ? 256 : 512;
+function defaultBeamWidth(_bagCount: number): number {
+  return 512;
 }

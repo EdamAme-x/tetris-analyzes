@@ -149,6 +149,8 @@ Executable examples live in `tests/`.
 - [x] Stop promoting sampled continuation queues into production presets
 - [x] Demote all-clear-bonus inflated continuation queues from TL opener ranking
 - [x] Show peak TL firepower first in replayed console summaries while retaining replay metrics
+- [x] Raise default opener experiments to quality-first continuation search and wider replay certification
+- [x] Require three-bag continuation replay pools to preserve 3+ T-spins and B2B chains
 - [x] Penalize ALL CLEAR candidates in native opener scoring while preserving TETR.IO attack accounting
 - [x] Convert TETR.IO kick offsets into native-up board coordinates and respect ordered kick resolution
 - [x] Apply TETR.IO rotation kicks around the matrix anchor instead of the trimmed native bounding box

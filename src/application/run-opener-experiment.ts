@@ -312,7 +312,7 @@ export interface OpenerDistributionSplits {
 const DISTRIBUTION_BAG = "IJLOSTZ";
 const DEFAULT_DISTRIBUTION_SEED = "tl-distribution-v1";
 const NATIVE_DEFAULT_SETUP_POOL_MULTIPLIER = 14;
-const DEFAULT_CONTINUATION_SETUP_POOL_MULTIPLIER = 32;
+const DEFAULT_CONTINUATION_SETUP_POOL_MULTIPLIER = 64;
 const DEFAULT_TWO_BAG_QUALITY_GATE = {
   minQueueIndex: 14,
   minAttack: 9,
@@ -327,9 +327,9 @@ const CONTINUATION_QUALITY_GATE = {
   minQueueIndex: 21,
   minAttack: 9,
   minDifficultAttack: 9,
-  minTSpinClears: 2,
-  minTSpinAttack: 7,
-  minBackToBackChain: 2,
+  minTSpinClears: 3,
+  minTSpinAttack: 8,
+  minBackToBackChain: 3,
   maxAllClears: 0,
   maxHoles: 0
 } as const satisfies OpenerExperimentQualityGate;
@@ -394,7 +394,7 @@ export const CONTINUATION_OPENER_EXPERIMENT_SCENARIOS: readonly OpenerExperiment
   trainSamples: 24,
   validationSamples: 0,
   testSamples: 0,
-  beamWidth: 256,
+  beamWidth: 512,
   maxDepth: 21
 }).train;
 
@@ -437,7 +437,7 @@ export function createTemplateReplayScenarios(sampleSize: number, options: Templ
     throw new Error("Template replay bagCount must be a positive integer.");
   }
   const maxDepth = options.maxDepth ?? bagCount * DISTRIBUTION_BAG.length;
-  const beamWidth = options.beamWidth ?? (bagCount >= 3 ? 256 : 512);
+  const beamWidth = options.beamWidth ?? 512;
   return createDistributionSplitScenarios({
     seed: options.seed ?? `${DEFAULT_DISTRIBUTION_SEED}:replay`,
     split: options.split ?? "validation",
@@ -1826,7 +1826,7 @@ function createDistributionSplitScenarios(input: {
     queues.push(queue);
   }
 
-  const beamWidth = input.beamWidth ?? (input.bagCount >= 3 ? 256 : 512);
+  const beamWidth = input.beamWidth ?? 512;
   const maxDepth = input.maxDepth ?? input.bagCount * DISTRIBUTION_BAG.length;
   const qualityGate = input.bagCount >= 3 ? CONTINUATION_QUALITY_GATE : DEFAULT_TWO_BAG_QUALITY_GATE;
   const setupPoolMultiplier = input.setupPoolMultiplier ?? defaultSetupPoolMultiplier(input.bagCount);
