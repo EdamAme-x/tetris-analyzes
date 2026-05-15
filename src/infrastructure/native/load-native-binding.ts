@@ -22,6 +22,7 @@ const nativeBindingSpec = {
   canReachOpenerPlacement: "function",
   resolveOpenerRotation: "function",
   detectOpenerSpin: "function",
+  detectOpenerSpinAfterRotation: "function",
   estimateOpenerTSpinPotential: "function",
   evaluateOpenerFirepower: "function",
   searchOpenerBeam: "function",

@@ -72,6 +72,15 @@ export interface NativeSpinDetection {
   clearedLines: number;
 }
 
+export interface NativeSpinAfterRotation {
+  success: boolean;
+  rotation?: number | null;
+  x?: number | null;
+  y?: number | null;
+  kickIndex?: number | null;
+  spin: NativeSpinDetection;
+}
+
 export interface NativeRotationResolution {
   success: boolean;
   rotation?: number | null;
@@ -268,6 +277,17 @@ export interface NativeBinding {
     kickTable?: NativeKickTable,
     allow180?: boolean
   ): NativeSpinDetection;
+  detectOpenerSpinAfterRotation(
+    rows: Uint16Array,
+    piece: string,
+    rotation: number,
+    x: number,
+    y: number,
+    direction: number,
+    spinMode?: NativeSpinMode,
+    kickTable?: NativeKickTable,
+    allow180?: boolean
+  ): NativeSpinAfterRotation;
   estimateOpenerTSpinPotential(rows: Uint16Array, kickTable?: NativeKickTable, allow180?: boolean): number;
   evaluateOpenerFirepower(events: NativeFirepowerInput[]): NativeFirepowerSummary;
   searchOpenerBeam(

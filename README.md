@@ -5,6 +5,7 @@ bun install
 bun run build:native:debug
 bun run generate:tetrio-tables
 bun run generate:tetrio-movement-snapshots
+bun run generate:tetrio-spin-snapshots
 bun run generate:tetrio-firepower-snapshots
 bun run check
 bun run test:native
@@ -28,7 +29,7 @@ Executable examples live in `tests/`.
 - [x] Add native bag-1 all-queue template mining and reproducibility ranking
 - [x] Add a fumen-ready opener generation command from native mining
 - [x] Add generated tetrio.js movement snapshot coverage for native rotation parity
-- [ ] Add generated tetrio.js spin-state snapshots for HasRotated/mini/kick-index parity
+- [x] Add generated tetrio.js spin-state snapshots for HasRotated/mini/kick-index parity
 - [ ] Wire TETR.IO `bagtype`, handling, ARE, locktime, and gravity options into search settings
 - [ ] Add exact placement frontier enumeration for bag-1 templates
 - [ ] Add known-opener fumen fixtures and recall@K benchmarks
@@ -138,7 +139,7 @@ Executable examples live in `tests/`.
 - [x] Remove measured holeless continuation queues from the TL production preset
 - [x] Skip native path-history cloning for compact replay and bag evaluation searches
 - [x] Keep setup-pool tuning as a CLI option instead of per-queue overrides
-- [x] Add a bench regression gate for holeless no-PC 14-attack triple T-spin continuation lines
+- [x] Add a bench regression gate for holeless no-PC 10-attack triple T-spin continuation lines
 - [x] Stop promoting sampled continuation queues into production presets
 - [x] Demote all-clear-bonus inflated continuation queues from TL opener ranking
 - [x] Show peak TL firepower first in replayed console summaries while retaining replay metrics
@@ -154,3 +155,5 @@ Executable examples live in `tests/`.
 - [x] Use extracted TETR.IO TL defaults for public ruleset helpers and native spin detection helpers
 - [x] Extract TETR.IO TL `allow180` and propagate it through native reachability, search, and opener reports
 - [x] Require reachable TETR.IO rotation semantics for native T-spin potential scoring
+- [x] Match TETR.IO spin-state snapshots for kick-index mini override and HANDHELD non-T corners
+- [x] Rank native beam candidates by T-spin and spin attack before raw spin count

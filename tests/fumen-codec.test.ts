@@ -110,6 +110,10 @@ describe("TetrisFumenCodec", () => {
       canReachOpenerPlacement: () => false,
       resolveOpenerRotation: () => ({ success: false }),
       detectOpenerSpin: () => ({ kind: "NONE", spin: false, mini: false, immobile: false, occupiedCorners: 0, clearedLines: 0 }),
+      detectOpenerSpinAfterRotation: () => ({
+        success: false,
+        spin: { kind: "NONE", spin: false, mini: false, immobile: false, occupiedCorners: 0, clearedLines: 0 }
+      }),
       estimateOpenerTSpinPotential: () => 0,
       evaluateOpenerFirepower: () => ({
         attack: 0,

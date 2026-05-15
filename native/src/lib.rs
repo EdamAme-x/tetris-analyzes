@@ -311,6 +311,16 @@ pub struct BeamSpinDetection {
 }
 
 #[napi(object)]
+pub struct BeamSpinAfterRotation {
+    pub success: bool,
+    pub rotation: Option<u32>,
+    pub x: Option<i32>,
+    pub y: Option<i32>,
+    pub kick_index: Option<u32>,
+    pub spin: BeamSpinDetection,
+}
+
+#[napi(object)]
 pub struct BeamRotationResolution {
     pub success: bool,
     pub rotation: Option<u32>,
@@ -592,6 +602,105 @@ pub fn detect_opener_spin(
         rotation_kick_index,
     );
     Ok(BeamSpinDetection::from(spin))
+}
+
+#[napi(js_name = "detectOpenerSpinAfterRotation")]
+pub fn detect_opener_spin_after_rotation(
+    rows: Uint16Array,
+    piece: String,
+    rotation: u32,
+    x: i32,
+    y: i32,
+    direction: i32,
+    spin_mode: Option<String>,
+    kick_table: Option<String>,
+    allow_180: Option<bool>,
+) -> Result<BeamSpinAfterRotation> {
+    let board = board::rows_to_array(rows.as_ref())?;
+    let piece = parse_piece_string(&piece)?;
+    let rotation = u8::try_from(rotation)
+        .map_err(|_| Error::from_reason(format!("rotation must fit in u8, got {rotation}.")))?;
+    let shape_index = piece_shapes(piece)
+        .iter()
+        .position(|shape| shape.rotation == rotation)
+        .ok_or_else(|| {
+            Error::from_reason(format!(
+                "Piece {} has no rotation {rotation}.",
+                piece_name(piece)
+            ))
+        })?;
+    let x =
+        i8::try_from(x).map_err(|_| Error::from_reason(format!("x must fit in i8, got {x}.")))?;
+    let y =
+        i8::try_from(y).map_err(|_| Error::from_reason(format!("y must fit in i8, got {y}.")))?;
+    let direction = i8::try_from(direction)
+        .map_err(|_| Error::from_reason(format!("direction must fit in i8, got {direction}.")))?;
+    if !matches!(direction, -1 | 1 | 2) {
+        return Err(Error::from_reason(format!(
+            "Unsupported native opener rotation direction {direction}. Supported directions are -1, 1, and 2."
+        )));
+    }
+    let spin_mode = parse_optional_spin_mode(spin_mode.as_deref())?;
+    let kick_table = parse_optional_kick_table(kick_table.as_deref())?;
+    let allow_180 = parse_optional_allow_180(allow_180);
+    if direction == 2 && !allow_180 {
+        return Ok(BeamSpinAfterRotation {
+            success: false,
+            rotation: None,
+            x: None,
+            y: None,
+            kick_index: None,
+            spin: BeamSpinDetection::none(0),
+        });
+    }
+
+    let shapes = piece_shapes(piece);
+    let state = MovementState { shape_index, x, y };
+    let Some(resolution) =
+        resolve_rotation_state(&board, piece, shapes, state, direction, kick_table)
+    else {
+        return Ok(BeamSpinAfterRotation {
+            success: false,
+            rotation: None,
+            x: None,
+            y: None,
+            kick_index: None,
+            spin: BeamSpinDetection::none(0),
+        });
+    };
+    let shape = shapes[resolution.state.shape_index];
+    let Some(locked) = lock_shape(&board, shape, resolution.state.x, resolution.state.y) else {
+        return Ok(BeamSpinAfterRotation {
+            success: false,
+            rotation: None,
+            x: None,
+            y: None,
+            kick_index: None,
+            spin: BeamSpinDetection::none(0),
+        });
+    };
+    let cleared_lines = board::count_full_lines_array(&locked);
+    let raw_kick_index = Some(resolution.kick_index.map_or(0, |index| index + 1));
+    let spin = detect_spin_for_mode_after_rotation(
+        &board,
+        &locked,
+        piece,
+        shape,
+        resolution.state.x,
+        resolution.state.y,
+        cleared_lines,
+        spin_mode,
+        raw_kick_index,
+    );
+
+    Ok(BeamSpinAfterRotation {
+        success: true,
+        rotation: Some(u32::from(shape.rotation)),
+        x: Some(i32::from(resolution.state.x)),
+        y: Some(i32::from(resolution.state.y)),
+        kick_index: resolution.kick_index.map(|index| index as u32),
+        spin: BeamSpinDetection::from(spin),
+    })
 }
 
 #[napi(js_name = "estimateOpenerTSpinPotential")]
@@ -1548,32 +1657,31 @@ fn place_grounded_at_y(
         placed[base_y + dy] |= shape.row_masks[dy] << x_shift;
     }
     let (cleared_rows, cleared_lines) = board::clear_full_lines_array_with_count(placed);
-    let rotation_kick_index =
-        if could_spin_for_mode(rows, &placed, choice.piece, shape, x, y, spin_mode) {
-            find_reachable_rotation_entry(
-                rows,
-                choice.piece,
-                shape_index,
-                x,
-                y,
-                kick_table,
-                allow_180,
-                reachable_cache,
-            )
-        } else {
-            None
-        };
-    let spin = detect_spin_for_mode_after_rotation(
-        rows,
-        &placed,
-        choice.piece,
-        shape,
-        x,
-        y,
-        cleared_lines,
-        spin_mode,
-        rotation_kick_index,
-    );
+    let spin = if could_spin_for_mode(rows, &placed, choice.piece, shape, x, y, spin_mode) {
+        let rotation_kick_index = find_reachable_rotation_entry(
+            rows,
+            choice.piece,
+            shape_index,
+            x,
+            y,
+            kick_table,
+            allow_180,
+            reachable_cache,
+        );
+        detect_spin_for_mode_after_rotation(
+            rows,
+            &placed,
+            choice.piece,
+            shape,
+            x,
+            y,
+            cleared_lines,
+            spin_mode,
+            rotation_kick_index,
+        )
+    } else {
+        SpinDetection::none(cleared_lines)
+    };
     Some(PlacedBoard {
         rows: cleared_rows,
         y,
@@ -1595,21 +1703,6 @@ fn compare_search_state(left: &SearchState, right: &SearchState) -> std::cmp::Or
     if ordering != std::cmp::Ordering::Equal {
         return ordering;
     }
-    let ordering = right.firepower.spin_clears.cmp(&left.firepower.spin_clears);
-    if ordering != std::cmp::Ordering::Equal {
-        return ordering;
-    }
-    let ordering = right.firepower.spin_attack.cmp(&left.firepower.spin_attack);
-    if ordering != std::cmp::Ordering::Equal {
-        return ordering;
-    }
-    let ordering = right
-        .firepower
-        .t_spin_clears
-        .cmp(&left.firepower.t_spin_clears);
-    if ordering != std::cmp::Ordering::Equal {
-        return ordering;
-    }
     let ordering = right
         .firepower
         .t_spin_attack
@@ -1617,10 +1710,7 @@ fn compare_search_state(left: &SearchState, right: &SearchState) -> std::cmp::Or
     if ordering != std::cmp::Ordering::Equal {
         return ordering;
     }
-    let ordering = right
-        .firepower
-        .difficult_clears
-        .cmp(&left.firepower.difficult_clears);
+    let ordering = right.firepower.spin_attack.cmp(&left.firepower.spin_attack);
     if ordering != std::cmp::Ordering::Equal {
         return ordering;
     }
@@ -1635,6 +1725,24 @@ fn compare_search_state(left: &SearchState, right: &SearchState) -> std::cmp::Or
         .firepower
         .back_to_back_chain
         .cmp(&left.firepower.back_to_back_chain);
+    if ordering != std::cmp::Ordering::Equal {
+        return ordering;
+    }
+    let ordering = right
+        .firepower
+        .t_spin_clears
+        .cmp(&left.firepower.t_spin_clears);
+    if ordering != std::cmp::Ordering::Equal {
+        return ordering;
+    }
+    let ordering = right.firepower.spin_clears.cmp(&left.firepower.spin_clears);
+    if ordering != std::cmp::Ordering::Equal {
+        return ordering;
+    }
+    let ordering = right
+        .firepower
+        .difficult_clears
+        .cmp(&left.firepower.difficult_clears);
     if ordering != std::cmp::Ordering::Equal {
         return ordering;
     }
@@ -1674,29 +1782,13 @@ fn compare_search_state_to_candidate(
     if ordering != std::cmp::Ordering::Equal {
         return ordering;
     }
-    let ordering = right_firepower.spin_clears.cmp(&left.firepower.spin_clears);
-    if ordering != std::cmp::Ordering::Equal {
-        return ordering;
-    }
-    let ordering = right_firepower.spin_attack.cmp(&left.firepower.spin_attack);
-    if ordering != std::cmp::Ordering::Equal {
-        return ordering;
-    }
-    let ordering = right_firepower
-        .t_spin_clears
-        .cmp(&left.firepower.t_spin_clears);
-    if ordering != std::cmp::Ordering::Equal {
-        return ordering;
-    }
     let ordering = right_firepower
         .t_spin_attack
         .cmp(&left.firepower.t_spin_attack);
     if ordering != std::cmp::Ordering::Equal {
         return ordering;
     }
-    let ordering = right_firepower
-        .difficult_clears
-        .cmp(&left.firepower.difficult_clears);
+    let ordering = right_firepower.spin_attack.cmp(&left.firepower.spin_attack);
     if ordering != std::cmp::Ordering::Equal {
         return ordering;
     }
@@ -1709,6 +1801,22 @@ fn compare_search_state_to_candidate(
     let ordering = right_firepower
         .back_to_back_chain
         .cmp(&left.firepower.back_to_back_chain);
+    if ordering != std::cmp::Ordering::Equal {
+        return ordering;
+    }
+    let ordering = right_firepower
+        .t_spin_clears
+        .cmp(&left.firepower.t_spin_clears);
+    if ordering != std::cmp::Ordering::Equal {
+        return ordering;
+    }
+    let ordering = right_firepower.spin_clears.cmp(&left.firepower.spin_clears);
+    if ordering != std::cmp::Ordering::Equal {
+        return ordering;
+    }
+    let ordering = right_firepower
+        .difficult_clears
+        .cmp(&left.firepower.difficult_clears);
     if ordering != std::cmp::Ordering::Equal {
         return ordering;
     }
@@ -1876,6 +1984,19 @@ impl From<SpinDetection> for BeamSpinDetection {
             immobile: spin.immobile,
             occupied_corners: spin.occupied_corners,
             cleared_lines: spin.cleared_lines,
+        }
+    }
+}
+
+impl BeamSpinDetection {
+    fn none(cleared_lines: u32) -> Self {
+        Self {
+            kind: spin_kind_name(spin::SpinKind::None).to_string(),
+            spin: false,
+            mini: false,
+            immobile: false,
+            occupied_corners: 0,
+            cleared_lines,
         }
     }
 }

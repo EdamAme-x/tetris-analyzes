@@ -16,6 +16,21 @@ pub(crate) struct SpinDetection {
     pub(crate) cleared_lines: u32,
 }
 
+impl SpinDetection {
+    pub(crate) fn none(cleared_lines: u32) -> Self {
+        Self {
+            kind: SpinKind::None,
+            spin: false,
+            mini: false,
+            immobile: false,
+            force_back_to_back: false,
+            halve_attack: false,
+            occupied_corners: 0,
+            cleared_lines,
+        }
+    }
+}
+
 #[derive(Clone, Copy, Eq, PartialEq)]
 pub(crate) enum SpinKind {
     None,
@@ -40,6 +55,7 @@ pub(crate) enum SpinMode {
 }
 
 #[cfg(test)]
+#[allow(dead_code)]
 pub(crate) fn detect_spin(
     locked_rows: &BoardRows,
     piece: Piece,
@@ -79,6 +95,7 @@ pub(crate) fn detect_spin(
 }
 
 #[cfg(test)]
+#[allow(dead_code)]
 pub(crate) fn detect_spin_for_mode(
     locked_rows: &BoardRows,
     piece: Piece,
@@ -107,7 +124,8 @@ pub(crate) fn detect_spin_for_mode(
     }
 
     if piece != Piece::T && mode == SpinMode::Handheld {
-        let occupied_corners = count_piece_occupied_corners(locked_rows, shape, x, y);
+        let occupied_corners =
+            count_handheld_occupied_corners(locked_rows, piece, shape.rotation, x, y);
         return SpinDetection {
             kind: if occupied_corners >= 3 {
                 SpinKind::TSpin
@@ -294,7 +312,8 @@ pub(crate) fn could_spin_for_mode(
     match mode {
         SpinMode::Handheld => {
             matches!(piece, Piece::S | Piece::Z | Piece::J | Piece::L)
-                && count_piece_occupied_corners(rows_before_lock, shape, x, y) >= 3
+                && count_handheld_occupied_corners(rows_before_lock, piece, shape.rotation, x, y)
+                    >= 3
         }
         SpinMode::AllSpins
         | SpinMode::AllSpinsPlus
@@ -319,7 +338,7 @@ fn detect_corner_spin_after_rotation(
         let occupied_corners = count_t_occupied_corners(rows_before_lock, shape.rotation, x, y);
         if occupied_corners >= 3 {
             let front_corners = count_t_front_corners(rows_before_lock, shape.rotation, x, y);
-            let mini = front_corners != 2 && raw_kick_index != 3;
+            let mini = front_corners != 2 && raw_kick_index != 4;
             return SpinDetection {
                 kind: if mini {
                     SpinKind::TSpinMini
@@ -348,7 +367,7 @@ fn detect_corner_spin_after_rotation(
     }
 
     let occupied_corners = if matches!(piece, Piece::S | Piece::Z | Piece::J | Piece::L) {
-        count_piece_occupied_corners(rows_before_lock, shape, x, y)
+        count_handheld_occupied_corners(rows_before_lock, piece, shape.rotation, x, y)
     } else {
         0
     };
@@ -378,6 +397,7 @@ fn detect_corner_spin_after_rotation(
 }
 
 #[cfg(test)]
+#[allow(dead_code)]
 fn detect_t_spin_corners(
     locked_rows: &BoardRows,
     rotation: u8,
@@ -560,25 +580,62 @@ pub(crate) fn count_t_front_corners(rows: &BoardRows, rotation: u8, x: i8, y: i8
         .count() as u32
 }
 
-pub(crate) fn count_piece_occupied_corners(rows: &BoardRows, shape: Shape, x: i8, y: i8) -> u32 {
-    [
-        Cell { x: x - 1, y: y - 1 },
-        Cell {
-            x: x + shape.width,
-            y: y - 1,
+pub(crate) fn count_handheld_occupied_corners(
+    rows: &BoardRows,
+    piece: Piece,
+    rotation: u8,
+    x: i8,
+    y: i8,
+) -> u32 {
+    handheld_corner_cells(piece, rotation, x, y)
+        .into_iter()
+        .flatten()
+        .filter(|cell| is_occupied_or_wall(rows, cell.x, cell.y))
+        .count() as u32
+}
+
+fn handheld_corner_cells(piece: Piece, rotation: u8, x: i8, y: i8) -> [Option<Cell>; 4] {
+    let offsets: [(i8, i8); 4] = match piece {
+        Piece::T => match rotation {
+            0 => [(0, 1), (2, 1), (2, -1), (0, -1)],
+            1 => [(-1, 2), (1, 2), (1, 0), (-1, 0)],
+            2 | 3 => [(0, 2), (2, 2), (2, 0), (0, 0)],
+            _ => return [None, None, None, None],
         },
-        Cell {
-            x: x - 1,
-            y: y + shape.height,
+        Piece::S => match rotation {
+            0 | 2 => [(0, 1), (3, 1), (2, 0), (-1, 0)],
+            1 => [(0, 3), (1, 2), (1, -1), (0, 0)],
+            3 => [(0, 3), (1, 2), (0, 0), (1, -1)],
+            _ => return [None, None, None, None],
         },
-        Cell {
-            x: x + shape.width,
-            y: y + shape.height,
+        Piece::Z => match rotation {
+            0 | 2 => [(-1, 1), (2, 1), (3, 0), (0, 0)],
+            1 => [(0, 2), (1, 3), (0, -1), (1, 0)],
+            3 => [(0, 2), (1, 3), (1, 0), (0, -1)],
+            _ => return [None, None, None, None],
         },
-    ]
-    .into_iter()
-    .filter(|cell| is_occupied_or_wall(rows, cell.x, cell.y))
-    .count() as u32
+        Piece::J => match rotation {
+            0 => [(1, 1), (2, 1), (2, -1), (0, -1)],
+            1 => [(-1, 2), (1, 1), (1, 0), (-1, 0)],
+            2 => [(0, 2), (2, 2), (1, 0), (0, 0)],
+            3 => [(0, 2), (2, 2), (2, 0), (0, 1)],
+            _ => return [None, None, None, None],
+        },
+        Piece::L => match rotation {
+            0 => [(0, 1), (1, 1), (2, -1), (0, -1)],
+            1 => [(-1, 2), (1, 2), (1, 1), (-1, 0)],
+            2 => [(0, 2), (2, 2), (2, 0), (1, 0)],
+            3 => [(0, 1), (2, 2), (2, 0), (0, 0)],
+            _ => return [None, None, None, None],
+        },
+        Piece::I | Piece::O => return [None, None, None, None],
+    };
+    offsets.map(|(dx, dy)| {
+        Some(Cell {
+            x: x + dx,
+            y: y + dy,
+        })
+    })
 }
 
 pub(crate) fn t_corner_cells(rotation: u8, x: i8, y: i8) -> [Cell; 4] {
@@ -708,18 +765,38 @@ mod tests {
     #[test]
     fn handheld_non_t_uses_four_corner_detection_and_half_attack() {
         let mut rows = [0_u16; BOARD_HEIGHT];
-        rows[1] = 1 << 2;
-        let shape = piece_shapes(Piece::I)[0];
-        let locked = lock_shape(&rows, shape, 3, 0).expect("I piece should lock on floor");
+        rows[1] = (1 << 0) | (1 << 3);
+        let shape = piece_shapes(Piece::S)[0];
+        let locked = lock_shape(&rows, shape, 0, 0).expect("S piece should lock on floor");
 
-        let handheld = detect_spin_for_mode(&locked, Piece::I, shape, 3, 0, 2, SpinMode::Handheld);
+        let handheld = detect_spin_for_mode_after_rotation(
+            &rows,
+            &locked,
+            Piece::S,
+            shape,
+            0,
+            0,
+            2,
+            SpinMode::Handheld,
+            Some(0),
+        );
         assert!(handheld.kind == SpinKind::TSpin);
         assert!(handheld.spin);
         assert_eq!(handheld.occupied_corners, 3);
         assert!(handheld.halve_attack);
 
-        let all_spins = detect_spin_for_mode(&locked, Piece::I, shape, 3, 0, 2, SpinMode::AllSpins);
-        assert!(all_spins.kind == SpinKind::None);
-        assert!(!all_spins.spin);
+        let t_spins = detect_spin_for_mode_after_rotation(
+            &rows,
+            &locked,
+            Piece::S,
+            shape,
+            0,
+            0,
+            2,
+            SpinMode::TSpins,
+            Some(0),
+        );
+        assert!(t_spins.kind == SpinKind::None);
+        assert!(!t_spins.spin);
     }
 }

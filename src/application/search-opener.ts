@@ -8,6 +8,7 @@ import type {
   NativeOpenerBagEvaluation,
   NativeOpenerBagTemplateMining,
   NativeRotationResolution,
+  NativeSpinAfterRotation,
   NativeSpinMode,
   NativeSpinDetection
 } from "../infrastructure/native/binding-types";
@@ -77,6 +78,10 @@ export interface OpenerRotationResolutionInput {
   readonly direction: -1 | 1 | 2;
   readonly kickTable?: NativeKickTable;
   readonly allow180?: boolean;
+}
+
+export interface OpenerSpinAfterRotationInput extends OpenerRotationResolutionInput {
+  readonly spinMode?: NativeSpinMode;
 }
 
 export function searchOpenerBeam(input: SearchOpenerBeamInput): SearchOpenerBeamNode[] {
@@ -189,6 +194,20 @@ export function detectOpenerSpin(input: OpenerPlacementReachabilityInput): Nativ
     input.rotation,
     input.x,
     input.y,
+    input.spinMode,
+    input.kickTable,
+    input.allow180
+  );
+}
+
+export function detectOpenerSpinAfterRotation(input: OpenerSpinAfterRotationInput): NativeSpinAfterRotation {
+  return loadNativeBinding().detectOpenerSpinAfterRotation(
+    input.rows,
+    input.piece,
+    input.rotation,
+    input.x,
+    input.y,
+    input.direction,
     input.spinMode,
     input.kickTable,
     input.allow180

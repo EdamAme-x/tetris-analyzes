@@ -19,6 +19,7 @@
     "generate:tetrio-firepower-snapshots": "bun run scripts/generate-tetrio-firepower-snapshots.ts",
     "generate:tetrio-tables": "bun run scripts/generate-tetrio-tables.ts",
     "generate:tetrio-movement-snapshots": "bun run scripts/generate-tetrio-movement-snapshots.ts",
+    "generate:tetrio-spin-snapshots": "bun run scripts/generate-tetrio-spin-snapshots.ts",
     "lint": "eslint .",
     "test:native": "cargo test --manifest-path native/Cargo.toml --features napi/noop,napi-derive/noop",
     "test": "bun test",
