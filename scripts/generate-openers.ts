@@ -4,6 +4,7 @@ import {
   generateOpeners,
   renderGeneratedOpenersConsole,
   renderGeneratedOpenersMarkdown,
+  type GeneratedOpenerPreviewMode,
   type GenerateOpenersRules
 } from "../src/application/generate-openers";
 
@@ -30,6 +31,7 @@ interface GenerateOpenersCliConfig {
   readonly top: number;
   readonly displayTop: number;
   readonly includePath: boolean;
+  readonly previewMode: GeneratedOpenerPreviewMode;
   readonly rules: Partial<GenerateOpenersRules>;
 }
 
@@ -47,6 +49,7 @@ function createGenerateOpenersCliConfig(argv: readonly string[]): GenerateOpener
     top,
     displayTop: readPositiveIntegerOption(args, "--display-top") ?? top,
     includePath: readBooleanOption(args, "--include-path") ?? true,
+    previewMode: readPreviewModeOption(args, "--preview-mode") ?? "placements",
     rules: {
       ...(args.has("--spin-mode") ? { spinMode: args.get("--spin-mode") as GenerateOpenersRules["spinMode"] } : {}),
       ...(args.has("--combo-table") ? { comboTable: args.get("--combo-table") as GenerateOpenersRules["comboTable"] } : {}),
@@ -66,6 +69,7 @@ function parseArgs(argv: readonly string[]): Map<string, string> {
     "--top",
     "--display-top",
     "--include-path",
+    "--preview-mode",
     "--spin-mode",
     "--combo-table",
     "--kick-table"
@@ -90,6 +94,17 @@ function parseArgs(argv: readonly string[]): Map<string, string> {
     parsed.set(flag, value);
   }
   return parsed;
+}
+
+function readPreviewModeOption(args: ReadonlyMap<string, string>, name: string): GeneratedOpenerPreviewMode | undefined {
+  const raw = args.get(name);
+  if (raw === undefined) {
+    return undefined;
+  }
+  if (raw === "placements" || raw === "final-board") {
+    return raw;
+  }
+  throw new Error(`${name} must be placements or final-board.`);
 }
 
 function splitOption(arg: string): [string, string | undefined] {

@@ -1,7 +1,14 @@
 import type { FumenCodec, FumenUrls } from "../domain/fumen";
 import { createFumenCodec } from "../infrastructure/fumen/tetris-fumen-codec";
 import type { NativeComboTable, NativeKickTable, NativeSpinMode } from "../infrastructure/native/binding-types";
-import { mineOpenerBagTemplates, type OpenerBagTemplateMining, type SearchPiece } from "./search-opener";
+import { createOpenerFumenPages } from "./create-opener-fumen";
+import {
+  mineOpenerBagTemplates,
+  searchOpenerBeamWithPlacements,
+  type OpenerBagTemplateMining,
+  type SearchOpenerBeamNode,
+  type SearchPiece
+} from "./search-opener";
 
 export interface GenerateOpenersRules {
   readonly spinMode: NativeSpinMode;
@@ -17,9 +24,12 @@ export interface GenerateOpenersInput {
   readonly maxQueues?: number;
   readonly top?: number;
   readonly includePath?: boolean;
+  readonly previewMode?: GeneratedOpenerPreviewMode;
   readonly rules?: Partial<GenerateOpenersRules>;
   readonly fumenCodec?: FumenCodec;
 }
+
+export type GeneratedOpenerPreviewMode = "placements" | "final-board";
 
 export interface GeneratedOpenerTemplate {
   readonly rank: number;
@@ -49,6 +59,8 @@ export interface GeneratedOpenerTemplate {
   readonly holes: number;
   readonly bumpiness: number;
   readonly previewUrl: string;
+  readonly previewMode: GeneratedOpenerPreviewMode;
+  readonly previewPageCount: number;
   readonly urls: FumenUrls;
 }
 
@@ -60,6 +72,7 @@ export interface GeneratedOpenersReport {
   readonly maxDepth: number;
   readonly maxQueues: number;
   readonly top: number;
+  readonly previewMode: GeneratedOpenerPreviewMode;
   readonly rules: GenerateOpenersRules;
   readonly mining: Omit<OpenerBagTemplateMining, "topTemplates">;
   readonly templates: readonly GeneratedOpenerTemplate[];
@@ -78,6 +91,7 @@ export function generateOpeners(input: GenerateOpenersInput = {}): GeneratedOpen
   const maxDepth = input.maxDepth ?? Math.min(7, bag.length);
   const maxQueues = input.maxQueues ?? 0;
   const top = input.top ?? 8;
+  const previewMode = input.previewMode ?? "placements";
   const rules = { ...DEFAULT_GENERATE_OPENERS_RULES, ...input.rules };
   const fumenCodec = input.fumenCodec ?? createFumenCodec();
   const mining = mineOpenerBagTemplates({
@@ -92,6 +106,7 @@ export function generateOpeners(input: GenerateOpenersInput = {}): GeneratedOpen
     kickTable: rules.kickTable,
     spinMode: rules.spinMode
   });
+  const detailedNodesByPreviewKey = new Map<string, readonly SearchOpenerBeamNode[]>();
 
   return {
     generatedAt: new Date().toISOString(),
@@ -101,6 +116,7 @@ export function generateOpeners(input: GenerateOpenersInput = {}): GeneratedOpen
     maxDepth,
     maxQueues,
     top,
+    previewMode,
     rules,
     mining: {
       bag: mining.bag,
@@ -111,12 +127,15 @@ export function generateOpeners(input: GenerateOpenersInput = {}): GeneratedOpen
       templateCount: mining.templateCount
     },
     templates: mining.topTemplates.map((template, index) => {
-      const data = fumenCodec.encodePages([
-        {
-          rows: Uint16Array.from(template.rows),
-          comment: formatTemplateComment(index + 1, template)
-        }
-      ]);
+      const preview = createTemplatePreview(template, index + 1, {
+        beamWidth,
+        hold,
+        maxDepth,
+        previewMode,
+        rules,
+        detailedNodesByPreviewKey
+      });
+      const data = fumenCodec.encodePages(preview.pages);
       const urls = fumenCodec.createUrls(data);
       return {
         rank: index + 1,
@@ -146,6 +165,8 @@ export function generateOpeners(input: GenerateOpenersInput = {}): GeneratedOpen
         holes: template.holes,
         bumpiness: template.bumpiness,
         previewUrl: urls.view,
+        previewMode: preview.mode,
+        previewPageCount: preview.pages.length,
         urls
       };
     })
@@ -188,10 +209,11 @@ export function renderGeneratedOpenersMarkdown(report: GeneratedOpenersReport): 
     `Beam: ${report.beamWidth}`,
     `Depth: ${report.maxDepth}`,
     `Queues: ${report.mining.searchedQueues}/${report.mining.totalQueues}`,
+    `Preview: ${report.previewMode}`,
     `Rules: spins=${report.rules.spinMode}, combo=${report.rules.comboTable}, kicks=${report.rules.kickTable}`,
     "",
-    "| rank | support | queue | hold | attack | difficult attack | spin | spin attack | tspin | tspin attack | b2b | combo | all clears | tspin potential | holes | bumpiness | path | preview |",
-    "| ---: | ---: | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- |"
+    "| rank | support | queue | hold | attack | difficult attack | spin | spin attack | tspin | tspin attack | b2b | combo | all clears | tspin potential | holes | bumpiness | pages | path | preview |",
+    "| ---: | ---: | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- |"
   ];
   for (const template of report.templates) {
     lines.push(
@@ -212,6 +234,7 @@ export function renderGeneratedOpenersMarkdown(report: GeneratedOpenersReport): 
         String(template.tSpinPotential),
         String(template.holes),
         String(template.bumpiness),
+        String(template.previewPageCount),
         template.path.join(" "),
         `[view](${template.previewUrl})`
       ].join(" | ")
@@ -219,6 +242,99 @@ export function renderGeneratedOpenersMarkdown(report: GeneratedOpenersReport): 
   }
   lines.push("");
   return lines.join("\n");
+}
+
+interface TemplatePreviewOptions {
+  readonly beamWidth: number;
+  readonly hold: boolean;
+  readonly maxDepth: number;
+  readonly previewMode: GeneratedOpenerPreviewMode;
+  readonly rules: GenerateOpenersRules;
+  readonly detailedNodesByPreviewKey: Map<string, readonly SearchOpenerBeamNode[]>;
+}
+
+interface TemplatePreview {
+  readonly mode: GeneratedOpenerPreviewMode;
+  readonly pages: ReturnType<typeof createOpenerFumenPages>;
+}
+
+function createTemplatePreview(
+  template: OpenerBagTemplateMining["topTemplates"][number],
+  rank: number,
+  options: TemplatePreviewOptions
+): TemplatePreview {
+  if (options.previewMode === "placements") {
+    const node = findDetailedTemplateNode(template, options);
+    if (node !== undefined) {
+      return {
+        mode: "placements",
+        pages: createOpenerFumenPages(node, { title: formatTemplateComment(rank, template) })
+      };
+    }
+  }
+
+  return {
+    mode: "final-board",
+    pages: [
+      {
+        rows: Uint16Array.from(template.rows),
+        comment: formatTemplateComment(rank, template)
+      }
+    ]
+  };
+}
+
+function findDetailedTemplateNode(
+  template: OpenerBagTemplateMining["topTemplates"][number],
+  options: TemplatePreviewOptions
+): SearchOpenerBeamNode | undefined {
+  const cacheKey = [
+    template.bestQueue,
+    options.beamWidth,
+    options.hold,
+    options.maxDepth,
+    options.rules.comboTable,
+    options.rules.kickTable,
+    options.rules.spinMode
+  ].join("|");
+  let nodes = options.detailedNodesByPreviewKey.get(cacheKey);
+  if (nodes === undefined) {
+    nodes = searchOpenerBeamWithPlacements({
+      queue: template.bestQueue,
+      beamWidth: options.beamWidth,
+      hold: options.hold,
+      maxDepth: options.maxDepth,
+      comboTable: options.rules.comboTable,
+      kickTable: options.rules.kickTable,
+      spinMode: options.rules.spinMode
+    });
+    options.detailedNodesByPreviewKey.set(cacheKey, nodes);
+  }
+  return nodes.find((node) => matchesTemplateNode(template, node));
+}
+
+function matchesTemplateNode(template: OpenerBagTemplateMining["topTemplates"][number], node: SearchOpenerBeamNode): boolean {
+  return (
+    node.depth === template.depth &&
+    node.queueIndex === template.queueIndex &&
+    rowsEqual(node.rows, template.rows) &&
+    (node.hold ?? null) === (template.hold ?? null) &&
+    node.attack === template.attack &&
+    node.difficultAttack === template.difficultAttack &&
+    node.points === template.points &&
+    node.allClears === template.allClears &&
+    node.difficultClears === template.difficultClears &&
+    (node.spinClears ?? 0) === (template.spinClears ?? 0) &&
+    (node.spinAttack ?? 0) === (template.spinAttack ?? 0) &&
+    node.tSpinClears === template.tSpinClears &&
+    node.tSpinAttack === template.tSpinAttack &&
+    node.combo === template.combo &&
+    node.backToBackChain === template.backToBackChain
+  );
+}
+
+function rowsEqual(left: readonly number[], right: readonly number[]): boolean {
+  return left.length === right.length && left.every((row, index) => row === right[index]);
 }
 
 function formatTemplateComment(rank: number, template: OpenerBagTemplateMining["topTemplates"][number]): string {

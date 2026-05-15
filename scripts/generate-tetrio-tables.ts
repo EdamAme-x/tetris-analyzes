@@ -585,7 +585,8 @@ function readKickList(value: unknown, label: string): RustKick[] {
       ) {
         throw new Error(`${label}[${index}] must be an integer [x, y] kick offset.`);
       }
-      return { x: entry[0], y: entry[1] };
+      // TETR.IO stores kick offsets in screen coordinates; native board y grows upward.
+      return { x: entry[0], y: -entry[1] };
     })
   ];
 }

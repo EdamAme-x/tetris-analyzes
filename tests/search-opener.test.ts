@@ -116,18 +116,21 @@ describe("native opener beam search", () => {
     expect(canReachOpenerPlacement({ rows: bitBoardFromRows(sealedCave), piece: "T", rotation: 0, x: 6, y: 1 })).toBe(false);
   });
 
+  test("rejects the reported step-17 T-spin slot under native-up SRS+ kicks", () => {
+    const rowsBeforeStep17 = [575, 895, 639, 571, 51, 51, 3, 3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+
+    expect(
+      canReachOpenerPlacement({ rows: bitBoardFromRows(rowsBeforeStep17), piece: "T", rotation: 0, x: 6, y: 0, kickTable: "SRS+" })
+    ).toBe(false);
+  });
+
   test("applies native kick table options during reachability and search", () => {
     const kickRequiredRows = new Array(20).fill(0);
-    kickRequiredRows[0] = 33;
-    kickRequiredRows[1] = 25;
-    kickRequiredRows[2] = 9;
-    kickRequiredRows[3] = 8;
-    kickRequiredRows[4] = 462;
-    kickRequiredRows[5] = 33;
+    kickRequiredRows[1] = (1 << 3) | (1 << 5);
     const board = bitBoardFromRows(kickRequiredRows);
 
-    expect(canReachOpenerPlacement({ rows: board, piece: "T", rotation: 0, x: 4, y: 2, kickTable: "SRS+" })).toBe(true);
-    expect(canReachOpenerPlacement({ rows: board, piece: "T", rotation: 0, x: 4, y: 2, kickTable: "NONE" })).toBe(false);
+    expect(canReachOpenerPlacement({ rows: board, piece: "T", rotation: 0, x: 3, y: 0, kickTable: "SRS+" })).toBe(true);
+    expect(canReachOpenerPlacement({ rows: board, piece: "T", rotation: 0, x: 3, y: 0, kickTable: "NONE" })).toBe(false);
     const parserSmoke = { queue: "TIL", beamWidth: 4, maxDepth: 1 } as const;
     expect(() => searchOpenerBeam({ ...parserSmoke, kickTable: "SRS-X" })).not.toThrow();
     expect(() => searchOpenerBeam({ ...parserSmoke, kickTable: "TETRA-X" })).not.toThrow();
@@ -511,7 +514,7 @@ describe("native opener beam search", () => {
     expect(wideTop).toMatchObject({
       queueIndex: 14,
       tSpinClears: 2,
-      tSpinAttack: 9,
+      tSpinAttack: 7,
       backToBackChain: 2,
       difficultClears: 2,
       holes: 0

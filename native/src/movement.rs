@@ -307,11 +307,13 @@ pub(crate) fn push_rotation_states(
         let Some(index) = movement_state_index(next) else {
             continue;
         };
-        if visited[index] || *tail >= queue.len() {
-            continue;
-        }
         if can_place(rows, next_shape, x, y) {
+            // TETR.IO resolves rotation kicks in order; later valid kicks are not selectable.
+            if visited[index] || *tail >= queue.len() {
+                return;
+            }
             push_indexed_movement_state(next, index, visited, queue, tail);
+            return;
         }
     }
 }
@@ -459,6 +461,42 @@ mod tests {
             &mut cache,
         ));
         assert!(cache.reachable.is_some());
+    }
+
+    #[test]
+    fn rotation_reachability_rejects_later_successful_kick_choices() {
+        let rows = [0_u16; BOARD_HEIGHT];
+        let shapes = piece_shapes(Piece::T);
+        let state = MovementState {
+            shape_index: 3,
+            x: 6,
+            y: 2,
+        };
+        let mut visited = [false; MOVEMENT_STATE_CAPACITY];
+        let mut queue = [state; MOVEMENT_STATE_CAPACITY];
+        let mut tail = 0_usize;
+
+        push_rotation_states(
+            &rows,
+            Piece::T,
+            shapes,
+            state,
+            1,
+            KickTable::SrsPlus,
+            &mut visited,
+            &mut queue,
+            &mut tail,
+        );
+
+        assert_eq!(tail, 1);
+        assert_eq!(
+            queue[0],
+            MovementState {
+                shape_index: 0,
+                x: 6,
+                y: 2,
+            }
+        );
     }
 
     #[test]

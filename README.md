@@ -138,3 +138,4 @@ Executable examples live in `tests/`.
 - [x] Demote all-clear-bonus inflated continuation queues from TL opener ranking
 - [x] Show peak TL firepower first in replayed console summaries while retaining replay metrics
 - [x] Penalize ALL CLEAR candidates in native opener scoring while preserving TETR.IO attack accounting
+- [x] Convert TETR.IO kick offsets into native-up board coordinates and respect ordered kick resolution
