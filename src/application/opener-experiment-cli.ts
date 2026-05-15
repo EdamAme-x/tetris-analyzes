@@ -14,6 +14,7 @@ export interface OpenerExperimentCliConfig {
   readonly survivabilityReplay: number;
   readonly certificationReplay: number;
   readonly replayTopTemplates: number;
+  readonly progress: boolean;
 }
 
 export function createOpenerExperimentCliConfig(argv: readonly string[]): OpenerExperimentCliConfig {
@@ -43,6 +44,7 @@ export function createOpenerExperimentCliConfig(argv: readonly string[]): Opener
   const displayTop = top ?? 5;
   const replayTopTemplates = readNumberOption(args, "--replay-top-templates") ?? defaultReplayTemplatePool(preset, displayTop);
   const experimentTop = survivabilityReplay === 0 && certificationReplay === 0 ? top : Math.max(displayTop, replayTopTemplates);
+  const progress = readBooleanOption(args, "--progress") ?? false;
 
   return {
     outDir,
@@ -55,7 +57,8 @@ export function createOpenerExperimentCliConfig(argv: readonly string[]): Opener
     ...(experimentTop === undefined ? {} : { experimentTop }),
     survivabilityReplay,
     certificationReplay,
-    replayTopTemplates
+    replayTopTemplates,
+    progress
   };
 }
 
@@ -98,8 +101,10 @@ function parseArgs(argv: readonly string[]): Map<string, string> {
     "--test-samples",
     "--survivability-replay",
     "--replay-top-templates",
-    "--setup-pool-multiplier"
+    "--setup-pool-multiplier",
+    "--progress"
   ]);
+  const booleanFlags = new Set(["--progress"]);
   const parsed = new Map<string, string>();
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
@@ -109,6 +114,13 @@ function parseArgs(argv: readonly string[]): Map<string, string> {
     const [flag, inlineValue] = splitOption(arg);
     if (!allowed.has(flag)) {
       throw new Error(`Unknown option ${flag}.`);
+    }
+    if (booleanFlags.has(flag) && inlineValue === undefined) {
+      const next = argv[index + 1];
+      if (next === undefined || next.startsWith("--")) {
+        parsed.set(flag, "true");
+        continue;
+      }
     }
     const value = inlineValue ?? argv[index + 1];
     if (value === undefined || value.startsWith("--")) {
@@ -152,6 +164,27 @@ function readNonNegativeNumberOption(args: ReadonlyMap<string, string>, name: st
     throw new Error(`${name} must be a non-negative integer.`);
   }
   return value;
+}
+
+function readBooleanOption(args: ReadonlyMap<string, string>, name: string): boolean | undefined {
+  const raw = args.get(name);
+  if (raw === undefined) {
+    return undefined;
+  }
+  switch (raw.trim().toLowerCase()) {
+    case "1":
+    case "true":
+    case "yes":
+    case "on":
+      return true;
+    case "0":
+    case "false":
+    case "no":
+    case "off":
+      return false;
+    default:
+      throw new Error(`${name} must be a boolean.`);
+  }
 }
 
 function readPreset(raw: string): OpenerExperimentPresetName {

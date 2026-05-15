@@ -17,6 +17,7 @@ bun run experiment:opener
 bun run experiment:opener -- --preset=distribution --top=3
 bun run experiment:opener -- --preset=distribution --seed=my-run --train-samples=24 --validation-samples=64 --test-samples=128 --top=3
 bun run experiment:opener -- --preset=continuation --top=3
+bun run experiment:opener -- --preset=continuation --top=5 --train-samples=64 --validation-samples=128 --test-samples=256 --replay-top-templates=256 --progress 2>&1 | tee experiments/runs/long-continuation.log
 bun run generate:openers -- --top=3
 ```
 

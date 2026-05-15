@@ -155,6 +155,47 @@ describe("opener experiment runner", () => {
     ).toBe(true);
   });
 
+  test("accepts progress logging CLI flags", () => {
+    expect(createOpenerExperimentCliConfig(["--progress"]).progress).toBe(true);
+    expect(createOpenerExperimentCliConfig(["--progress=false"]).progress).toBe(false);
+  });
+
+  test("emits progress events around long-running search steps", () => {
+    const events: string[] = [];
+    const report = runOpenerExperiment({
+      scenarios: [
+        {
+          name: "progress-scenario",
+          queue: "TI",
+          hold: true,
+          beamWidth: 4,
+          maxDepth: 1,
+          warmups: 1,
+          iterations: 1,
+          top: 1
+        }
+      ],
+      clock: createClock("2026-05-14T00:00:00.000Z", [0, 2, 10, 15]),
+      fumenCodec: fakeCodec,
+      search: () => [{ ...candidateNode("progress"), placements: [] }],
+      onProgress: (event) => {
+        events.push(`${event.stage}:${event.step}:${event.scenario}`);
+      }
+    });
+
+    expect(report.scenarios[0]?.medianMs).toBe(5);
+    expect(events).toEqual([
+      "train:scenario-start:progress-scenario",
+      "train:warmup-start:progress-scenario",
+      "train:warmup-end:progress-scenario",
+      "train:iteration-start:progress-scenario",
+      "train:iteration-end:progress-scenario",
+      "train:detail-start:progress-scenario",
+      "train:detail-end:progress-scenario",
+      "train:scenario-end:progress-scenario"
+    ]);
+  });
+
   test("measures native search scenarios and keeps top candidates linkable", () => {
     const clock = createClock("2026-05-14T00:00:00.000Z", [100, 104, 200, 206, 300, 305]);
     let calls = 0;

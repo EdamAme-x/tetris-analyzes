@@ -273,12 +273,38 @@ export interface RunOpenerExperimentInput {
   readonly top?: number;
   readonly templateReplay?: OpenerTemplateReplayInput;
   readonly certificationReplay?: OpenerTemplateReplayInput;
+  readonly onProgress?: OpenerExperimentProgressSink;
 }
 
 export interface OpenerTemplateReplayInput {
   readonly scenarios: readonly OpenerExperimentScenario[];
   readonly topTemplates?: number;
 }
+
+export type OpenerExperimentProgressStage = "train" | "template-replay" | "certification-replay";
+export type OpenerExperimentProgressStep =
+  | "scenario-start"
+  | "warmup-start"
+  | "warmup-end"
+  | "iteration-start"
+  | "iteration-end"
+  | "detail-start"
+  | "detail-end"
+  | "scenario-end";
+
+export interface OpenerExperimentProgressEvent {
+  readonly stage: OpenerExperimentProgressStage;
+  readonly step: OpenerExperimentProgressStep;
+  readonly scenario: string;
+  readonly queue: string;
+  readonly index: number;
+  readonly total: number;
+  readonly elapsedMs?: number;
+  readonly resultCount?: number;
+  readonly medianMs?: number;
+}
+
+export type OpenerExperimentProgressSink = (event: OpenerExperimentProgressEvent) => void;
 
 export interface TemplateReplayScenarioOptions {
   readonly bagCount?: number;
@@ -459,7 +485,14 @@ export function runOpenerExperiment(input: RunOpenerExperimentInput): OpenerExpe
   const replaySearch = input.replaySearch ?? (input.search === undefined ? searchOpenerBeamCompact : search);
   const fumenCodec = input.fumenCodec ?? createFumenCodec();
   const environment = input.environment ?? { runtime: "bun", nativeProfile: "release" };
-  const scenarios = input.scenarios.map((scenario) => runScenario(scenario, input.top, search, detailSearch, fumenCodec, clock));
+  const scenarios = input.scenarios.map((scenario, index) =>
+    runScenario(scenario, input.top, search, detailSearch, fumenCodec, clock, {
+      stage: "train",
+      index: index + 1,
+      total: input.scenarios.length,
+      ...(input.onProgress === undefined ? {} : { onProgress: input.onProgress })
+    })
+  );
   const reportWithoutReplay: OpenerExperimentReport = {
     generatedAt: clock.isoNow(),
     engine: "native-rust-beam",
@@ -469,7 +502,7 @@ export function runOpenerExperiment(input: RunOpenerExperimentInput): OpenerExpe
   const templateReplay =
     input.templateReplay === undefined
       ? undefined
-      : replayOpenerTemplateSurvivability(reportWithoutReplay, input.templateReplay, replaySearch);
+      : replayOpenerTemplateSurvivability(reportWithoutReplay, input.templateReplay, replaySearch, input.onProgress, "template-replay");
   const reportWithReplay = {
     ...reportWithoutReplay,
     ...(templateReplay === undefined ? {} : { templateReplay })
@@ -477,7 +510,13 @@ export function runOpenerExperiment(input: RunOpenerExperimentInput): OpenerExpe
   const certificationReplay =
     input.certificationReplay === undefined
       ? undefined
-      : replayOpenerTemplateSurvivability(reportWithReplay, input.certificationReplay, replaySearch);
+      : replayOpenerTemplateSurvivability(
+          reportWithReplay,
+          input.certificationReplay,
+          replaySearch,
+          input.onProgress,
+          "certification-replay"
+        );
 
   return {
     ...reportWithReplay,
@@ -826,7 +865,9 @@ export function rankOpenerTemplates(report: OpenerExperimentReport, topCount: nu
 export function replayOpenerTemplateSurvivability(
   report: OpenerExperimentReport,
   input: OpenerTemplateReplayInput,
-  search: OpenerSearch = searchOpenerBeamWithPlacements
+  search: OpenerSearch = searchOpenerBeamWithPlacements,
+  onProgress?: OpenerExperimentProgressSink,
+  stage: OpenerExperimentProgressStage = "template-replay"
 ): OpenerTemplateReplayReport {
   const topTemplateCount = input.topTemplates ?? 5;
   if (!Number.isInteger(topTemplateCount) || topTemplateCount <= 0) {
@@ -857,7 +898,15 @@ export function replayOpenerTemplateSurvivability(
     }
   }
   const cachedScenarios = new Map(report.scenarios.map((scenario) => [scenarioResultSignature(scenario), scenario]));
-  for (const scenario of input.scenarios) {
+  for (const [scenarioIndex, scenario] of input.scenarios.entries()) {
+    const progressBase = {
+      stage,
+      scenario: scenario.name,
+      queue: scenario.queue,
+      index: scenarioIndex + 1,
+      total: input.scenarios.length
+    } as const;
+    emitProgress(onProgress, { ...progressBase, step: "scenario-start" });
     const scenarioHits = new Set<string>();
     const scenarioPhaseHits = new Set<string>();
     const scenarioPhaseProfileHits = new Set<string>();
@@ -913,6 +962,7 @@ export function replayOpenerTemplateSurvivability(
           }
         ]);
       }
+      emitProgress(onProgress, { ...progressBase, step: "scenario-end" });
       continue;
     }
 
@@ -958,6 +1008,7 @@ export function replayOpenerTemplateSurvivability(
         }
       ]);
     }
+    emitProgress(onProgress, { ...progressBase, step: "scenario-end", resultCount: nodes.length });
   }
 
   return {
@@ -997,7 +1048,13 @@ function runScenario(
   search: OpenerSearch,
   detailSearch: OpenerSearch | undefined,
   fumenCodec: FumenCodec,
-  clock: OpenerExperimentClock
+  clock: OpenerExperimentClock,
+  progress: {
+    readonly stage: OpenerExperimentProgressStage;
+    readonly index: number;
+    readonly total: number;
+    readonly onProgress?: OpenerExperimentProgressSink;
+  }
 ): OpenerExperimentScenarioResult {
   const warmups = scenario.warmups ?? 1;
   const iterations = scenario.iterations ?? 5;
@@ -1008,25 +1065,47 @@ function runScenario(
     throw new Error(`Scenario ${scenario.name} iterations must be a positive integer.`);
   }
 
+  const progressBase = {
+    stage: progress.stage,
+    scenario: scenario.name,
+    queue: scenario.queue,
+    index: progress.index,
+    total: progress.total
+  } as const;
+  emitProgress(progress.onProgress, { ...progressBase, step: "scenario-start" });
+
   for (let index = 0; index < warmups; index += 1) {
+    const start = progress.onProgress === undefined ? 0 : clock.nowMs();
+    emitProgress(progress.onProgress, { ...progressBase, step: "warmup-start" });
     search(searchInput(scenario));
+    emitProgress(progress.onProgress, {
+      ...progressBase,
+      step: "warmup-end",
+      ...(progress.onProgress === undefined ? {} : { elapsedMs: clock.nowMs() - start })
+    });
   }
 
   const timings: number[] = [];
   let lastNodes: SearchOpenerBeamNode[] = [];
   for (let index = 0; index < iterations; index += 1) {
     const start = clock.nowMs();
+    emitProgress(progress.onProgress, { ...progressBase, step: "iteration-start" });
     lastNodes = search(searchInput(scenario));
-    timings.push(clock.nowMs() - start);
+    const elapsedMs = clock.nowMs() - start;
+    timings.push(elapsedMs);
+    emitProgress(progress.onProgress, { ...progressBase, step: "iteration-end", elapsedMs, resultCount: lastNodes.length });
   }
 
   const stats = summarizeTimings(timings);
   const rules = scenarioRules(scenario);
+  emitProgress(progress.onProgress, { ...progressBase, step: "detail-start" });
   const detailedNodes = detailSearch === undefined ? lastNodes : detailSearch(searchInput(scenario));
+  emitProgress(progress.onProgress, { ...progressBase, step: "detail-end", resultCount: detailedNodes.length });
   const topCandidates = createTopCandidates(detailedNodes, scenario, topOverride ?? scenario.top ?? 5, fumenCodec);
   if (scenario.qualityGateRequired !== false) {
     assertScenarioQualityGate(scenario, topCandidates[0]);
   }
+  emitProgress(progress.onProgress, { ...progressBase, step: "scenario-end", resultCount: lastNodes.length, medianMs: stats.median });
   return {
     name: scenario.name,
     queue: scenario.queue,
@@ -1050,6 +1129,10 @@ function runScenario(
     top: topCandidates,
     tags: scenario.tags ?? []
   };
+}
+
+function emitProgress(onProgress: OpenerExperimentProgressSink | undefined, event: OpenerExperimentProgressEvent): void {
+  onProgress?.(event);
 }
 
 function searchPhaseFrontierNodes(
