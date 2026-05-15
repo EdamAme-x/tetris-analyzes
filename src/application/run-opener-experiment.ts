@@ -285,6 +285,8 @@ export interface OpenerDistributionSplits {
 
 const DISTRIBUTION_BAG = "IJLOSTZ";
 const DEFAULT_DISTRIBUTION_SEED = "tl-distribution-v1";
+const NATIVE_DEFAULT_SETUP_POOL_MULTIPLIER = 14;
+const DEFAULT_CONTINUATION_SETUP_POOL_MULTIPLIER = 32;
 const DEFAULT_TWO_BAG_QUALITY_GATE = {
   minQueueIndex: 14,
   minAttack: 9,
@@ -480,6 +482,9 @@ export function renderOpenerExperimentMarkdown(report: OpenerExperimentReport): 
       ].join(" | ")
     );
   }
+  if (bestCandidates.length === 0) {
+    lines.push("_No candidates passed the quality gate. See Candidate details for raw scenario leaders._");
+  }
 
   lines.push(
     "",
@@ -488,7 +493,8 @@ export function renderOpenerExperimentMarkdown(report: OpenerExperimentReport): 
     "| rank | survival | sources | attack | difficult attack | spin | tspin | b2b | all clears | holes | bumpiness | clears | preview |",
     "| ---: | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- |"
   );
-  for (const template of rankOpenerTemplates(report, 12)) {
+  const templates = rankOpenerTemplates(report, 12);
+  for (const template of templates) {
     lines.push(
       [
         String(template.rank),
@@ -506,6 +512,9 @@ export function renderOpenerExperimentMarkdown(report: OpenerExperimentReport): 
         `[view](${template.best.previewUrl})`
       ].join(" | ")
     );
+  }
+  if (templates.length === 0) {
+    lines.push("_No templates passed the quality gate._");
   }
 
   appendTemplateReplayMarkdown(lines, "Template validation", report.templateReplay);
@@ -530,7 +539,7 @@ export function renderOpenerExperimentMarkdown(report: OpenerExperimentReport): 
         scenario.rules.kickTable,
         String(scenario.beamWidth),
         String(scenario.maxDepth),
-        String(scenario.setupPoolMultiplier ?? 14),
+        String(scenario.setupPoolMultiplier ?? NATIVE_DEFAULT_SETUP_POOL_MULTIPLIER),
         scenario.medianMs.toFixed(3),
         scenario.searchesPerSecond.toFixed(1),
         String(scenario.resultCount),
@@ -619,13 +628,17 @@ function appendTemplateReplayMarkdown(lines: string[], heading: string, replay: 
       ].join(" | ")
     );
   }
+  if (replay.templates.length === 0) {
+    lines.push("_No templates passed the quality gate._");
+  }
 }
 
 export function renderOpenerExperimentConsoleSummary(report: OpenerExperimentReport, topCount = 5): string {
   const replay = report.certificationReplay ?? report.templateReplay;
   if (replay !== undefined) {
     const lines = [report.certificationReplay === undefined ? "Best opener templates (validated)" : "Best opener templates (tested)", ""];
-    for (const [index, template] of rankReplayTemplatesForConsole(replay.templates).slice(0, topCount).entries()) {
+    const rankedTemplates = rankReplayTemplatesForConsole(replay.templates).slice(0, topCount);
+    for (const [index, template] of rankedTemplates.entries()) {
       const candidate = template.best;
       lines.push(
         `#${index + 1} sources=${template.sources.join(",")} replay=${formatReplaySurvival(template)} phase=${formatPhaseReplaySurvival(template)} profile=${formatPhaseProfileReplaySurvival(template)} quality=${formatQualityReplaySurvival(template)} grouped=${formatGroupedReplaySurvival(template)} queueIndex=${candidate.queueIndex} hold=${candidate.hold ?? "-"} attack=${candidate.attack} difficultAttack=${candidate.difficultAttack} otherAttack=${candidate.nonDifficultAttack} spin=${candidate.spinClears} spinAttack=${candidate.spinAttack} tspin=${candidate.tSpinClears} tspinAttack=${candidate.tSpinAttack} b2b=${candidate.backToBackChain} allClears=${candidate.allClears} tspinPotential=${candidate.tSpinPotential} points=${candidate.points} score=${candidate.score.toFixed(1)} holes=${candidate.holes} bump=${candidate.bumpiness}`,
@@ -635,11 +648,16 @@ export function renderOpenerExperimentConsoleSummary(report: OpenerExperimentRep
         ""
       );
     }
+    if (rankedTemplates.length === 0) {
+      lines.push("No opener templates passed the quality gates.", "");
+      appendRawCandidateConsoleFallback(lines, report, topCount);
+    }
     return lines.join("\n").trimEnd();
   }
 
   const lines = ["Best opener templates", ""];
-  for (const template of rankOpenerTemplates(report, topCount)) {
+  const templates = rankOpenerTemplates(report, topCount);
+  for (const template of templates) {
     const candidate = template.best;
     lines.push(
       `#${template.rank} sources=${template.sources.join(",")} survival=${formatTemplateSurvival(template)} queueIndex=${candidate.queueIndex} hold=${candidate.hold ?? "-"} attack=${candidate.attack} difficultAttack=${candidate.difficultAttack} otherAttack=${candidate.nonDifficultAttack} spin=${candidate.spinClears} spinAttack=${candidate.spinAttack} tspin=${candidate.tSpinClears} tspinAttack=${candidate.tSpinAttack} b2b=${candidate.backToBackChain} allClears=${candidate.allClears} tspinPotential=${candidate.tSpinPotential} points=${candidate.points} score=${candidate.score.toFixed(1)} holes=${candidate.holes} bump=${candidate.bumpiness}`,
@@ -649,7 +667,29 @@ export function renderOpenerExperimentConsoleSummary(report: OpenerExperimentRep
       ""
     );
   }
+  if (templates.length === 0) {
+    lines.push("No opener templates passed the quality gates.", "");
+    appendRawCandidateConsoleFallback(lines, report, topCount);
+  }
   return lines.join("\n").trimEnd();
+}
+
+function appendRawCandidateConsoleFallback(lines: string[], report: OpenerExperimentReport, topCount: number): void {
+  const candidates = rankRawOpenerCandidates(report, topCount);
+  if (candidates.length === 0) {
+    lines.push("No raw candidates were produced.");
+    return;
+  }
+  lines.push("Best raw candidates", "");
+  for (const candidate of candidates) {
+    lines.push(
+      `#${candidate.rank} source=${candidate.sourceScenario} queueIndex=${candidate.queueIndex} hold=${candidate.hold ?? "-"} attack=${candidate.attack} difficultAttack=${candidate.difficultAttack} otherAttack=${candidate.nonDifficultAttack} spin=${candidate.spinClears} spinAttack=${candidate.spinAttack} tspin=${candidate.tSpinClears} tspinAttack=${candidate.tSpinAttack} b2b=${candidate.backToBackChain} allClears=${candidate.allClears} tspinPotential=${candidate.tSpinPotential} points=${candidate.points} score=${candidate.score.toFixed(1)} holes=${candidate.holes} bump=${candidate.bumpiness}`,
+      `clears: ${formatClearSequence(candidate.clearSequence)}`,
+      `path: ${candidate.path.join(" ")}`,
+      `view: ${candidate.previewUrl}`,
+      ""
+    );
+  }
 }
 
 function rankReplayTemplatesForConsole(templates: readonly OpenerTemplateReplayEntry[]): OpenerTemplateReplayEntry[] {
@@ -668,6 +708,21 @@ export function rankOpenerCandidates(report: OpenerExperimentReport, topCount: n
           survivalCount: survivalByTemplate.get(templateKey(candidate)) ?? 1,
           survivalRate: (survivalByTemplate.get(templateKey(candidate)) ?? 1) / report.scenarios.length
         }))
+    )
+    .sort(compareRankedOpenerCandidates)
+    .slice(0, topCount)
+    .map((candidate, index) => ({ ...candidate, rank: index + 1 }));
+}
+
+function rankRawOpenerCandidates(report: OpenerExperimentReport, topCount: number): RankedOpenerCandidate[] {
+  return report.scenarios
+    .flatMap((scenario) =>
+      scenario.top.map((candidate) => ({
+        ...candidate,
+        sourceScenario: scenario.name,
+        survivalCount: 1,
+        survivalRate: 1 / report.scenarios.length
+      }))
     )
     .sort(compareRankedOpenerCandidates)
     .slice(0, topCount)
@@ -987,7 +1042,7 @@ function scenarioSignature(scenario: OpenerExperimentScenario): string {
     String(scenario.hold),
     String(scenario.beamWidth),
     String(scenario.maxDepth),
-    String(scenario.setupPoolMultiplier ?? 14),
+    String(scenario.setupPoolMultiplier ?? NATIVE_DEFAULT_SETUP_POOL_MULTIPLIER),
     formatRules(rules)
   ].join("|");
 }
@@ -998,7 +1053,7 @@ function scenarioResultSignature(scenario: OpenerExperimentScenarioResult): stri
     String(scenario.hold),
     String(scenario.beamWidth),
     String(scenario.maxDepth),
-    String(scenario.setupPoolMultiplier ?? 14),
+    String(scenario.setupPoolMultiplier ?? NATIVE_DEFAULT_SETUP_POOL_MULTIPLIER),
     formatRules(scenario.rules)
   ].join("|");
 }
@@ -1693,6 +1748,7 @@ function createDistributionSplitScenarios(input: {
   const beamWidth = input.beamWidth ?? (input.bagCount >= 3 ? 256 : 512);
   const maxDepth = input.maxDepth ?? input.bagCount * DISTRIBUTION_BAG.length;
   const qualityGate = input.bagCount >= 3 ? CONTINUATION_QUALITY_GATE : DEFAULT_TWO_BAG_QUALITY_GATE;
+  const setupPoolMultiplier = input.setupPoolMultiplier ?? defaultSetupPoolMultiplier(input.bagCount);
   const bagTag = bagCountTag(input.bagCount);
   return queues.map((queue, index) => ({
     name: `${input.split}-${String(index + 1).padStart(3, "0")}`,
@@ -1700,7 +1756,7 @@ function createDistributionSplitScenarios(input: {
     hold: true,
     beamWidth,
     maxDepth,
-    ...(input.setupPoolMultiplier === undefined ? {} : { setupPoolMultiplier: input.setupPoolMultiplier }),
+    ...(setupPoolMultiplier === undefined ? {} : { setupPoolMultiplier }),
     rules: TETRIO_TL_OPENER_SEARCH_RULES,
     qualityGate,
     qualityGateRequired: false,
@@ -1709,6 +1765,10 @@ function createDistributionSplitScenarios(input: {
     top: input.split === "train" ? 8 : 1,
     tags: ["distribution", input.split, "hold", bagTag, "t-spin", "tetrio-tl"]
   }));
+}
+
+function defaultSetupPoolMultiplier(bagCount: number): number | undefined {
+  return bagCount >= 3 ? DEFAULT_CONTINUATION_SETUP_POOL_MULTIPLIER : undefined;
 }
 
 function seededBagQueue(seed: string, split: OpenerDistributionSplitName, drawIndex: number, bagCount: number): string {

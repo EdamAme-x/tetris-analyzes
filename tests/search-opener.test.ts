@@ -112,7 +112,7 @@ describe("native opener beam search", () => {
     expect(canReachOpenerPlacement({ rows: empty, piece: "I", rotation: 0, x: 3, y: 5 })).toBe(false);
     expect(
       canReachOpenerPlacement({ rows: bitBoardFromRows(blockedLateralEntry), piece: "O", rotation: 0, x: 0, y: 0, kickTable: "NONE" })
-    ).toBe(false);
+    ).toBe(true);
     expect(canReachOpenerPlacement({ rows: bitBoardFromRows(sealedCave), piece: "T", rotation: 0, x: 6, y: 1 })).toBe(false);
   });
 
@@ -124,13 +124,21 @@ describe("native opener beam search", () => {
     ).toBe(false);
   });
 
+  test("rejects the reported train-001 step-6 T-spin slot", () => {
+    const rowsBeforeStep6 = [902, 1007, 769, 385, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+
+    expect(
+      canReachOpenerPlacement({ rows: bitBoardFromRows(rowsBeforeStep6), piece: "T", rotation: 0, x: 3, y: 0, kickTable: "SRS+" })
+    ).toBe(false);
+  });
+
   test("applies native kick table options during reachability and search", () => {
     const kickRequiredRows = new Array(20).fill(0);
-    kickRequiredRows[1] = (1 << 3) | (1 << 5);
+    kickRequiredRows[2] = 1 << 1;
     const board = bitBoardFromRows(kickRequiredRows);
 
-    expect(canReachOpenerPlacement({ rows: board, piece: "T", rotation: 0, x: 3, y: 0, kickTable: "SRS+" })).toBe(true);
-    expect(canReachOpenerPlacement({ rows: board, piece: "T", rotation: 0, x: 3, y: 0, kickTable: "NONE" })).toBe(false);
+    expect(canReachOpenerPlacement({ rows: board, piece: "T", rotation: 1, x: 0, y: 0, kickTable: "SRS+" })).toBe(true);
+    expect(canReachOpenerPlacement({ rows: board, piece: "T", rotation: 1, x: 0, y: 0, kickTable: "NONE" })).toBe(false);
     const parserSmoke = { queue: "TIL", beamWidth: 4, maxDepth: 1 } as const;
     expect(() => searchOpenerBeam({ ...parserSmoke, kickTable: "SRS-X" })).not.toThrow();
     expect(() => searchOpenerBeam({ ...parserSmoke, kickTable: "TETRA-X" })).not.toThrow();
@@ -168,10 +176,11 @@ describe("native opener beam search", () => {
     });
   });
 
-  test("estimates T-spin slot potential before the clearing T is placed", () => {
+  test("estimates reachable T-spin slot potential before the T is placed", () => {
     const empty = bitBoardFromRows(new Array(20).fill(0));
     const readyRows = new Array(20).fill(0);
-    readyRows[1] = (1 << 3) | (1 << 5);
+    readyRows[0] = 1 << 0;
+    readyRows[2] = (1 << 0) | (1 << 2);
     const unreachableRows = new Array(20).fill(0);
     unreachableRows[0] = 660;
     unreachableRows[1] = 553;

@@ -25,7 +25,7 @@ use firepower::{
 };
 use movement::{
     can_place, can_place_in_bounds, is_reachable_placement, is_reachable_placement_with_cache,
-    lock_shape, parse_kick_table, ReachabilityCache,
+    lock_shape, parse_kick_table, resolve_rotation_state, MovementState, ReachabilityCache,
 };
 use pieces::{
     format_placement, parse_piece_string, parse_queue, piece_name, piece_shapes,
@@ -308,6 +308,15 @@ pub struct BeamSpinDetection {
 }
 
 #[napi(object)]
+pub struct BeamRotationResolution {
+    pub success: bool,
+    pub rotation: Option<u32>,
+    pub x: Option<i32>,
+    pub y: Option<i32>,
+    pub kick_index: Option<u32>,
+}
+
+#[napi(object)]
 pub struct BeamFirepowerInput {
     pub clear_name: String,
     pub all_clear: Option<bool>,
@@ -431,6 +440,65 @@ pub fn can_reach_opener_placement(
     Ok(can_place(&board, shape, x, y)
         && (y == 0 || !can_place(&board, shape, x, y - 1))
         && is_reachable_placement(&board, piece, shape_index, x, y, kick_table))
+}
+
+#[napi(js_name = "resolveOpenerRotation")]
+pub fn resolve_opener_rotation(
+    rows: Uint16Array,
+    piece: String,
+    rotation: u32,
+    x: i32,
+    y: i32,
+    direction: i32,
+    kick_table: Option<String>,
+) -> Result<BeamRotationResolution> {
+    let board = board::rows_to_array(rows.as_ref())?;
+    let piece = parse_piece_string(&piece)?;
+    let rotation = u8::try_from(rotation)
+        .map_err(|_| Error::from_reason(format!("rotation must fit in u8, got {rotation}.")))?;
+    let shape_index = piece_shapes(piece)
+        .iter()
+        .position(|shape| shape.rotation == rotation)
+        .ok_or_else(|| {
+            Error::from_reason(format!(
+                "Piece {} has no rotation {rotation}.",
+                piece_name(piece)
+            ))
+        })?;
+    let x =
+        i8::try_from(x).map_err(|_| Error::from_reason(format!("x must fit in i8, got {x}.")))?;
+    let y =
+        i8::try_from(y).map_err(|_| Error::from_reason(format!("y must fit in i8, got {y}.")))?;
+    let direction = i8::try_from(direction)
+        .map_err(|_| Error::from_reason(format!("direction must fit in i8, got {direction}.")))?;
+    if !matches!(direction, -1 | 1 | 2) {
+        return Err(Error::from_reason(format!(
+            "Unsupported native opener rotation direction {direction}. Supported directions are -1, 1, and 2."
+        )));
+    }
+    let kick_table = parse_optional_kick_table(kick_table.as_deref())?;
+    let shapes = piece_shapes(piece);
+    let state = MovementState { shape_index, x, y };
+
+    let Some(resolution) =
+        resolve_rotation_state(&board, piece, shapes, state, direction, kick_table)
+    else {
+        return Ok(BeamRotationResolution {
+            success: false,
+            rotation: None,
+            x: None,
+            y: None,
+            kick_index: None,
+        });
+    };
+
+    Ok(BeamRotationResolution {
+        success: true,
+        rotation: Some(u32::from(shapes[resolution.state.shape_index].rotation)),
+        x: Some(i32::from(resolution.state.x)),
+        y: Some(i32::from(resolution.state.y)),
+        kick_index: resolution.kick_index.map(|index| index as u32),
+    })
 }
 
 #[napi(js_name = "detectOpenerSpin")]
@@ -748,7 +816,8 @@ pub(crate) fn search_opener_states(
                 .flatten()
             {
                 let shapes = piece_shapes(choice.piece);
-                let mut reachable_cache = ReachabilityCache::new(&state.rows, choice.piece);
+                let mut reachable_cache =
+                    ReachabilityCache::new(&state.rows, choice.piece, kick_table);
                 for shape_index in placement_shape_indices(choice.piece).iter().copied() {
                     let shape = shapes[shape_index];
                     for x in 0..=(BOARD_WIDTH as i8 - shape.width) {

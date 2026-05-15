@@ -71,6 +71,14 @@ export interface NativeSpinDetection {
   clearedLines: number;
 }
 
+export interface NativeRotationResolution {
+  success: boolean;
+  rotation?: number | null;
+  x?: number | null;
+  y?: number | null;
+  kickIndex?: number | null;
+}
+
 export interface NativeFirepowerInput {
   clearName: NativeClearName;
   allClear?: boolean | undefined;
@@ -223,6 +231,15 @@ export interface NativeBinding {
   rowsToFumenField(rows: Uint16Array): string;
   batchRowsToFumenFields(rows: Uint16Array, boardCount: number): string[];
   canReachOpenerPlacement(rows: Uint16Array, piece: string, rotation: number, x: number, y: number, kickTable?: NativeKickTable): boolean;
+  resolveOpenerRotation(
+    rows: Uint16Array,
+    piece: string,
+    rotation: number,
+    x: number,
+    y: number,
+    direction: number,
+    kickTable?: NativeKickTable
+  ): NativeRotationResolution;
   detectOpenerSpin(
     rows: Uint16Array,
     piece: string,

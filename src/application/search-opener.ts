@@ -7,6 +7,7 @@ import type {
   NativeKickTable,
   NativeOpenerBagEvaluation,
   NativeOpenerBagTemplateMining,
+  NativeRotationResolution,
   NativeSpinMode,
   NativeSpinDetection
 } from "../infrastructure/native/binding-types";
@@ -61,6 +62,16 @@ export interface OpenerPlacementReachabilityInput {
   readonly y: number;
   readonly kickTable?: NativeKickTable;
   readonly spinMode?: NativeSpinMode;
+}
+
+export interface OpenerRotationResolutionInput {
+  readonly rows: Uint16Array;
+  readonly piece: SearchPiece;
+  readonly rotation: number;
+  readonly x: number;
+  readonly y: number;
+  readonly direction: -1 | 1 | 2;
+  readonly kickTable?: NativeKickTable;
 }
 
 export function searchOpenerBeam(input: SearchOpenerBeamInput): SearchOpenerBeamNode[] {
@@ -138,6 +149,18 @@ export function mineOpenerBagTemplates(input: MineOpenerBagTemplatesInput = {}):
 
 export function canReachOpenerPlacement(input: OpenerPlacementReachabilityInput): boolean {
   return loadNativeBinding().canReachOpenerPlacement(input.rows, input.piece, input.rotation, input.x, input.y, input.kickTable);
+}
+
+export function resolveOpenerRotation(input: OpenerRotationResolutionInput): NativeRotationResolution {
+  return loadNativeBinding().resolveOpenerRotation(
+    input.rows,
+    input.piece,
+    input.rotation,
+    input.x,
+    input.y,
+    input.direction,
+    input.kickTable
+  );
 }
 
 export function detectOpenerSpin(input: OpenerPlacementReachabilityInput): NativeSpinDetection {

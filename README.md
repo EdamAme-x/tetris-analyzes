@@ -4,6 +4,7 @@
 bun install
 bun run build:native:debug
 bun run generate:tetrio-tables
+bun run generate:tetrio-movement-snapshots
 bun run check
 bun run test:native
 bun test
@@ -25,6 +26,7 @@ Executable examples live in `tests/`.
 - [x] Add seed-based train/validation/test distribution splits
 - [x] Add native bag-1 all-queue template mining and reproducibility ranking
 - [x] Add a fumen-ready opener generation command from native mining
+- [x] Add generated tetrio.js movement snapshot coverage for native rotation parity
 - [ ] Add exact placement frontier enumeration for bag-1 templates
 - [ ] Add known-opener fumen fixtures and recall@K benchmarks
 - [ ] Confirm the current TETR.IO TL spin/B2B profile from extracted client tables
@@ -139,3 +141,6 @@ Executable examples live in `tests/`.
 - [x] Show peak TL firepower first in replayed console summaries while retaining replay metrics
 - [x] Penalize ALL CLEAR candidates in native opener scoring while preserving TETR.IO attack accounting
 - [x] Convert TETR.IO kick offsets into native-up board coordinates and respect ordered kick resolution
+- [x] Apply TETR.IO rotation kicks around the matrix anchor instead of the trimmed native bounding box
+- [x] Generate native movement offsets and spawn rotations from tetrio.js kicksets
+- [x] Add tetrio.js-derived movement snapshot tests for direct, kicked, and failed rotations

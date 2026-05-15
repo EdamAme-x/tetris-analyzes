@@ -44,6 +44,7 @@ describe("opener experiment runner", () => {
       hold: true,
       beamWidth: 256,
       maxDepth: 21,
+      setupPoolMultiplier: 32,
       rules: TETRIO_TL_OPENER_SEARCH_RULES,
       qualityGateRequired: false,
       qualityGate: {
@@ -90,6 +91,7 @@ describe("opener experiment runner", () => {
     expect(CONTINUATION_OPENER_EXPERIMENT_SCENARIOS.every((scenario) => isThreeBagQueue(scenario.queue))).toBe(true);
     expect(CONTINUATION_OPENER_EXPERIMENT_SCENARIOS.every((scenario) => scenario.beamWidth === 256)).toBe(true);
     expect(CONTINUATION_OPENER_EXPERIMENT_SCENARIOS.every((scenario) => scenario.maxDepth === 21)).toBe(true);
+    expect(CONTINUATION_OPENER_EXPERIMENT_SCENARIOS.every((scenario) => scenario.setupPoolMultiplier === 32)).toBe(true);
     expect(CONTINUATION_OPENER_EXPERIMENT_SCENARIOS.every((scenario) => scenario.qualityGate?.minBackToBackChain === 2)).toBe(true);
     expect(CONTINUATION_OPENER_EXPERIMENT_SCENARIOS.every((scenario) => scenario.qualityGate?.maxAllClears === 0)).toBe(true);
     expect(CONTINUATION_OPENER_EXPERIMENT_SCENARIOS.every((scenario) => scenario.tags?.includes("three-bag"))).toBe(true);
@@ -127,6 +129,7 @@ describe("opener experiment runner", () => {
     expect(config.replayTopTemplates).toBe(64);
     expect(config.experimentTop).toBe(64);
     expect(config.scenarios).toHaveLength(4);
+    expect(config.scenarios.every((scenario) => scenario.setupPoolMultiplier === 32)).toBe(true);
     expect(config.validationScenarios).toHaveLength(8);
     expect(config.testScenarios).toHaveLength(16);
   });
@@ -592,6 +595,50 @@ describe("opener experiment runner", () => {
     );
     expect(summary).toContain("path: T@r0,x3");
     expect(summary).not.toContain("fake-scenario | TI");
+  });
+
+  test("explains empty quality-gated replay output and prints raw candidates", () => {
+    const report = runOpenerExperiment({
+      scenarios: [
+        {
+          name: "strict-source",
+          queue: "TI",
+          hold: false,
+          beamWidth: 4,
+          maxDepth: 1,
+          warmups: 0,
+          iterations: 1,
+          top: 1,
+          qualityGate: { minAttack: 99 },
+          qualityGateRequired: false
+        }
+      ],
+      templateReplay: {
+        scenarios: [
+          {
+            name: "strict-replay",
+            queue: "TI",
+            hold: false,
+            beamWidth: 4,
+            maxDepth: 1,
+            warmups: 0,
+            iterations: 1,
+            top: 1
+          }
+        ],
+        topTemplates: 1
+      },
+      clock: createClock("2026-05-14T00:00:00.000Z", [0, 2]),
+      fumenCodec: fakeCodec,
+      search: () => [{ ...candidateNode("weak-template"), attack: 1, difficultAttack: 1 }]
+    });
+
+    const summary = renderOpenerExperimentConsoleSummary(report, 1);
+    expect(summary).toContain("No opener templates passed the quality gates.");
+    expect(summary).toContain("Best raw candidates");
+    expect(summary).toContain("path: weak-template");
+    expect(renderOpenerExperimentMarkdown(report)).toContain("No candidates passed the quality gate");
+    expect(renderOpenerExperimentMarkdown(report)).toContain("No templates passed the quality gate");
   });
 
   test("renders native candidate queue and hold state in reports", () => {

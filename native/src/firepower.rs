@@ -101,7 +101,10 @@ pub(crate) fn firepower_score(firepower: FirepowerState) -> f64 {
         - firepower.all_clears as f64 * ALL_CLEAR_OPENER_SCORE_PENALTY
 }
 
-pub(crate) fn quad_well_continuation_score(quad_well_potential: u32, back_to_back_chain: u32) -> f64 {
+pub(crate) fn quad_well_continuation_score(
+    quad_well_potential: u32,
+    back_to_back_chain: u32,
+) -> f64 {
     if quad_well_potential == 0 || back_to_back_chain == 0 {
         return 0.0;
     }
@@ -135,7 +138,7 @@ fn t_spin_setup_score(t_spin_potential: u32, back_to_back_chain: u32) -> f64 {
 pub(crate) fn estimate_t_spin_potential(rows: &BoardRows, kick_table: KickTable) -> u32 {
     let mut best = 0_u32;
     let shapes = piece_shapes(Piece::T);
-    let mut reachable_cache = ReachabilityCache::new(rows, Piece::T);
+    let mut reachable_cache = ReachabilityCache::new(rows, Piece::T, kick_table);
     for shape_index in placement_shape_indices(Piece::T).iter().copied() {
         let shape = shapes[shape_index];
         for x in 0..=(BOARD_WIDTH as i8 - shape.width) {
@@ -443,7 +446,11 @@ mod tests {
         [0, 0, 0, 0, 0]
     }
 
-    fn spin_detection(kind: SpinKind, cleared_lines: u32, force_back_to_back: bool) -> SpinDetection {
+    fn spin_detection(
+        kind: SpinKind,
+        cleared_lines: u32,
+        force_back_to_back: bool,
+    ) -> SpinDetection {
         SpinDetection {
             kind,
             spin: kind != SpinKind::None,
