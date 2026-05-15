@@ -65,30 +65,8 @@ impl ReachablePlacementSet {
         movement_state_index(state).is_some_and(|index| visited_contains(&self.visited, index))
     }
 
-    fn contains(
-        &self,
-        piece: Piece,
-        shapes: &[Shape],
-        target_shape_index: usize,
-        target_x: i8,
-        target_y: i8,
-    ) -> bool {
-        let target_rotation = shapes[target_shape_index].rotation;
-        match piece {
-            Piece::O => (0..MOVEMENT_ROTATION_CAPACITY)
-                .any(|shape_index| self.contains_shape_index(shape_index, target_x, target_y)),
-            Piece::I | Piece::S | Piece::Z if matches!(target_rotation, 0 | 2) => {
-                self.contains_shape_index(0, target_x, target_y)
-                    || self.contains_shape_index(2, target_x, target_y)
-            }
-            Piece::I | Piece::S | Piece::Z if matches!(target_rotation, 1 | 3) => {
-                self.contains_shape_index(1, target_x, target_y)
-                    || self.contains_shape_index(3, target_x, target_y)
-            }
-            Piece::T | Piece::J | Piece::L | Piece::I | Piece::S | Piece::Z => {
-                self.contains_shape_index(target_shape_index, target_x, target_y)
-            }
-        }
+    fn contains(&self, target_shape_index: usize, target_x: i8, target_y: i8) -> bool {
+        self.contains_shape_index(target_shape_index, target_x, target_y)
     }
 
     fn contains_shape_index(&self, shape_index: usize, x: i8, y: i8) -> bool {
@@ -158,19 +136,21 @@ pub(crate) fn is_reachable_placement_with_cache(
     let target_shape = shapes[target_shape_index];
     if reachable_cache.reachable_allow_180 == Some(allow_180) {
         if let Some(reachable) = reachable_cache.reachable.as_ref() {
-            return reachable.contains(piece, shapes, target_shape_index, target_x, target_y);
+            return reachable.contains(target_shape_index, target_x, target_y);
         }
     }
 
-    if has_clear_horizontal_entry_drop(
-        rows,
-        piece,
-        target_shape_index,
-        target_shape,
-        target_x,
-        target_y,
-        kick_table,
-    ) {
+    if target_shape_index == kick_table_spawn_rotation(kick_table, piece) as usize
+        && has_clear_horizontal_entry_drop(
+            rows,
+            piece,
+            target_shape_index,
+            target_shape,
+            target_x,
+            target_y,
+            kick_table,
+        )
+    {
         return true;
     }
 
@@ -181,9 +161,10 @@ pub(crate) fn is_reachable_placement_with_cache(
         ));
         reachable_cache.reachable_allow_180 = Some(allow_180);
     }
-    reachable_cache.reachable.as_ref().is_some_and(|reachable| {
-        reachable.contains(piece, shapes, target_shape_index, target_x, target_y)
-    })
+    reachable_cache
+        .reachable
+        .as_ref()
+        .is_some_and(|reachable| reachable.contains(target_shape_index, target_x, target_y))
 }
 
 fn build_reachable_placement_set(
@@ -718,6 +699,24 @@ mod tests {
     }
 
     #[test]
+    fn non_spawn_rotation_reachability_builds_bfs_cache() {
+        let rows = [0_u16; BOARD_HEIGHT];
+        let mut cache = ReachabilityCache::new(&rows, Piece::T, KickTable::SrsPlus);
+
+        assert!(is_reachable_placement_with_cache(
+            &rows,
+            Piece::T,
+            1,
+            3,
+            0,
+            KickTable::SrsPlus,
+            true,
+            &mut cache,
+        ));
+        assert!(cache.reachable.is_some());
+    }
+
+    #[test]
     fn reachability_cache_is_built_only_after_direct_drop_misses() {
         let mut rows = [0_u16; BOARD_HEIGHT];
         rows[BOARD_HEIGHT - 1] = 1;
@@ -841,14 +840,25 @@ mod tests {
     }
 
     #[test]
-    fn reachable_set_checks_equivalent_rotation_membership_directly() {
-        let rows = [0_u16; BOARD_HEIGHT];
-        let reachable = build_reachable_placement_set(&rows, Piece::I, KickTable::SrsPlus, true);
-        let shapes = piece_shapes(Piece::I);
+    fn reachable_set_requires_exact_final_rotation_membership() {
+        let mut visited = [0_u64; MOVEMENT_VISITED_WORDS];
+        let mut queue = [0_u16; MOVEMENT_STATE_CAPACITY];
+        let mut tail = 0_usize;
+        push_known_movement_state(
+            MovementState {
+                shape_index: 0,
+                x: 3,
+                y: 0,
+            },
+            &mut visited,
+            &mut queue,
+            &mut tail,
+        );
+        let reachable = ReachablePlacementSet { visited };
 
-        assert!(reachable.contains(Piece::I, shapes, 0, 3, 0));
-        assert!(reachable.contains(Piece::I, shapes, 2, 3, 0));
-        assert!(!reachable.contains(Piece::I, shapes, 2, 10, 0));
+        assert!(reachable.contains(0, 3, 0));
+        assert!(!reachable.contains(2, 3, 0));
+        assert!(!reachable.contains(2, 10, 0));
     }
 
     #[test]

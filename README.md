@@ -83,7 +83,7 @@ Executable examples live in `tests/`.
 - [x] Limit native continuation potential credit to T/I pieces reachable within remaining search depth
 - [x] Use native shape row masks for faster collision and lock operations
 - [x] Add regression tests for B2B carry/reset, empty-hold queue consumption, grounded placements, and TL non-T spin suppression
-- [x] Use static equivalent-rotation lookup for native reachability cache membership
+- [x] Require exact final rotation membership for native reachability cache checks
 - [x] Pre-allocate accepted native child paths and placement histories during beam expansion
 - [x] Stop native T-spin potential scans once the maximum reachable continuation value is found
 - [x] Make native ALL-MINI and MINI-ONLY non-T spin clears advance Back-to-Back chains
