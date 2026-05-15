@@ -1,5 +1,6 @@
 import { createRequire } from "node:module";
 import {
+  BAG_TYPE_OPTIONS,
   CHEESE_LIMITS,
   COMBO_TABLE_OPTIONS,
   GARBAGE_OPTIONS,
@@ -8,14 +9,17 @@ import {
   KICK_TABLE_OPTIONS,
   SPIN_OPTIONS,
   STATIC_GRAVITY_LIMITS,
+  type BagType,
   type ComboTable,
   type GarbageRules,
   type GravityRules,
+  type HandlingRules,
   type HoldMode,
   type HoldRules,
   type Ruleset,
   type RulesetInput,
-  type TetrioConfig
+  type TetrioConfig,
+  type TimingRules
 } from "../domain/rules";
 import { TETRIO_TL_OPTIONS } from "../domain/tetrio-tables";
 import { bitBoardFromRows, createEmptyBitBoard } from "../infrastructure/bitboard/native-bitboard";
@@ -25,9 +29,20 @@ type TetrioComboTableKey = keyof TetrioTables["TETRIO_COMBO_ATTACK_TABLES"];
 
 const moduleRequire = createRequire(import.meta.url);
 const DEFAULT_HOLD: HoldRules = { mode: "ON", infinite: "OFF" };
+const DEFAULT_BAG_TYPE = TETRIO_TL_OPTIONS.bagtype;
+const DEFAULT_HANDLING: HandlingRules = {
+  roomHandling: TETRIO_TL_OPTIONS.room_handling,
+  arr: TETRIO_TL_OPTIONS.room_handling_arr,
+  das: TETRIO_TL_OPTIONS.room_handling_das,
+  sdf: TETRIO_TL_OPTIONS.room_handling_sdf
+};
 const DEFAULT_GRAVITY: GravityRules = {
   mode: "STATIC",
-  staticGravity: STATIC_GRAVITY_LIMITS.default
+  staticGravity: STATIC_GRAVITY_LIMITS.default,
+  g: TETRIO_TL_OPTIONS.g,
+  increase: TETRIO_TL_OPTIONS.gincrease,
+  margin: TETRIO_TL_OPTIONS.gmargin,
+  may20g: TETRIO_TL_OPTIONS.gravitymay20g
 };
 const DEFAULT_GARBAGE: GarbageRules = {
   mode: "OFF",
@@ -35,18 +50,27 @@ const DEFAULT_GARBAGE: GarbageRules = {
   cheeseTimerInterval: CHEESE_LIMITS.timerInterval.default,
   cheeseMessinessPercent: CHEESE_LIMITS.messinessPercent.default
 };
+const DEFAULT_TIMING: TimingRules = {
+  are: TETRIO_TL_OPTIONS.are,
+  lineClearAre: TETRIO_TL_OPTIONS.lineclear_are,
+  lockTime: TETRIO_TL_OPTIONS.locktime,
+  lockResets: TETRIO_TL_OPTIONS.lockresets
+};
 let cachedTetrioTables: TetrioTables | undefined;
 
 export function createRuleset(input: RulesetInput = {}): Ruleset {
   return {
     baseBoard: input.baseBoard === undefined ? createEmptyBitBoard() : bitBoardFromRows(input.baseBoard),
+    bagType: normalizeBagType(input.bagType ?? DEFAULT_BAG_TYPE),
     hold: normalizeHold(input.hold, input.infiniteHold),
     allow180: input.allow180 ?? TETRIO_TL_OPTIONS.allow180,
     spins: normalizeOption(input.spins ?? TETRIO_TL_OPTIONS.spinbonuses, SPIN_OPTIONS, "spins"),
     comboTable: normalizeOption(input.comboTable ?? TETRIO_TL_OPTIONS.combotable, COMBO_TABLE_OPTIONS, "comboTable"),
     kickTable: normalizeOption(input.kickTable ?? TETRIO_TL_OPTIONS.kickset, KICK_TABLE_OPTIONS, "kickTable"),
+    handling: normalizeHandling(input.handling),
     gravity: normalizeGravity(input.gravity),
-    garbage: normalizeGarbage(input.garbage)
+    garbage: normalizeGarbage(input.garbage),
+    timing: normalizeTiming(input.timing)
   };
 }
 
@@ -60,18 +84,31 @@ export function usesStaticGravity(ruleset: Pick<Ruleset, "gravity">): boolean {
 
 export function toTetrioConfig(ruleset: Ruleset): TetrioConfig {
   return {
+    bagtype: ruleset.bagType,
     hold: toOnOffValue(ruleset.hold.mode),
     infinite_hold: toOnOffValue(ruleset.hold.infinite),
     allow180: toOnOffValue(ruleset.allow180),
     spins: getTetrioValue(ruleset.spins, SPIN_OPTIONS, "spins"),
     combotable: getTetrioValue(ruleset.comboTable, COMBO_TABLE_OPTIONS, "comboTable"),
     kickset: getTetrioValue(ruleset.kickTable, KICK_TABLE_OPTIONS, "kickTable"),
+    room_handling: toOnOffValue(ruleset.handling.roomHandling),
+    room_handling_arr: ruleset.handling.arr,
+    room_handling_das: ruleset.handling.das,
+    room_handling_sdf: ruleset.handling.sdf,
     gravitymode: getTetrioValue(ruleset.gravity.mode, GRAVITY_OPTIONS, "gravity.mode"),
     gravitystatic: ruleset.gravity.staticGravity,
+    g: ruleset.gravity.g,
+    gincrease: ruleset.gravity.increase,
+    gmargin: ruleset.gravity.margin,
+    gravitymay20g: toOnOffValue(ruleset.gravity.may20g),
     garbagemode: getTetrioValue(ruleset.garbage.mode, GARBAGE_OPTIONS, "garbage.mode"),
     cheeselayer_height: ruleset.garbage.cheeseLayerHeight,
     cheesetimer_interval: ruleset.garbage.cheeseTimerInterval,
-    cheesemessiness: ruleset.garbage.cheeseMessinessPercent
+    cheesemessiness: ruleset.garbage.cheeseMessinessPercent,
+    are: ruleset.timing.are,
+    lineclear_are: ruleset.timing.lineClearAre,
+    locktime: ruleset.timing.lockTime,
+    lockresets: ruleset.timing.lockResets
   };
 }
 
@@ -145,6 +182,28 @@ function normalizeHoldMode(value: HoldMode | boolean, label: string): HoldMode {
   );
 }
 
+function normalizeBagType(value: string): BagType {
+  return normalizeOption(value, BAG_TYPE_OPTIONS, "bagType");
+}
+
+function normalizeHandling(value: RulesetInput["handling"]): HandlingRules {
+  if (value === undefined) {
+    return { ...DEFAULT_HANDLING };
+  }
+  const arr = value.arr ?? DEFAULT_HANDLING.arr;
+  const das = value.das ?? DEFAULT_HANDLING.das;
+  const sdf = value.sdf ?? DEFAULT_HANDLING.sdf;
+  assertNonNegativeFinite(arr, "handling.arr");
+  assertNonNegativeFinite(das, "handling.das");
+  assertNonNegativeFinite(sdf, "handling.sdf");
+  return {
+    roomHandling: value.roomHandling ?? DEFAULT_HANDLING.roomHandling,
+    arr,
+    das,
+    sdf
+  };
+}
+
 function normalizeGravity(value: RulesetInput["gravity"]): GravityRules {
   if (value === undefined) {
     return { ...DEFAULT_GRAVITY };
@@ -152,14 +211,24 @@ function normalizeGravity(value: RulesetInput["gravity"]): GravityRules {
   if (typeof value === "string") {
     return {
       mode: normalizeOption(value, GRAVITY_OPTIONS, "gravity"),
-      staticGravity: DEFAULT_GRAVITY.staticGravity
+      staticGravity: DEFAULT_GRAVITY.staticGravity,
+      g: DEFAULT_GRAVITY.g,
+      increase: DEFAULT_GRAVITY.increase,
+      margin: DEFAULT_GRAVITY.margin,
+      may20g: DEFAULT_GRAVITY.may20g
     };
   }
 
   const mode = normalizeOption(value.mode ?? DEFAULT_GRAVITY.mode, GRAVITY_OPTIONS, "gravity.mode");
   const staticGravity = value.staticGravity ?? DEFAULT_GRAVITY.staticGravity;
+  const g = value.g ?? DEFAULT_GRAVITY.g;
+  const increase = value.increase ?? DEFAULT_GRAVITY.increase;
+  const margin = value.margin ?? DEFAULT_GRAVITY.margin;
   assertInRange(staticGravity, STATIC_GRAVITY_LIMITS.min, STATIC_GRAVITY_LIMITS.max, "gravity.staticGravity");
-  return { mode, staticGravity };
+  assertNonNegativeFinite(g, "gravity.g");
+  assertNonNegativeFinite(increase, "gravity.increase");
+  assertNonNegativeInteger(margin, "gravity.margin");
+  return { mode, staticGravity, g, increase, margin, may20g: value.may20g ?? DEFAULT_GRAVITY.may20g };
 }
 
 function normalizeGarbage(value: RulesetInput["garbage"]): GarbageRules {
@@ -186,6 +255,21 @@ function normalizeGarbage(value: RulesetInput["garbage"]): GarbageRules {
     "garbage.cheeseMessinessPercent"
   );
   return { mode, cheeseLayerHeight, cheeseTimerInterval, cheeseMessinessPercent };
+}
+
+function normalizeTiming(value: RulesetInput["timing"]): TimingRules {
+  if (value === undefined) {
+    return { ...DEFAULT_TIMING };
+  }
+  const are = value.are ?? DEFAULT_TIMING.are;
+  const lineClearAre = value.lineClearAre ?? DEFAULT_TIMING.lineClearAre;
+  const lockTime = value.lockTime ?? DEFAULT_TIMING.lockTime;
+  const lockResets = value.lockResets ?? DEFAULT_TIMING.lockResets;
+  assertNonNegativeFinite(are, "timing.are");
+  assertNonNegativeFinite(lineClearAre, "timing.lineClearAre");
+  assertNonNegativeFinite(lockTime, "timing.lockTime");
+  assertNonNegativeInteger(lockResets, "timing.lockResets");
+  return { are, lineClearAre, lockTime, lockResets };
 }
 
 function normalizeOption<T extends string>(
@@ -242,6 +326,12 @@ function roundAttack(attack: number, rounding: "DOWN" | "RAW"): number {
 function assertInRange(value: number, min: number, max: number, label: string): void {
   if (!Number.isFinite(value) || value < min || value > max) {
     throw new Error(`${label} must be between ${min} and ${max}, got ${value}.`);
+  }
+}
+
+function assertNonNegativeFinite(value: number, label: string): void {
+  if (!Number.isFinite(value) || value < 0) {
+    throw new Error(`${label} must be a non-negative finite number, got ${value}.`);
   }
 }
 

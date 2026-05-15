@@ -1,4 +1,15 @@
+import { TETRIO_BAG_TYPES } from "./tetrio-tables";
+
 export const HOLD_MODES = ["ON", "OFF"] as const;
+
+export type BagType = (typeof TETRIO_BAG_TYPES)[number];
+
+export const BAG_TYPE_OPTIONS: readonly { readonly value: BagType; readonly tetrioValue: BagType; readonly title: string }[] =
+  TETRIO_BAG_TYPES.map((value) => ({
+    value,
+    tetrioValue: value,
+    title: `TETR.IO ${value} randomizer.`
+  }));
 
 export const SPIN_OPTIONS = [
   {
@@ -143,6 +154,13 @@ export type KickTable = (typeof KICK_TABLE_OPTIONS)[number]["value"];
 export type GravityMode = (typeof GRAVITY_OPTIONS)[number]["value"];
 export type GarbageMode = (typeof GARBAGE_OPTIONS)[number]["value"];
 
+export interface HandlingRules {
+  readonly roomHandling: boolean;
+  readonly arr: number;
+  readonly das: number;
+  readonly sdf: number;
+}
+
 export interface HoldRules {
   readonly mode: HoldMode;
   readonly infinite: HoldMode;
@@ -151,6 +169,10 @@ export interface HoldRules {
 export interface GravityRules {
   readonly mode: GravityMode;
   readonly staticGravity: number;
+  readonly g: number;
+  readonly increase: number;
+  readonly margin: number;
+  readonly may20g: boolean;
 }
 
 export interface GarbageRules {
@@ -160,27 +182,40 @@ export interface GarbageRules {
   readonly cheeseMessinessPercent: number;
 }
 
+export interface TimingRules {
+  readonly are: number;
+  readonly lineClearAre: number;
+  readonly lockTime: number;
+  readonly lockResets: number;
+}
+
 export interface Ruleset {
   readonly baseBoard: Uint16Array;
+  readonly bagType: BagType;
   readonly hold: HoldRules;
   readonly allow180: boolean;
   readonly spins: SpinMode;
   readonly comboTable: ComboTable;
   readonly kickTable: KickTable;
+  readonly handling: HandlingRules;
   readonly gravity: GravityRules;
   readonly garbage: GarbageRules;
+  readonly timing: TimingRules;
 }
 
 export interface RulesetInput {
   readonly baseBoard?: ArrayLike<number>;
+  readonly bagType?: BagType | string;
   readonly hold?: HoldMode | boolean | HoldRulesInput;
   readonly infiniteHold?: HoldMode | boolean;
   readonly allow180?: boolean;
   readonly spins?: SpinMode | string;
   readonly comboTable?: ComboTable | string;
   readonly kickTable?: KickTable | string;
+  readonly handling?: HandlingRulesInput;
   readonly gravity?: GravityMode | string | GravityRulesInput;
   readonly garbage?: GarbageMode | string | boolean | GarbageRulesInput;
+  readonly timing?: TimingRulesInput;
 }
 
 export interface HoldRulesInput {
@@ -188,9 +223,20 @@ export interface HoldRulesInput {
   readonly infinite?: HoldMode | boolean;
 }
 
+export interface HandlingRulesInput {
+  readonly roomHandling?: boolean;
+  readonly arr?: number;
+  readonly das?: number;
+  readonly sdf?: number;
+}
+
 export interface GravityRulesInput {
   readonly mode?: GravityMode | string;
   readonly staticGravity?: number;
+  readonly g?: number;
+  readonly increase?: number;
+  readonly margin?: number;
+  readonly may20g?: boolean;
 }
 
 export interface GarbageRulesInput {
@@ -200,17 +246,37 @@ export interface GarbageRulesInput {
   readonly cheeseMessinessPercent?: number;
 }
 
+export interface TimingRulesInput {
+  readonly are?: number;
+  readonly lineClearAre?: number;
+  readonly lockTime?: number;
+  readonly lockResets?: number;
+}
+
 export interface TetrioConfig {
+  readonly bagtype: string;
   readonly hold: "on" | "off";
   readonly infinite_hold: "on" | "off";
   readonly allow180: "on" | "off";
   readonly spins: string;
   readonly combotable: string;
   readonly kickset: string;
+  readonly room_handling: "on" | "off";
+  readonly room_handling_arr: number;
+  readonly room_handling_das: number;
+  readonly room_handling_sdf: number;
   readonly gravitymode: string;
   readonly gravitystatic: number;
+  readonly g: number;
+  readonly gincrease: number;
+  readonly gmargin: number;
+  readonly gravitymay20g: "on" | "off";
   readonly garbagemode: string;
   readonly cheeselayer_height: number;
   readonly cheesetimer_interval: number;
   readonly cheesemessiness: number;
+  readonly are: number;
+  readonly lineclear_are: number;
+  readonly locktime: number;
+  readonly lockresets: number;
 }

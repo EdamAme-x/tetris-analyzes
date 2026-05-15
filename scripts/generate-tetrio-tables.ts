@@ -38,10 +38,23 @@ const RUST_PIECES = [
 const ZERO_KICK: RustKick = { x: 0, y: 0 };
 const TETRIO_TL_PRESET = "tetra league";
 const TETRIO_TL_OPTION_DEFINITIONS = [
+  { key: "bagtype", type: "string" },
   { key: "allow180", type: "boolean" },
   { key: "spinbonuses", type: "string" },
   { key: "kickset", type: "string" },
   { key: "combotable", type: "string" },
+  { key: "are", type: "number" },
+  { key: "lineclear_are", type: "number" },
+  { key: "g", type: "number" },
+  { key: "gincrease", type: "number" },
+  { key: "gmargin", type: "number" },
+  { key: "gravitymay20g", type: "boolean" },
+  { key: "locktime", type: "number" },
+  { key: "lockresets", type: "number" },
+  { key: "room_handling", type: "boolean" },
+  { key: "room_handling_arr", type: "number" },
+  { key: "room_handling_das", type: "number" },
+  { key: "room_handling_sdf", type: "number" },
   { key: "b2bchaining", type: "boolean" },
   { key: "b2bcharging", type: "boolean" },
   { key: "b2bextras", type: "boolean" },
@@ -227,6 +240,7 @@ function extractTables(bundle: string): Record<string, unknown> {
     TETRIO_COMBO_ATTACK_TABLES: comboTables,
     TETRIO_SPIN_BONUS_RULES: evaluateObject(extractObjectLiteralAfterKey(bundle, "spinbonuses_rules")),
     TETRIO_KICK_TABLES: evaluateObject(extractObjectLiteralAfterKey(bundle, "kicksets")),
+    TETRIO_BAG_TYPES: evaluateStringArray(extractArrayLiteralAfterKey(bundle, "BagList")),
     TETRIO_TL_OPTIONS: extractPresetOptions(bundle, TETRIO_TL_PRESET)
   };
 }
@@ -291,6 +305,59 @@ function evaluateObject(source: string): Record<string, unknown> {
     throw new Error("Extracted source did not evaluate to an object.");
   }
   return value as Record<string, unknown>;
+}
+
+function evaluateStringArray(source: string): readonly string[] {
+  const value = Function(`"use strict"; return (${source});`)() as unknown;
+  if (!Array.isArray(value) || value.some((entry) => typeof entry !== "string")) {
+    throw new Error("Extracted source did not evaluate to a string array.");
+  }
+  return value as string[];
+}
+
+function extractArrayLiteralAfterKey(input: string, key: string): string {
+  const keyIndex = input.indexOf(`${key}=[`);
+  if (keyIndex === -1) {
+    throw new Error(`Could not find ${key} array in the client bundle.`);
+  }
+
+  const start = input.indexOf("[", keyIndex + key.length);
+  if (start === -1) {
+    throw new Error(`Could not find ${key} array start.`);
+  }
+
+  let depth = 0;
+  let quote: string | undefined;
+  let escaped = false;
+  for (let index = start; index < input.length; index += 1) {
+    const char = input[index];
+    if (quote !== undefined) {
+      if (escaped) {
+        escaped = false;
+      } else if (char === "\\") {
+        escaped = true;
+      } else if (char === quote) {
+        quote = undefined;
+      }
+      continue;
+    }
+    if (char === '"' || char === "'" || char === "`") {
+      quote = char;
+      continue;
+    }
+    if (char === "[") {
+      depth += 1;
+      continue;
+    }
+    if (char === "]") {
+      depth -= 1;
+      if (depth === 0) {
+        return input.slice(start, index + 1);
+      }
+    }
+  }
+
+  throw new Error(`Could not find ${key} array end.`);
 }
 
 function extractPresetOptions(bundle: string, presetName: string): Record<string, TetrioOptionValue> {
@@ -438,6 +505,8 @@ function formatGeneratedTsModule(source: BundleSource, tables: Record<string, un
     "",
     `export const TETRIO_KICK_TABLES = ${formatConst(tables.TETRIO_KICK_TABLES)};`,
     "",
+    `export const TETRIO_BAG_TYPES = ${formatConst(tables.TETRIO_BAG_TYPES)};`,
+    "",
     `export const TETRIO_TL_OPTIONS = ${formatConst(tables.TETRIO_TL_OPTIONS)};`,
     ""
   ].join("\n");
@@ -533,10 +602,23 @@ function formatGeneratedRustModule(source: BundleSource, tables: Record<string, 
     `pub const ALL_CLEAR_ATTACK: u32 = ${formatRustU32(readInteger(garbage, "ALL_CLEAR", "TETRIO_GARBAGE_ATTACK_TABLE"))};`,
     `pub const ALL_CLEAR_POINTS: u32 = ${formatRustU32(readInteger(scoring, "ALL_CLEAR", "TETRIO_SCORING_TABLE"))};`,
     "",
+    `pub const TL_BAG_TYPE: &str = ${formatRustString(readString(tlOptions, "bagtype", "TETRIO_TL_OPTIONS"))};`,
     `pub const TL_ALLOW_180: bool = ${formatRustBool(readBoolean(tlOptions, "allow180", "TETRIO_TL_OPTIONS"))};`,
     `pub const TL_SPIN_BONUSES: &str = ${formatRustString(readString(tlOptions, "spinbonuses", "TETRIO_TL_OPTIONS"))};`,
     `pub const TL_KICKSET: &str = ${formatRustString(readString(tlOptions, "kickset", "TETRIO_TL_OPTIONS"))};`,
     `pub const TL_COMBO_TABLE: &str = ${formatRustString(readString(tlOptions, "combotable", "TETRIO_TL_OPTIONS"))};`,
+    `pub const TL_ARE: u32 = ${formatRustU32(readIntegerValue(tlOptions, "are", "TETRIO_TL_OPTIONS"))};`,
+    `pub const TL_LINE_CLEAR_ARE: u32 = ${formatRustU32(readIntegerValue(tlOptions, "lineclear_are", "TETRIO_TL_OPTIONS"))};`,
+    `pub const TL_GRAVITY: f64 = ${formatRustFloat(readFiniteNumberValue(tlOptions, "g", "TETRIO_TL_OPTIONS"))};`,
+    `pub const TL_GRAVITY_INCREASE: f64 = ${formatRustFloat(readFiniteNumberValue(tlOptions, "gincrease", "TETRIO_TL_OPTIONS"))};`,
+    `pub const TL_GRAVITY_MARGIN: u32 = ${formatRustU32(readIntegerValue(tlOptions, "gmargin", "TETRIO_TL_OPTIONS"))};`,
+    `pub const TL_GRAVITY_MAY_20G: bool = ${formatRustBool(readBoolean(tlOptions, "gravitymay20g", "TETRIO_TL_OPTIONS"))};`,
+    `pub const TL_LOCK_TIME: u32 = ${formatRustU32(readIntegerValue(tlOptions, "locktime", "TETRIO_TL_OPTIONS"))};`,
+    `pub const TL_LOCK_RESETS: u32 = ${formatRustU32(readIntegerValue(tlOptions, "lockresets", "TETRIO_TL_OPTIONS"))};`,
+    `pub const TL_ROOM_HANDLING: bool = ${formatRustBool(readBoolean(tlOptions, "room_handling", "TETRIO_TL_OPTIONS"))};`,
+    `pub const TL_ROOM_HANDLING_ARR: u32 = ${formatRustU32(readIntegerValue(tlOptions, "room_handling_arr", "TETRIO_TL_OPTIONS"))};`,
+    `pub const TL_ROOM_HANDLING_DAS: u32 = ${formatRustU32(readIntegerValue(tlOptions, "room_handling_das", "TETRIO_TL_OPTIONS"))};`,
+    `pub const TL_ROOM_HANDLING_SDF: u32 = ${formatRustU32(readIntegerValue(tlOptions, "room_handling_sdf", "TETRIO_TL_OPTIONS"))};`,
     `pub const TL_B2B_CHAINING: bool = ${formatRustBool(readBoolean(tlOptions, "b2bchaining", "TETRIO_TL_OPTIONS"))};`,
     `pub const TL_B2B_CHARGING: bool = ${formatRustBool(readBoolean(tlOptions, "b2bcharging", "TETRIO_TL_OPTIONS"))};`,
     `pub const TL_B2B_EXTRAS: bool = ${formatRustBool(readBoolean(tlOptions, "b2bextras", "TETRIO_TL_OPTIONS"))};`,

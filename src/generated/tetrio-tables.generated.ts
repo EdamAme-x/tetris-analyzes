@@ -7375,11 +7375,41 @@ export const TETRIO_KICK_TABLES = {
   }
 } as const;
 
+export const TETRIO_BAG_TYPES = [
+  "total mayhem",
+  "classic",
+  "pairs",
+  "14-bag",
+  "7+1-bag",
+  "7+2-bag",
+  "7+x-bag",
+  "7-bag+oo",
+  "7+1-lone-bag",
+  "14+1-lone-bag",
+  "7+2-lone-bag",
+  "14+2-lone-bag",
+  "zenith",
+  "7-bag"
+] as const;
+
 export const TETRIO_TL_OPTIONS = {
+  "bagtype": "7-bag",
   "allow180": true,
   "spinbonuses": "all-mini+",
   "kickset": "SRS+",
   "combotable": "multiplier",
+  "are": 0,
+  "lineclear_are": 0,
+  "g": 0.02,
+  "gincrease": 0.0035,
+  "gmargin": 7200,
+  "gravitymay20g": true,
+  "locktime": 30,
+  "lockresets": 15,
+  "room_handling": false,
+  "room_handling_arr": 2,
+  "room_handling_das": 10,
+  "room_handling_sdf": 6,
   "b2bchaining": false,
   "b2bcharging": true,
   "b2bextras": false,

@@ -1,6 +1,7 @@
 import { createFumenCodec } from "../infrastructure/fumen/tetris-fumen-codec";
 import { BOARD_HEIGHT, BOARD_WIDTH, ROW_MASK } from "../domain/board";
 import type { FumenCodec, FumenUrls } from "../domain/fumen";
+import { TETRIO_TL_OPTIONS } from "../domain/tetrio-tables";
 import type { NativeComboTable, NativeKickTable, NativeSpinMode } from "../infrastructure/native/binding-types";
 import { createOpenerFumenPages } from "./create-opener-fumen";
 import {
@@ -12,10 +13,35 @@ import {
 } from "./search-opener";
 
 export interface OpenerExperimentSearchRules {
+  readonly bagType: string;
   readonly spinMode: NativeSpinMode;
   readonly comboTable: NativeComboTable;
   readonly kickTable: NativeKickTable;
   readonly allow180: boolean;
+  readonly handling: OpenerExperimentHandlingRules;
+  readonly gravity: OpenerExperimentGravityRules;
+  readonly timing: OpenerExperimentTimingRules;
+}
+
+export interface OpenerExperimentHandlingRules {
+  readonly roomHandling: boolean;
+  readonly arr: number;
+  readonly das: number;
+  readonly sdf: number;
+}
+
+export interface OpenerExperimentGravityRules {
+  readonly g: number;
+  readonly increase: number;
+  readonly margin: number;
+  readonly may20g: boolean;
+}
+
+export interface OpenerExperimentTimingRules {
+  readonly are: number;
+  readonly lineClearAre: number;
+  readonly lockTime: number;
+  readonly lockResets: number;
 }
 
 export interface OpenerExperimentScenario {
@@ -310,10 +336,29 @@ const CONTINUATION_QUALITY_GATE = {
 } as const satisfies OpenerExperimentQualityGate;
 
 export const TETRIO_TL_OPENER_SEARCH_RULES = {
+  bagType: TETRIO_TL_OPTIONS.bagtype,
   spinMode: "ALL-MINI+",
   comboTable: "MULTIPLIER",
   kickTable: "SRS+",
-  allow180: true
+  allow180: TETRIO_TL_OPTIONS.allow180,
+  handling: {
+    roomHandling: TETRIO_TL_OPTIONS.room_handling,
+    arr: TETRIO_TL_OPTIONS.room_handling_arr,
+    das: TETRIO_TL_OPTIONS.room_handling_das,
+    sdf: TETRIO_TL_OPTIONS.room_handling_sdf
+  },
+  gravity: {
+    g: TETRIO_TL_OPTIONS.g,
+    increase: TETRIO_TL_OPTIONS.gincrease,
+    margin: TETRIO_TL_OPTIONS.gmargin,
+    may20g: TETRIO_TL_OPTIONS.gravitymay20g
+  },
+  timing: {
+    are: TETRIO_TL_OPTIONS.are,
+    lineClearAre: TETRIO_TL_OPTIONS.lineclear_are,
+    lockTime: TETRIO_TL_OPTIONS.locktime,
+    lockResets: TETRIO_TL_OPTIONS.lockresets
+  }
 } as const satisfies OpenerExperimentSearchRules;
 
 export const DEFAULT_OPENER_EXPERIMENT_SCENARIOS: readonly OpenerExperimentScenario[] = createDistributionOpenerExperimentSplits({
@@ -1689,7 +1734,18 @@ function formatClearSequence(clearSequence: readonly string[]): string {
 }
 
 function formatRules(rules: OpenerExperimentSearchRules): string {
-  return `spins=${rules.spinMode}, combo=${rules.comboTable}, kicks=${rules.kickTable}, 180=${formatBooleanRule(rules.allow180)}`;
+  return [
+    `spins=${rules.spinMode}`,
+    `combo=${rules.comboTable}`,
+    `kicks=${rules.kickTable}`,
+    `bag=${rules.bagType}`,
+    `180=${formatBooleanRule(rules.allow180)}`,
+    `g=${rules.gravity.g}+${rules.gravity.increase}@${rules.gravity.margin}`,
+    `20g=${formatBooleanRule(rules.gravity.may20g)}`,
+    `are=${rules.timing.are}/${rules.timing.lineClearAre}`,
+    `lock=${rules.timing.lockTime}/${rules.timing.lockResets}`,
+    `handling=${formatBooleanRule(rules.handling.roomHandling)}:${rules.handling.arr}/${rules.handling.das}/${rules.handling.sdf}`
+  ].join(", ");
 }
 
 function formatBooleanRule(value: boolean): "on" | "off" {
@@ -1709,10 +1765,23 @@ function formatReportRules(scenarios: readonly OpenerExperimentScenarioResult[])
 
 function rulesEqual(left: OpenerExperimentSearchRules, right: OpenerExperimentSearchRules): boolean {
   return (
+    left.bagType === right.bagType &&
     left.spinMode === right.spinMode &&
     left.comboTable === right.comboTable &&
     left.kickTable === right.kickTable &&
-    left.allow180 === right.allow180
+    left.allow180 === right.allow180 &&
+    left.handling.roomHandling === right.handling.roomHandling &&
+    left.handling.arr === right.handling.arr &&
+    left.handling.das === right.handling.das &&
+    left.handling.sdf === right.handling.sdf &&
+    left.gravity.g === right.gravity.g &&
+    left.gravity.increase === right.gravity.increase &&
+    left.gravity.margin === right.gravity.margin &&
+    left.gravity.may20g === right.gravity.may20g &&
+    left.timing.are === right.timing.are &&
+    left.timing.lineClearAre === right.timing.lineClearAre &&
+    left.timing.lockTime === right.timing.lockTime &&
+    left.timing.lockResets === right.timing.lockResets
   );
 }
 

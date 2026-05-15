@@ -30,10 +30,11 @@ Executable examples live in `tests/`.
 - [x] Add a fumen-ready opener generation command from native mining
 - [x] Add generated tetrio.js movement snapshot coverage for native rotation parity
 - [x] Add generated tetrio.js spin-state snapshots for HasRotated/mini/kick-index parity
-- [ ] Wire TETR.IO `bagtype`, handling, ARE, locktime, and gravity options into search settings
+- [x] Wire TETR.IO `bagtype`, handling, ARE, locktime, and gravity options into search settings
 - [ ] Add exact placement frontier enumeration for bag-1 templates
 - [ ] Add known-opener fumen fixtures and recall@K benchmarks
 - [x] Confirm the current TETR.IO TL spin/B2B profile from extracted client tables
+- [x] Extract TETR.IO TL bag, handling, ARE, locktime, and raw gravity profile from tetrio.js
 - [ ] Add column-major board storage for search hot paths
 - [ ] Add optional DAG/BMCTS continuation search for bag-2+
 
