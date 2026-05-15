@@ -79,7 +79,7 @@ export interface GeneratedOpenersReport {
 }
 
 export const DEFAULT_GENERATE_OPENERS_RULES = {
-  spinMode: "T-SPINS",
+  spinMode: "ALL-MINI+",
   comboTable: "MULTIPLIER",
   kickTable: "SRS+"
 } as const satisfies GenerateOpenersRules;

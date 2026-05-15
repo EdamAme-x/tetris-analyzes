@@ -247,6 +247,7 @@ function placementFromOperation(operation: FumenOperation): NativeBeamPlacement 
     backToBackChain: 0,
     backToBack: false,
     backToBackBonus: 0,
+    backToBackChargeAttack: 0,
     allClear: false,
     allClearBonus: 0
   };

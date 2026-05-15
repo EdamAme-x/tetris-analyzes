@@ -5,6 +5,7 @@ bun install
 bun run build:native:debug
 bun run generate:tetrio-tables
 bun run generate:tetrio-movement-snapshots
+bun run generate:tetrio-firepower-snapshots
 bun run check
 bun run test:native
 bun test
@@ -29,7 +30,7 @@ Executable examples live in `tests/`.
 - [x] Add generated tetrio.js movement snapshot coverage for native rotation parity
 - [ ] Add exact placement frontier enumeration for bag-1 templates
 - [ ] Add known-opener fumen fixtures and recall@K benchmarks
-- [ ] Confirm the current TETR.IO TL spin/B2B profile from extracted client tables
+- [x] Confirm the current TETR.IO TL spin/B2B profile from extracted client tables
 - [ ] Add column-major board storage for search hot paths
 - [ ] Add optional DAG/BMCTS continuation search for bag-2+
 
@@ -144,3 +145,6 @@ Executable examples live in `tests/`.
 - [x] Apply TETR.IO rotation kicks around the matrix anchor instead of the trimmed native bounding box
 - [x] Generate native movement offsets and spawn rotations from tetrio.js kicksets
 - [x] Add tetrio.js-derived movement snapshot tests for direct, kicked, and failed rotations
+- [x] Extract current TETR.IO TL options from tetrio.js and use ALL-MINI+ / SRS+ / multiplier defaults in opener generation
+- [x] Match TL all-clear, mini-spin B2B, flat B2B bonus, and B2B charge firepower accounting
+- [x] Add tetrio.js-derived firepower snapshot tests for TL line clear, combo, B2B, and all-clear parity

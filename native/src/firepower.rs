@@ -39,8 +39,24 @@ pub(crate) struct FirepowerEvent {
     pub(crate) back_to_back_chain: u32,
     pub(crate) back_to_back: bool,
     pub(crate) back_to_back_bonus: f64,
+    pub(crate) back_to_back_charge_attack: u32,
     pub(crate) all_clear: bool,
     pub(crate) all_clear_bonus: u32,
+}
+
+#[derive(Clone, Copy)]
+pub(crate) struct FirepowerRules {
+    pub(crate) b2b_chaining: bool,
+    pub(crate) b2b_charging: bool,
+    pub(crate) b2b_extras: bool,
+    pub(crate) b2b_charge_at: u32,
+    pub(crate) b2b_charge_base: u32,
+    pub(crate) all_clear_attack: u32,
+    pub(crate) all_clear_b2b: u32,
+    pub(crate) all_clear_b2b_sends: bool,
+    pub(crate) all_clear_b2b_dupes: bool,
+    pub(crate) all_clear_charges: bool,
+    pub(crate) garbage_multiplier: f64,
 }
 
 impl FirepowerState {
@@ -73,8 +89,27 @@ impl FirepowerEvent {
             back_to_back_chain: 0,
             back_to_back: false,
             back_to_back_bonus: 0.0,
+            back_to_back_charge_attack: 0,
             all_clear: false,
             all_clear_bonus: 0,
+        }
+    }
+}
+
+impl FirepowerRules {
+    pub(crate) fn tetrio_tl() -> Self {
+        Self {
+            b2b_chaining: tetrio_tables::TL_B2B_CHAINING,
+            b2b_charging: tetrio_tables::TL_B2B_CHARGING,
+            b2b_extras: tetrio_tables::TL_B2B_EXTRAS,
+            b2b_charge_at: tetrio_tables::TL_B2B_CHARGE_AT,
+            b2b_charge_base: tetrio_tables::TL_B2B_CHARGE_BASE,
+            all_clear_attack: tetrio_tables::TL_ALL_CLEAR_ATTACK,
+            all_clear_b2b: tetrio_tables::TL_ALL_CLEAR_B2B,
+            all_clear_b2b_sends: tetrio_tables::TL_ALL_CLEAR_B2B_SENDS,
+            all_clear_b2b_dupes: tetrio_tables::TL_ALL_CLEAR_B2B_DUPES,
+            all_clear_charges: tetrio_tables::TL_ALL_CLEAR_CHARGES,
+            garbage_multiplier: tetrio_tables::TL_GARBAGE_MULTIPLIER,
         }
     }
 }
@@ -229,6 +264,31 @@ pub(crate) fn advance_firepower_for_clear_with_combo_table(
     force_back_to_back: bool,
     halve_attack: bool,
 ) -> (FirepowerState, FirepowerEvent) {
+    advance_firepower_for_clear_with_rules(
+        previous,
+        clear_kind,
+        cleared_lines,
+        all_clear,
+        spin_piece,
+        combo_table,
+        force_back_to_back,
+        halve_attack,
+        FirepowerRules::tetrio_tl(),
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn advance_firepower_for_clear_with_rules(
+    previous: FirepowerState,
+    clear_kind: ClearKind,
+    cleared_lines: u32,
+    all_clear: bool,
+    spin_piece: Option<Piece>,
+    combo_table: ComboTable,
+    force_back_to_back: bool,
+    halve_attack: bool,
+    rules: FirepowerRules,
+) -> (FirepowerState, FirepowerEvent) {
     let base_attack = clear_kind_attack(clear_kind);
     let mut attack = base_attack as f64;
     let mut points = clear_kind_points(clear_kind);
@@ -238,22 +298,45 @@ pub(crate) fn advance_firepower_for_clear_with_combo_table(
         0
     };
     let max_combo = previous.max_combo.max(combo);
-    let difficult = force_back_to_back || is_back_to_back_clear(clear_kind);
-    let back_to_back_chain = if difficult {
-        previous.back_to_back_chain + 1
+    let difficult_clear_kind = force_back_to_back || is_back_to_back_clear(clear_kind);
+    let mut back_to_back_increment = u32::from(difficult_clear_kind);
+    if all_clear {
+        back_to_back_increment += rules.all_clear_b2b;
+        if !rules.all_clear_b2b_dupes {
+            back_to_back_increment = rules
+                .all_clear_b2b
+                .max(back_to_back_increment.saturating_sub(rules.all_clear_b2b));
+        }
+        if rules.all_clear_charges {
+            back_to_back_increment = back_to_back_increment.max(
+                rules
+                    .b2b_charge_at
+                    .saturating_add(1)
+                    .saturating_sub(previous.back_to_back_chain),
+            );
+        }
+    }
+    let back_to_back_chain = if back_to_back_increment > 0 {
+        previous.back_to_back_chain + back_to_back_increment
     } else if cleared_lines > 0 {
         0
     } else {
         previous.back_to_back_chain
     };
-    let back_to_back = difficult && back_to_back_chain > 1;
+    let back_to_back = back_to_back_increment > 0 && back_to_back_chain > 1;
+    let sends_back_to_back =
+        rules.all_clear_b2b_sends || !(all_clear && back_to_back_increment == rules.all_clear_b2b);
     let back_to_back_bonus = if back_to_back {
-        back_to_back_chain_bonus(back_to_back_chain)
+        if rules.b2b_chaining {
+            b2b_chain_attack_bonus(back_to_back_chain)
+        } else {
+            flat_back_to_back_bonus(clear_kind, cleared_lines, rules.b2b_extras)
+        }
     } else {
         0.0
     };
 
-    if back_to_back {
+    if back_to_back && sends_back_to_back {
         attack += back_to_back_bonus;
         points = (points as f64 * tetrio_tables::BACK_TO_BACK_SCORE_MULTIPLIER).floor() as u32;
     }
@@ -262,24 +345,32 @@ pub(crate) fn advance_firepower_for_clear_with_combo_table(
         attack = tetrio_tables::combo_table_attack(combo_table, attack, combo);
     }
 
-    let all_clear_bonus = if all_clear {
-        tetrio_tables::ALL_CLEAR_ATTACK
-    } else {
-        0
-    };
+    let all_clear_bonus = if all_clear { rules.all_clear_attack } else { 0 };
     let all_clear_points = if all_clear {
         tetrio_tables::ALL_CLEAR_POINTS
     } else {
         0
     };
-    let event_attack = if halve_attack {
+    let line_attack = if halve_attack {
         (attack * 0.5).floor() as u32
     } else {
         attack.floor() as u32
-    } + all_clear_bonus;
+    };
+    let back_to_back_charge_attack = if cleared_lines > 0
+        && back_to_back_increment == 0
+        && rules.b2b_charging
+        && previous.back_to_back_chain > rules.b2b_charge_at
+    {
+        ((previous.back_to_back_chain - rules.b2b_charge_at + rules.b2b_charge_base) as f64
+            * rules.garbage_multiplier)
+            .floor() as u32
+    } else {
+        0
+    };
+    let event_attack = line_attack + all_clear_bonus + back_to_back_charge_attack;
     let event_points = points + all_clear_points;
     let all_clears = previous.all_clears + u32::from(all_clear);
-    let difficult_clear = difficult && cleared_lines > 0;
+    let difficult_clear = difficult_clear_kind && cleared_lines > 0;
     let spin_clear = is_spin_line_clear(clear_kind);
     let t_spin_clear = is_real_t_spin_line_clear(clear_kind, spin_piece);
 
@@ -308,6 +399,7 @@ pub(crate) fn advance_firepower_for_clear_with_combo_table(
             back_to_back_chain,
             back_to_back,
             back_to_back_bonus,
+            back_to_back_charge_attack,
             all_clear,
             all_clear_bonus,
         },
@@ -326,6 +418,7 @@ pub(crate) fn classify_clear(spin_kind: SpinKind, cleared_lines: u32) -> ClearKi
         (SpinKind::TSpin, 3) => ClearKind::TSpinTriple,
         (SpinKind::TSpinMini, 4) => ClearKind::TSpinMiniQuad,
         (SpinKind::TSpin, 4) => ClearKind::TSpinQuad,
+        (SpinKind::TSpinMini, _) if cleared_lines >= 5 => ClearKind::TSpinPenta,
         (SpinKind::TSpin, _) if cleared_lines >= 5 => ClearKind::TSpinPenta,
         (_, 0) => ClearKind::None,
         (_, 1) => ClearKind::Single,
@@ -391,9 +484,13 @@ fn is_back_to_back_clear(kind: ClearKind) -> bool {
 fn is_spin_line_clear(kind: ClearKind) -> bool {
     matches!(
         kind,
-        ClearKind::TSpinSingle
+        ClearKind::TSpinMiniSingle
+            | ClearKind::TSpinSingle
+            | ClearKind::TSpinMiniDouble
             | ClearKind::TSpinDouble
+            | ClearKind::TSpinMiniTriple
             | ClearKind::TSpinTriple
+            | ClearKind::TSpinMiniQuad
             | ClearKind::TSpinQuad
             | ClearKind::TSpinPenta
     )
@@ -405,15 +502,29 @@ fn is_real_t_spin_line_clear(kind: ClearKind, spin_piece: Option<Piece>) -> bool
     }
     matches!(
         kind,
-        ClearKind::TSpinSingle
+        ClearKind::TSpinMiniSingle
+            | ClearKind::TSpinSingle
+            | ClearKind::TSpinMiniDouble
             | ClearKind::TSpinDouble
+            | ClearKind::TSpinMiniTriple
             | ClearKind::TSpinTriple
+            | ClearKind::TSpinMiniQuad
             | ClearKind::TSpinQuad
             | ClearKind::TSpinPenta
     )
 }
 
-fn back_to_back_chain_bonus(back_to_back_chain: u32) -> f64 {
+fn flat_back_to_back_bonus(kind: ClearKind, cleared_lines: u32, b2b_extras: bool) -> f64 {
+    let multiplier =
+        if b2b_extras && (cleared_lines == 4 || is_spin_line_clear(kind) && cleared_lines >= 2) {
+            2.0
+        } else {
+            1.0
+        };
+    tetrio_tables::BACK_TO_BACK_BONUS * multiplier
+}
+
+fn b2b_chain_attack_bonus(back_to_back_chain: u32) -> f64 {
     if back_to_back_chain <= 1 {
         return 0.0;
     }
@@ -517,7 +628,8 @@ mod tests {
         );
 
         assert_eq!(normal_event.attack, 4);
-        assert_eq!(all_clear_event.attack, 14);
+        assert_eq!(all_clear_event.attack, 10);
+        assert_eq!(all_clear_state.back_to_back_chain, 2);
         assert_eq!(all_clear_state.all_clears, 1);
         assert!(firepower_score(all_clear_state) < firepower_score(normal_state));
     }

@@ -60,8 +60,8 @@ pub(crate) struct Kick {
 
 pub const SOURCE_ASSET: &str =
     "https://tetr.io/js/tetrio.js?hv=7eebfc9cd.987f91854aad.20260504T210001";
-pub const SOURCE_FETCHED_AT: &str = "2026-05-14T07:32:32+09:00";
-pub const SOURCE_LAST_MODIFIED: &str = "Thu, 14 May 2026 06:42:10 GMT";
+pub const SOURCE_FETCHED_AT: &str = "2026-05-15T14:42:44+09:00";
+pub const SOURCE_LAST_MODIFIED: &str = "Fri, 15 May 2026 05:42:44 GMT";
 
 pub const BACK_TO_BACK_SCORE_MULTIPLIER: f64 = 1.5_f64;
 pub const BACK_TO_BACK_BONUS: f64 = 1.0_f64;
@@ -72,6 +72,24 @@ pub const COMBO_MINIFIER: f64 = 1.0_f64;
 pub const COMBO_MINIFIER_LOG: f64 = 1.25_f64;
 pub const ALL_CLEAR_ATTACK: u32 = 10_u32;
 pub const ALL_CLEAR_POINTS: u32 = 3500_u32;
+
+pub const TL_SPIN_BONUSES: &str = "all-mini+";
+pub const TL_KICKSET: &str = "SRS+";
+pub const TL_COMBO_TABLE: &str = "multiplier";
+pub const TL_B2B_CHAINING: bool = false;
+pub const TL_B2B_CHARGING: bool = true;
+pub const TL_B2B_EXTRAS: bool = false;
+pub const TL_B2B_CHARGE_AT: u32 = 4_u32;
+pub const TL_B2B_CHARGE_BASE: u32 = 0_u32;
+pub const TL_ALL_CLEAR_ATTACK: u32 = 5_u32;
+pub const TL_ALL_CLEAR_B2B: u32 = 1_u32;
+pub const TL_ALL_CLEAR_B2B_SENDS: bool = false;
+pub const TL_ALL_CLEAR_B2B_DUPES: bool = true;
+pub const TL_ALL_CLEAR_CHARGES: bool = false;
+pub const TL_GARBAGE_MULTIPLIER: f64 = 1.0_f64;
+pub const TL_GARBAGE_SPECIAL_BONUS: bool = true;
+pub const TL_ROUND_MODE: &str = "down";
+pub const TL_OPENER_PHASE: u32 = 14_u32;
 
 pub(crate) const CLEAR_KIND_COUNT: usize = 17;
 pub(crate) const CLEAR_NAMES: [&str; CLEAR_KIND_COUNT] = [
@@ -106,8 +124,8 @@ pub(crate) const CLEAR_CLEARED_LINES: [u32; CLEAR_KIND_COUNT] = [
     3_u32, 4_u32, 4_u32, 5_u32,
 ];
 pub(crate) const CLEAR_BACK_TO_BACK: [bool; CLEAR_KIND_COUNT] = [
-    false, false, false, false, true, true, false, false, false, true, false, true, false, true,
-    true, true, true,
+    false, false, false, false, true, true, false, false, true, true, true, true, true, true, true,
+    true, true,
 ];
 
 pub(crate) const COMBO_TABLE_NONE: [u32; 1] = [0_u32];

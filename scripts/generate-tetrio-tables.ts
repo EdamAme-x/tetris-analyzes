@@ -1,3 +1,4 @@
+import { spawnSync } from "node:child_process";
 import { resolve } from "node:path";
 
 const TETRIO_HOME = "https://tetr.io/";
@@ -13,11 +14,11 @@ const RUST_CLEAR_DEFINITIONS = [
   { variant: "Penta", name: "PENTA", key: "PENTA", clearedLines: 5, backToBack: true },
   { variant: "TSpin", name: "TSPIN", key: "TSPIN", clearedLines: 0, backToBack: false },
   { variant: "TSpinMini", name: "TSPIN_MINI", key: "TSPIN_MINI", clearedLines: 0, backToBack: false },
-  { variant: "TSpinMiniSingle", name: "TSPIN_MINI_SINGLE", key: "TSPIN_MINI_SINGLE", clearedLines: 1, backToBack: false },
+  { variant: "TSpinMiniSingle", name: "TSPIN_MINI_SINGLE", key: "TSPIN_MINI_SINGLE", clearedLines: 1, backToBack: true },
   { variant: "TSpinSingle", name: "TSPIN_SINGLE", key: "TSPIN_SINGLE", clearedLines: 1, backToBack: true },
-  { variant: "TSpinMiniDouble", name: "TSPIN_MINI_DOUBLE", key: "TSPIN_MINI_DOUBLE", clearedLines: 2, backToBack: false },
+  { variant: "TSpinMiniDouble", name: "TSPIN_MINI_DOUBLE", key: "TSPIN_MINI_DOUBLE", clearedLines: 2, backToBack: true },
   { variant: "TSpinDouble", name: "TSPIN_DOUBLE", key: "TSPIN_DOUBLE", clearedLines: 2, backToBack: true },
-  { variant: "TSpinMiniTriple", name: "TSPIN_MINI_TRIPLE", key: "TSPIN_MINI_TRIPLE", clearedLines: 3, backToBack: false },
+  { variant: "TSpinMiniTriple", name: "TSPIN_MINI_TRIPLE", key: "TSPIN_MINI_TRIPLE", clearedLines: 3, backToBack: true },
   { variant: "TSpinTriple", name: "TSPIN_TRIPLE", key: "TSPIN_TRIPLE", clearedLines: 3, backToBack: true },
   { variant: "TSpinMiniQuad", name: "TSPIN_MINI_QUAD", key: "TSPIN_MINI_QUAD", clearedLines: 4, backToBack: true },
   { variant: "TSpinQuad", name: "TSPIN_QUAD", key: "TSPIN_QUAD", clearedLines: 4, backToBack: true },
@@ -35,6 +36,26 @@ const RUST_PIECES = [
   { key: "l", variant: "L", constantName: "L" }
 ] as const;
 const ZERO_KICK: RustKick = { x: 0, y: 0 };
+const TETRIO_TL_PRESET = "tetra league";
+const TETRIO_TL_OPTION_DEFINITIONS = [
+  { key: "spinbonuses", type: "string" },
+  { key: "kickset", type: "string" },
+  { key: "combotable", type: "string" },
+  { key: "b2bchaining", type: "boolean" },
+  { key: "b2bcharging", type: "boolean" },
+  { key: "b2bextras", type: "boolean" },
+  { key: "b2bcharge_at", type: "number" },
+  { key: "b2bcharge_base", type: "number" },
+  { key: "allclear_garbage", type: "number" },
+  { key: "allclear_b2b", type: "number" },
+  { key: "allclear_b2b_sends", type: "boolean" },
+  { key: "allclear_b2b_dupes", type: "boolean" },
+  { key: "allclear_charges", type: "boolean" },
+  { key: "garbagemultiplier", type: "number" },
+  { key: "garbagespecialbonus", type: "boolean" },
+  { key: "roundmode", type: "string" },
+  { key: "openerphase", type: "number" }
+] as const;
 
 interface GenerateOptions {
   readonly input?: string;
@@ -53,6 +74,9 @@ interface BundleSource {
   readonly lastModified: string;
 }
 
+type TetrioOptionType = (typeof TETRIO_TL_OPTION_DEFINITIONS)[number]["type"];
+type TetrioOptionValue = string | number | boolean;
+
 const options = parseArgs(process.argv.slice(2));
 let source = await loadBundleSource(options);
 const outputPath = resolve(options.output);
@@ -68,7 +92,7 @@ if (options.fetchedAt === undefined && existingSource?.asset === source.asset) {
 const tables = extractTables(source.text);
 const generatedFiles = [
   { label: options.output, path: outputPath, content: formatGeneratedTsModule(source, tables) },
-  { label: options.rustOutput, path: rustOutputPath, content: formatGeneratedRustModule(source, tables) }
+  { label: options.rustOutput, path: rustOutputPath, content: formatRustModule(formatGeneratedRustModule(source, tables)) }
 ] as const;
 
 if (options.check) {
@@ -201,7 +225,8 @@ function extractTables(bundle: string): Record<string, unknown> {
     TETRIO_GARBAGE_ATTACK_TABLE: garbage,
     TETRIO_COMBO_ATTACK_TABLES: comboTables,
     TETRIO_SPIN_BONUS_RULES: evaluateObject(extractObjectLiteralAfterKey(bundle, "spinbonuses_rules")),
-    TETRIO_KICK_TABLES: evaluateObject(extractObjectLiteralAfterKey(bundle, "kicksets"))
+    TETRIO_KICK_TABLES: evaluateObject(extractObjectLiteralAfterKey(bundle, "kicksets")),
+    TETRIO_TL_OPTIONS: extractPresetOptions(bundle, TETRIO_TL_PRESET)
   };
 }
 
@@ -267,6 +292,111 @@ function evaluateObject(source: string): Record<string, unknown> {
   return value as Record<string, unknown>;
 }
 
+function extractPresetOptions(bundle: string, presetName: string): Record<string, TetrioOptionValue> {
+  const assigned = parsePresetAssignments(extractPresetString(bundle, presetName));
+  const output: Record<string, TetrioOptionValue> = {};
+  for (const definition of TETRIO_TL_OPTION_DEFINITIONS) {
+    const raw = assigned.get(definition.key) ?? extractOptionDefault(bundle, definition.key);
+    output[definition.key] = parseOptionValue(raw, definition.type, definition.key);
+  }
+  return output;
+}
+
+function extractPresetString(bundle: string, presetName: string): string {
+  const startNeedle = `${JSON.stringify(presetName)}:"`;
+  const start = bundle.indexOf(startNeedle);
+  if (start === -1) {
+    throw new Error(`Could not find TETR.IO preset ${presetName}.`);
+  }
+
+  let escaped = false;
+  const valueStart = start + startNeedle.length;
+  for (let index = valueStart; index < bundle.length; index += 1) {
+    const char = bundle[index];
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (char === "\\") {
+      escaped = true;
+      continue;
+    }
+    if (char === '"') {
+      return bundle.slice(valueStart, index);
+    }
+  }
+
+  throw new Error(`Could not find TETR.IO preset ${presetName} end.`);
+}
+
+function parsePresetAssignments(preset: string): Map<string, string> {
+  const assignments = new Map<string, string>();
+  for (const statement of preset.split(";")) {
+    const match = statement.match(/^options\.([a-z0-9_]+)=(.*)$/);
+    if (match?.[1] !== undefined && match[2] !== undefined) {
+      assignments.set(match[1], match[2]);
+    }
+  }
+  return assignments;
+}
+
+function extractOptionDefault(bundle: string, key: string): string {
+  const keyIndex = bundle.indexOf(`${key}:{default:`);
+  if (keyIndex === -1) {
+    throw new Error(`Could not find TETR.IO option default ${key}.`);
+  }
+  const valueStart = keyIndex + `${key}:{default:`.length;
+  let quote: string | undefined;
+  let escaped = false;
+  for (let index = valueStart; index < bundle.length; index += 1) {
+    const char = bundle[index];
+    if (quote !== undefined) {
+      if (escaped) {
+        escaped = false;
+      } else if (char === "\\") {
+        escaped = true;
+      } else if (char === quote) {
+        quote = undefined;
+      }
+      continue;
+    }
+    if (char === '"' || char === "'") {
+      quote = char;
+      continue;
+    }
+    if (char === "," || char === "}") {
+      return bundle.slice(valueStart, index);
+    }
+  }
+  throw new Error(`Could not find TETR.IO option default ${key} end.`);
+}
+
+function parseOptionValue(raw: string, type: TetrioOptionType, key: string): TetrioOptionValue {
+  const value = raw.trim();
+  switch (type) {
+    case "boolean":
+      if (value === "1" || value === "true" || value === "!0") {
+        return true;
+      }
+      if (value === "0" || value === "false" || value === "!1") {
+        return false;
+      }
+      throw new Error(`TETR.IO option ${key} must be boolean-like, got ${raw}.`);
+    case "number": {
+      const parsed = Number(value);
+      if (!Number.isFinite(parsed)) {
+        throw new Error(`TETR.IO option ${key} must be numeric, got ${raw}.`);
+      }
+      return parsed;
+    }
+    case "string":
+      if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+        return value.slice(1, -1);
+      }
+      return value;
+  }
+}
+
 async function readGeneratedSource(outputPath: string): Promise<{ asset: string; fetchedAt: string; lastModified: string } | undefined> {
   try {
     const text = await Bun.file(outputPath).text();
@@ -306,6 +436,8 @@ function formatGeneratedTsModule(source: BundleSource, tables: Record<string, un
     `export const TETRIO_SPIN_BONUS_RULES = ${formatConst(tables.TETRIO_SPIN_BONUS_RULES)};`,
     "",
     `export const TETRIO_KICK_TABLES = ${formatConst(tables.TETRIO_KICK_TABLES)};`,
+    "",
+    `export const TETRIO_TL_OPTIONS = ${formatConst(tables.TETRIO_TL_OPTIONS)};`,
     ""
   ].join("\n");
 }
@@ -314,9 +446,25 @@ function formatConst(value: unknown): string {
   return `${JSON.stringify(value, null, 2)} as const`;
 }
 
+function formatRustModule(content: string): string {
+  const result = spawnSync("rustfmt", ["--emit", "stdout"], {
+    encoding: "utf8",
+    input: content,
+    maxBuffer: 64 * 1024 * 1024
+  });
+  if (result.error !== undefined) {
+    throw result.error;
+  }
+  if (result.status !== 0) {
+    throw new Error(`rustfmt failed while formatting generated native tables:\n${result.stderr}`);
+  }
+  return result.stdout;
+}
+
 function formatGeneratedRustModule(source: BundleSource, tables: Record<string, unknown>): string {
   const scoring = readNumberRecord(tables, "TETRIO_SCORING_TABLE");
   const garbage = readNumberRecord(tables, "TETRIO_GARBAGE_ATTACK_TABLE");
+  const tlOptions = readRecord(tables, "TETRIO_TL_OPTIONS");
   const comboTables = readComboTables(tables);
   const kickTables = readKickTables(tables);
   const clearNames = RUST_CLEAR_DEFINITIONS.map((definition) => definition.name);
@@ -383,6 +531,24 @@ function formatGeneratedRustModule(source: BundleSource, tables: Record<string, 
     `pub const COMBO_MINIFIER_LOG: f64 = ${formatRustFloat(readFiniteNumber(garbage, "COMBO_MINIFIER_LOG", "TETRIO_GARBAGE_ATTACK_TABLE"))};`,
     `pub const ALL_CLEAR_ATTACK: u32 = ${formatRustU32(readInteger(garbage, "ALL_CLEAR", "TETRIO_GARBAGE_ATTACK_TABLE"))};`,
     `pub const ALL_CLEAR_POINTS: u32 = ${formatRustU32(readInteger(scoring, "ALL_CLEAR", "TETRIO_SCORING_TABLE"))};`,
+    "",
+    `pub const TL_SPIN_BONUSES: &str = ${formatRustString(readString(tlOptions, "spinbonuses", "TETRIO_TL_OPTIONS"))};`,
+    `pub const TL_KICKSET: &str = ${formatRustString(readString(tlOptions, "kickset", "TETRIO_TL_OPTIONS"))};`,
+    `pub const TL_COMBO_TABLE: &str = ${formatRustString(readString(tlOptions, "combotable", "TETRIO_TL_OPTIONS"))};`,
+    `pub const TL_B2B_CHAINING: bool = ${formatRustBool(readBoolean(tlOptions, "b2bchaining", "TETRIO_TL_OPTIONS"))};`,
+    `pub const TL_B2B_CHARGING: bool = ${formatRustBool(readBoolean(tlOptions, "b2bcharging", "TETRIO_TL_OPTIONS"))};`,
+    `pub const TL_B2B_EXTRAS: bool = ${formatRustBool(readBoolean(tlOptions, "b2bextras", "TETRIO_TL_OPTIONS"))};`,
+    `pub const TL_B2B_CHARGE_AT: u32 = ${formatRustU32(readIntegerValue(tlOptions, "b2bcharge_at", "TETRIO_TL_OPTIONS"))};`,
+    `pub const TL_B2B_CHARGE_BASE: u32 = ${formatRustU32(readIntegerValue(tlOptions, "b2bcharge_base", "TETRIO_TL_OPTIONS"))};`,
+    `pub const TL_ALL_CLEAR_ATTACK: u32 = ${formatRustU32(readIntegerValue(tlOptions, "allclear_garbage", "TETRIO_TL_OPTIONS"))};`,
+    `pub const TL_ALL_CLEAR_B2B: u32 = ${formatRustU32(readIntegerValue(tlOptions, "allclear_b2b", "TETRIO_TL_OPTIONS"))};`,
+    `pub const TL_ALL_CLEAR_B2B_SENDS: bool = ${formatRustBool(readBoolean(tlOptions, "allclear_b2b_sends", "TETRIO_TL_OPTIONS"))};`,
+    `pub const TL_ALL_CLEAR_B2B_DUPES: bool = ${formatRustBool(readBoolean(tlOptions, "allclear_b2b_dupes", "TETRIO_TL_OPTIONS"))};`,
+    `pub const TL_ALL_CLEAR_CHARGES: bool = ${formatRustBool(readBoolean(tlOptions, "allclear_charges", "TETRIO_TL_OPTIONS"))};`,
+    `pub const TL_GARBAGE_MULTIPLIER: f64 = ${formatRustFloat(readFiniteNumberValue(tlOptions, "garbagemultiplier", "TETRIO_TL_OPTIONS"))};`,
+    `pub const TL_GARBAGE_SPECIAL_BONUS: bool = ${formatRustBool(readBoolean(tlOptions, "garbagespecialbonus", "TETRIO_TL_OPTIONS"))};`,
+    `pub const TL_ROUND_MODE: &str = ${formatRustString(readString(tlOptions, "roundmode", "TETRIO_TL_OPTIONS"))};`,
+    `pub const TL_OPENER_PHASE: u32 = ${formatRustU32(readIntegerValue(tlOptions, "openerphase", "TETRIO_TL_OPTIONS"))};`,
     "",
     `pub(crate) const CLEAR_KIND_COUNT: usize = ${RUST_CLEAR_DEFINITIONS.length};`,
     `pub(crate) const CLEAR_NAMES: [&str; CLEAR_KIND_COUNT] = ${formatRustStringArray(clearNames)};`,
@@ -711,6 +877,38 @@ function readFiniteNumber(record: Record<string, number>, key: string, label: st
   return value;
 }
 
+function readIntegerValue(record: Record<string, unknown>, key: string, label: string): number {
+  const value = readFiniteNumberValue(record, key, label);
+  if (!Number.isInteger(value) || value < 0) {
+    throw new Error(`${label}.${key} must be a non-negative integer, got ${value}.`);
+  }
+  return value;
+}
+
+function readFiniteNumberValue(record: Record<string, unknown>, key: string, label: string): number {
+  const value = record[key];
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    throw new Error(`${label}.${key} must be a finite number.`);
+  }
+  return value;
+}
+
+function readBoolean(record: Record<string, unknown>, key: string, label: string): boolean {
+  const value = record[key];
+  if (typeof value !== "boolean") {
+    throw new Error(`${label}.${key} must be a boolean.`);
+  }
+  return value;
+}
+
+function readString(record: Record<string, unknown>, key: string, label: string): string {
+  const value = record[key];
+  if (typeof value !== "string") {
+    throw new Error(`${label}.${key} must be a string.`);
+  }
+  return value;
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -734,6 +932,10 @@ function formatRustFloat(value: number): string {
 
 function formatRustU32(value: number): string {
   return `${value}_u32`;
+}
+
+function formatRustBool(value: boolean): string {
+  return value ? "true" : "false";
 }
 
 function formatRustStringArray(values: readonly string[]): string {

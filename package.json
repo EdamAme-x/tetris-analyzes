@@ -16,6 +16,7 @@
     "generate:openers": "bun run build:native && bun run scripts/generate-openers.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "generate:tetrio-firepower-snapshots": "bun run scripts/generate-tetrio-firepower-snapshots.ts",
     "generate:tetrio-tables": "bun run scripts/generate-tetrio-tables.ts",
     "generate:tetrio-movement-snapshots": "bun run scripts/generate-tetrio-movement-snapshots.ts",
     "lint": "eslint .",

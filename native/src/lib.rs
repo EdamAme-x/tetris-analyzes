@@ -293,6 +293,7 @@ pub struct BeamPlacement {
     pub back_to_back_chain: u32,
     pub back_to_back: bool,
     pub back_to_back_bonus: f64,
+    pub back_to_back_charge_attack: u32,
     pub all_clear: bool,
     pub all_clear_bonus: u32,
 }
@@ -330,8 +331,10 @@ pub struct BeamFirepowerEvent {
     pub base_attack: u32,
     pub points: u32,
     pub combo: u32,
+    pub back_to_back_chain: u32,
     pub back_to_back: bool,
     pub back_to_back_bonus: f64,
+    pub back_to_back_charge_attack: u32,
     pub all_clear: bool,
     pub all_clear_bonus: u32,
 }
@@ -344,6 +347,12 @@ pub struct BeamFirepowerSummary {
     pub max_combo: u32,
     pub back_to_back_chain: u32,
     pub all_clears: u32,
+    pub difficult_clears: u32,
+    pub difficult_attack: u32,
+    pub spin_clears: u32,
+    pub spin_attack: u32,
+    pub t_spin_clears: u32,
+    pub t_spin_attack: u32,
     pub firepower_score: f64,
     pub events: Vec<BeamFirepowerEvent>,
 }
@@ -595,6 +604,12 @@ pub fn evaluate_opener_firepower(events: Vec<BeamFirepowerInput>) -> Result<Beam
         max_combo: state.max_combo,
         back_to_back_chain: state.back_to_back_chain,
         all_clears: state.all_clears,
+        difficult_clears: state.difficult_clears,
+        difficult_attack: state.difficult_attack,
+        spin_clears: state.spin_clears,
+        spin_attack: state.spin_attack,
+        t_spin_clears: state.t_spin_clears,
+        t_spin_attack: state.t_spin_attack,
         firepower_score: firepower_score(state),
         events: output_events,
     })
@@ -1758,6 +1773,7 @@ impl From<Placement> for BeamPlacement {
             back_to_back_chain: placement.firepower.back_to_back_chain,
             back_to_back: placement.firepower.back_to_back,
             back_to_back_bonus: placement.firepower.back_to_back_bonus,
+            back_to_back_charge_attack: placement.firepower.back_to_back_charge_attack,
             all_clear: placement.firepower.all_clear,
             all_clear_bonus: placement.firepower.all_clear_bonus,
         }
@@ -1785,8 +1801,10 @@ impl From<FirepowerEvent> for BeamFirepowerEvent {
             base_attack: event.base_attack,
             points: event.points,
             combo: event.combo,
+            back_to_back_chain: event.back_to_back_chain,
             back_to_back: event.back_to_back,
             back_to_back_bonus: event.back_to_back_bonus,
+            back_to_back_charge_attack: event.back_to_back_charge_attack,
             all_clear: event.all_clear,
             all_clear_bonus: event.all_clear_bonus,
         }

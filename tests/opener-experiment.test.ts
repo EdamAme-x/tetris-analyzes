@@ -179,7 +179,7 @@ describe("opener experiment runner", () => {
           beamWidth: 8,
           hold: true,
           maxDepth: 2,
-          spinMode: "T-SPINS",
+          spinMode: "ALL-MINI+",
           comboTable: "MULTIPLIER",
           kickTable: "SRS+",
           setupPoolMultiplier: 26
@@ -303,10 +303,10 @@ describe("opener experiment runner", () => {
 
     const markdown = renderOpenerExperimentMarkdown(report);
     expect(markdown).toContain("# Opener experiment");
-    expect(markdown).toContain("Rules: spins=T-SPINS, combo=MULTIPLIER, kicks=SRS+");
+    expect(markdown).toContain("Rules: spins=ALL-MINI+, combo=MULTIPLIER, kicks=SRS+");
     expect(markdown).toContain("## Best openers");
     expect(markdown).toContain("## Template survivability");
-    expect(markdown).toContain("fake-scenario | TI | false | T-SPINS | MULTIPLIER | SRS+ | 4 | 1 | 14 | 2.000");
+    expect(markdown).toContain("fake-scenario | TI | false | ALL-MINI+ | MULTIPLIER | SRS+ | 4 | 1 | 14 | 2.000");
     expect(markdown).toContain("quality gate");
     expect(markdown).toContain("## Candidate details");
     expect(markdown).toContain("[view](https://fumen.zui.jp/?m115@test)");
@@ -2146,6 +2146,7 @@ function placementEvent(
     backToBackChain: 0,
     backToBack: false,
     backToBackBonus: 0,
+    backToBackChargeAttack: 0,
     allClear: false,
     allClearBonus: 0
   };

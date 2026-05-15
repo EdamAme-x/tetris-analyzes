@@ -24,7 +24,8 @@ import {
   TETRIO_GARBAGE_ATTACK_TABLE,
   TETRIO_KICK_TABLES,
   TETRIO_SPIN_BONUS_RULES,
-  TETRIO_TABLE_SOURCE
+  TETRIO_TABLE_SOURCE,
+  TETRIO_TL_OPTIONS
 } from "../src/domain/tetrio-tables";
 
 describe("TETR.IO-derived ruleset helpers", () => {
@@ -154,6 +155,16 @@ describe("TETR.IO-derived ruleset helpers", () => {
 
   test("models TETR.IO combo garbage from the extracted client tables", () => {
     expect(TETRIO_TABLE_SOURCE.asset).toContain("/js/tetrio.js?hv=7eebfc9cd.987f91854aad.20260504T210001");
+    expect(TETRIO_TL_OPTIONS).toMatchObject({
+      spinbonuses: "all-mini+",
+      kickset: "SRS+",
+      combotable: "multiplier",
+      b2bchaining: false,
+      b2bcharging: true,
+      allclear_garbage: 5,
+      allclear_b2b: 1,
+      roundmode: "down"
+    });
     expect(TETRIO_COMBO_ATTACK_TABLES["classic guideline"]).toEqual([0, 1, 1, 2, 2, 3, 3, 4, 4, 4, 5]);
     expect(TETRIO_COMBO_ATTACK_TABLES["modern guideline"]).toEqual([0, 1, 1, 2, 2, 2, 3, 3, 3, 3, 3, 3, 4]);
 
@@ -199,9 +210,10 @@ describe("TETR.IO-derived ruleset helpers", () => {
       combo: TETRIO_COMBO_ATTACK_TABLES,
       garbage: TETRIO_GARBAGE_ATTACK_TABLE,
       spins: TETRIO_SPIN_BONUS_RULES,
-      kicks: TETRIO_KICK_TABLES
+      kicks: TETRIO_KICK_TABLES,
+      tl: TETRIO_TL_OPTIONS
     });
 
-    expect(createHash("sha256").update(payload).digest("hex")).toBe("9794a9486700417f098df6e8510e9e0865f9850853ef612e78a58452a091b4ca");
+    expect(createHash("sha256").update(payload).digest("hex")).toBe("e1513987cfb839736ecd0afee2f86aede1b58d37467f25f3bc84c9741e259663");
   });
 });

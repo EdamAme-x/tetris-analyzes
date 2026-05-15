@@ -2,8 +2,8 @@
 
 export const TETRIO_TABLE_SOURCE = {
   "asset": "https://tetr.io/js/tetrio.js?hv=7eebfc9cd.987f91854aad.20260504T210001",
-  "fetchedAt": "2026-05-14T07:32:32+09:00",
-  "lastModified": "Thu, 14 May 2026 06:42:10 GMT"
+  "fetchedAt": "2026-05-15T14:42:44+09:00",
+  "lastModified": "Fri, 15 May 2026 05:42:44 GMT"
 } as const;
 
 export const TETRIO_SCORING_TABLE = {
@@ -7373,4 +7373,24 @@ export const TETRIO_KICK_TABLES = {
     "spawn_rotation": {},
     "preview_overrides": {}
   }
+} as const;
+
+export const TETRIO_TL_OPTIONS = {
+  "spinbonuses": "all-mini+",
+  "kickset": "SRS+",
+  "combotable": "multiplier",
+  "b2bchaining": false,
+  "b2bcharging": true,
+  "b2bextras": false,
+  "b2bcharge_at": 4,
+  "b2bcharge_base": 0,
+  "allclear_garbage": 5,
+  "allclear_b2b": 1,
+  "allclear_b2b_sends": false,
+  "allclear_b2b_dupes": true,
+  "allclear_charges": false,
+  "garbagemultiplier": 1,
+  "garbagespecialbonus": true,
+  "roundmode": "down",
+  "openerphase": 14
 } as const;

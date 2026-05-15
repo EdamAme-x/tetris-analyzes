@@ -25,6 +25,7 @@ export interface NativeBeamPlacement {
   backToBackChain: number;
   backToBack: boolean;
   backToBackBonus: number;
+  backToBackChargeAttack: number;
   allClear: boolean;
   allClearBonus: number;
 }
@@ -91,8 +92,10 @@ export interface NativeFirepowerEvent {
   baseAttack: number;
   points: number;
   combo: number;
+  backToBackChain: number;
   backToBack: boolean;
   backToBackBonus: number;
+  backToBackChargeAttack: number;
   allClear: boolean;
   allClearBonus: number;
 }
@@ -104,6 +107,12 @@ export interface NativeFirepowerSummary {
   maxCombo: number;
   backToBackChain: number;
   allClears: number;
+  difficultClears: number;
+  difficultAttack: number;
+  spinClears: number;
+  spinAttack: number;
+  tSpinClears: number;
+  tSpinAttack: number;
   firepowerScore: number;
   events: NativeFirepowerEvent[];
 }

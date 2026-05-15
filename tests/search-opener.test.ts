@@ -11,7 +11,12 @@ import {
   searchOpenerBeamWithPlacements,
   type SearchPiece
 } from "../src/application/search-opener";
-import { TETRIO_COMBO_ATTACK_TABLES, TETRIO_GARBAGE_ATTACK_TABLE, TETRIO_SCORING_TABLE } from "../src/domain/tetrio-tables";
+import {
+  TETRIO_COMBO_ATTACK_TABLES,
+  TETRIO_GARBAGE_ATTACK_TABLE,
+  TETRIO_SCORING_TABLE,
+  TETRIO_TL_OPTIONS
+} from "../src/domain/tetrio-tables";
 import { bitBoardFromRows } from "../src/infrastructure/bitboard/native-bitboard";
 import type { NativeClearName } from "../src/infrastructure/native/binding-types";
 
@@ -250,10 +255,11 @@ describe("native opener beam search", () => {
 
   test("evaluates TETR.IO-style opener firepower in native code", () => {
     expect(evaluateOpenerFirepower([{ clearName: "SINGLE", allClear: true }])).toMatchObject({
-      attack: 10,
+      attack: 5,
       points: 3600,
       combo: 1,
-      allClears: 1
+      allClears: 1,
+      backToBackChain: 1
     });
 
     const b2b = evaluateOpenerFirepower([{ clearName: "QUAD" }, { clearName: "QUAD" }]);
@@ -274,6 +280,39 @@ describe("native opener beam search", () => {
       points: 1200,
       combo: 1
     });
+  });
+
+  test("matches current TETR.IO TL B2B mini spin and charge accounting", () => {
+    const miniSingles = evaluateOpenerFirepower([{ clearName: "TSPIN_MINI_SINGLE" }, { clearName: "TSPIN_MINI_SINGLE" }]);
+    expect(miniSingles).toMatchObject({
+      attack: 1,
+      points: 550,
+      backToBackChain: 2,
+      difficultClears: 2,
+      spinClears: 2
+    });
+    expect(miniSingles.events[1]).toMatchObject({
+      clearName: "TSPIN_MINI_SINGLE",
+      attack: 1,
+      backToBack: true,
+      backToBackBonus: 1
+    });
+
+    const b2bChargeBreak = evaluateOpenerFirepower([
+      { clearName: "QUAD" },
+      { clearName: "QUAD" },
+      { clearName: "QUAD" },
+      { clearName: "QUAD" },
+      { clearName: "QUAD" },
+      { clearName: "SINGLE" }
+    ]);
+    expect(b2bChargeBreak.events[5]).toMatchObject({
+      clearName: "SINGLE",
+      attack: 2,
+      backToBack: false,
+      backToBackChargeAttack: 1
+    });
+    expect(b2bChargeBreak.backToBackChain).toBe(0);
   });
 
   test("preserves B2B through no-line setup moves and resets it on ordinary clears", () => {
@@ -335,7 +374,7 @@ describe("native opener beam search", () => {
     }
 
     const allClearSingle = evaluateOpenerFirepower([{ clearName: "SINGLE", allClear: true }]).events[0];
-    expect(allClearSingle?.attack).toBe(TETRIO_GARBAGE_ATTACK_TABLE.SINGLE + TETRIO_GARBAGE_ATTACK_TABLE.ALL_CLEAR);
+    expect(allClearSingle?.attack).toBe(TETRIO_TL_OPTIONS.allclear_garbage);
     expect(allClearSingle?.points).toBe(TETRIO_SCORING_TABLE.SINGLE + TETRIO_SCORING_TABLE.ALL_CLEAR);
   });
 
@@ -500,32 +539,38 @@ describe("native opener beam search", () => {
     expect(tightTop?.placements.some((placement) => placement.piece === "I" && placement.clearName === "TSPIN_SINGLE")).toBe(true);
   });
 
-  test("keeps medium-depth TL pruning on B2B T-spin lines", () => {
+  test("keeps medium-depth TL pruning on B2B spin lines", () => {
     const input = {
       queue: "SZILOJTSTOZLJI",
       hold: true,
       maxDepth: 14,
       comboTable: "MULTIPLIER",
       kickTable: "SRS+",
-      spinMode: "T-SPINS"
+      spinMode: "ALL-MINI+"
     } as const;
     const [mediumTop] = searchOpenerBeam({ ...input, beamWidth: 256 });
     const [wideTop] = searchOpenerBeam({ ...input, beamWidth: 512 });
 
     expect(mediumTop).toMatchObject({
       queueIndex: 14,
+      attack: 12,
+      spinClears: 5,
+      spinAttack: 7,
       tSpinClears: 2,
-      tSpinAttack: 5,
-      backToBackChain: 2,
-      difficultClears: 2,
+      tSpinAttack: 4,
+      backToBackChain: 11,
+      difficultClears: 5,
       holes: 0
     });
     expect(wideTop).toMatchObject({
       queueIndex: 14,
+      attack: 12,
+      spinClears: 5,
+      spinAttack: 7,
       tSpinClears: 2,
-      tSpinAttack: 7,
-      backToBackChain: 2,
-      difficultClears: 2,
+      tSpinAttack: 4,
+      backToBackChain: 11,
+      difficultClears: 5,
       holes: 0
     });
     expect(wideTop?.attack ?? 0).toBeGreaterThanOrEqual(mediumTop?.attack ?? 0);

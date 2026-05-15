@@ -309,7 +309,7 @@ const CONTINUATION_QUALITY_GATE = {
 } as const satisfies OpenerExperimentQualityGate;
 
 export const TETRIO_TL_OPENER_SEARCH_RULES = {
-  spinMode: "T-SPINS",
+  spinMode: "ALL-MINI+",
   comboTable: "MULTIPLIER",
   kickTable: "SRS+"
 } as const satisfies OpenerExperimentSearchRules;

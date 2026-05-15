@@ -60,6 +60,12 @@ function createValidBinding(): NativeBinding {
       maxCombo: 0,
       backToBackChain: 0,
       allClears: 0,
+      difficultClears: 0,
+      difficultAttack: 0,
+      spinClears: 0,
+      spinAttack: 0,
+      tSpinClears: 0,
+      tSpinAttack: 0,
       firepowerScore: 0,
       events: []
     }),
