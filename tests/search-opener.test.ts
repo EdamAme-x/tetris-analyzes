@@ -154,29 +154,35 @@ describe("native opener beam search", () => {
     expect(() => searchOpenerBeam({ queue: "TIL", kickTable: "BAD KICKS" as "SRS" })).toThrow("Unsupported native opener kick table");
   });
 
-  test("detects T-spin, T-spin mini, and immobile spin primitives in native code", () => {
-    const fullTSpinRows = new Array(20).fill(0);
-    fullTSpinRows[1] = (1 << 3) | (1 << 5);
-    const miniTSpinRows = new Array(20).fill(0);
-    miniTSpinRows[1] = 1 << 3;
+  test("detects spins only when the final state can be reached by rotation", () => {
+    const geometryOnlyTSpinRows = new Array(20).fill(0);
+    geometryOnlyTSpinRows[1] = (1 << 3) | (1 << 5);
+    const reachableMiniRows = new Array(20).fill(0);
+    reachableMiniRows[0] = 1016;
+    reachableMiniRows[1] = 540;
+    reachableMiniRows[2] = 4;
     const immobileIRows = new Array(20).fill(0);
     immobileIRows[0] = (1 << 2) | (1 << 7);
+    immobileIRows[1] = 1 << 3;
 
-    expect(detectOpenerSpin({ rows: bitBoardFromRows(fullTSpinRows), piece: "T", rotation: 0, x: 3, y: 0 })).toMatchObject({
-      kind: "T_SPIN",
-      spin: true,
-      mini: false,
+    expect(detectOpenerSpin({ rows: bitBoardFromRows(geometryOnlyTSpinRows), piece: "T", rotation: 0, x: 3, y: 0 })).toMatchObject({
+      kind: "NONE",
+      spin: false,
       occupiedCorners: 4
     });
-    expect(detectOpenerSpin({ rows: bitBoardFromRows(miniTSpinRows), piece: "T", rotation: 0, x: 3, y: 0 })).toMatchObject({
+    expect(
+      detectOpenerSpin({ rows: bitBoardFromRows(reachableMiniRows), piece: "T", rotation: 0, x: 0, y: 0, kickTable: "SRS-X" })
+    ).toMatchObject({
       kind: "T_SPIN_MINI",
       spin: true,
       mini: true,
-      occupiedCorners: 3
+      immobile: true,
+      occupiedCorners: 3,
+      clearedLines: 1
     });
     expect(detectOpenerSpin({ rows: bitBoardFromRows(immobileIRows), piece: "I", rotation: 0, x: 3, y: 0 })).toMatchObject({
-      kind: "IMMOBILE_SPIN",
-      spin: true,
+      kind: "NONE",
+      spin: false,
       immobile: true
     });
   });
@@ -206,6 +212,7 @@ describe("native opener beam search", () => {
     fullTSpinRows[1] = (1 << 3) | (1 << 5);
     const immobileIRows = new Array(20).fill(0);
     immobileIRows[0] = (1 << 2) | (1 << 7);
+    immobileIRows[1] = 1 << 3;
     const handheldCornerRows = new Array(20).fill(0);
     handheldCornerRows[1] = 1 << 2;
 
@@ -218,8 +225,8 @@ describe("native opener beam search", () => {
     expect(
       detectOpenerSpin({ rows: bitBoardFromRows(immobileIRows), piece: "I", rotation: 0, x: 3, y: 0, spinMode: "ALL-SPINS" })
     ).toMatchObject({
-      kind: "T_SPIN",
-      spin: true,
+      kind: "NONE",
+      spin: false,
       mini: false
     });
     expect(
@@ -232,9 +239,9 @@ describe("native opener beam search", () => {
     expect(
       detectOpenerSpin({ rows: bitBoardFromRows(immobileIRows), piece: "I", rotation: 0, x: 3, y: 0, spinMode: "ALL-MINI" })
     ).toMatchObject({
-      kind: "T_SPIN_MINI",
-      spin: true,
-      mini: true
+      kind: "NONE",
+      spin: false,
+      mini: false
     });
     expect(
       detectOpenerSpin({ rows: bitBoardFromRows(handheldCornerRows), piece: "I", rotation: 0, x: 3, y: 0, spinMode: "ALL-SPINS" })
@@ -245,9 +252,9 @@ describe("native opener beam search", () => {
     expect(
       detectOpenerSpin({ rows: bitBoardFromRows(handheldCornerRows), piece: "I", rotation: 0, x: 3, y: 0, spinMode: "HANDHELD" })
     ).toMatchObject({
-      kind: "T_SPIN",
-      spin: true,
-      occupiedCorners: 3
+      kind: "NONE",
+      spin: false,
+      occupiedCorners: 0
     });
     expect(() => searchOpenerBeam({ queue: "TIL", spinMode: "HANDHELD" })).not.toThrow();
     expect(() => searchOpenerBeam({ queue: "TIL", spinMode: "BAD SPINS" as "T-SPINS" })).toThrow("Unsupported native opener spin mode");
@@ -505,7 +512,7 @@ describe("native opener beam search", () => {
     );
   });
 
-  test("matches wide-beam spin objective under tight native pruning", () => {
+  test("does not score non-rotated all-spin placements as spin clears", () => {
     const input = {
       queue: "JLSTZIOT",
       hold: true,
@@ -518,25 +525,25 @@ describe("native opener beam search", () => {
     const [wideTop] = searchOpenerBeamWithPlacements({ ...input, beamWidth: 64 });
 
     expect(tightTop).toMatchObject({
-      spinClears: 1,
-      spinAttack: 2,
+      spinClears: 0,
+      spinAttack: 0,
       tSpinClears: 0,
+      tSpinAttack: 0,
+      difficultClears: 0,
+      backToBackChain: 0,
+      attack: 0
+    });
+    expect(wideTop).toMatchObject({
+      spinClears: 1,
+      spinAttack: 0,
+      tSpinClears: 1,
       tSpinAttack: 0,
       difficultClears: 1,
       backToBackChain: 1,
-      attack: 2
+      attack: 0
     });
-    expect(wideTop).toMatchObject({
-      spinClears: tightTop?.spinClears,
-      spinAttack: tightTop?.spinAttack,
-      tSpinClears: tightTop?.tSpinClears,
-      tSpinAttack: tightTop?.tSpinAttack,
-      difficultClears: tightTop?.difficultClears,
-      backToBackChain: tightTop?.backToBackChain,
-      attack: tightTop?.attack
-    });
-    expect(tightTop?.placements.some((placement) => placement.clearName === "TSPIN_SINGLE")).toBe(true);
-    expect(tightTop?.placements.some((placement) => placement.piece === "I" && placement.clearName === "TSPIN_SINGLE")).toBe(true);
+    expect(tightTop?.placements.some((placement) => placement.piece === "I" && placement.clearName.startsWith("TSPIN"))).toBe(false);
+    expect(wideTop?.placements.some((placement) => placement.piece === "T" && placement.clearName === "TSPIN_MINI_SINGLE")).toBe(true);
   });
 
   test("keeps medium-depth TL pruning on B2B spin lines", () => {
@@ -548,29 +555,27 @@ describe("native opener beam search", () => {
       kickTable: "SRS+",
       spinMode: "ALL-MINI+"
     } as const;
-    const [mediumTop] = searchOpenerBeam({ ...input, beamWidth: 256 });
-    const [wideTop] = searchOpenerBeam({ ...input, beamWidth: 512 });
+    const [mediumTop] = searchOpenerBeam({ ...input, beamWidth: 128 });
+    const [wideTop] = searchOpenerBeam({ ...input, beamWidth: 256 });
 
     expect(mediumTop).toMatchObject({
       queueIndex: 14,
-      attack: 12,
-      spinClears: 5,
-      spinAttack: 7,
+      attack: 6,
+      spinClears: 3,
+      spinAttack: 6,
       tSpinClears: 2,
-      tSpinAttack: 4,
-      backToBackChain: 11,
-      difficultClears: 5,
+      backToBackChain: 3,
+      difficultClears: 3,
       holes: 0
     });
     expect(wideTop).toMatchObject({
       queueIndex: 14,
-      attack: 12,
-      spinClears: 5,
-      spinAttack: 7,
+      attack: 6,
+      spinClears: 3,
+      spinAttack: 6,
       tSpinClears: 2,
-      tSpinAttack: 4,
-      backToBackChain: 11,
-      difficultClears: 5,
+      backToBackChain: 3,
+      difficultClears: 3,
       holes: 0
     });
     expect(wideTop?.attack ?? 0).toBeGreaterThanOrEqual(mediumTop?.attack ?? 0);

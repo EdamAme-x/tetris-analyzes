@@ -17,6 +17,7 @@ import {
   type RulesetInput,
   type TetrioConfig
 } from "../domain/rules";
+import { TETRIO_TL_OPTIONS } from "../domain/tetrio-tables";
 import { bitBoardFromRows, createEmptyBitBoard } from "../infrastructure/bitboard/native-bitboard";
 
 type TetrioTables = typeof import("../domain/tetrio-tables");
@@ -40,9 +41,9 @@ export function createRuleset(input: RulesetInput = {}): Ruleset {
   return {
     baseBoard: input.baseBoard === undefined ? createEmptyBitBoard() : bitBoardFromRows(input.baseBoard),
     hold: normalizeHold(input.hold, input.infiniteHold),
-    spins: normalizeOption(input.spins ?? "T-SPINS", SPIN_OPTIONS, "spins"),
-    comboTable: normalizeOption(input.comboTable ?? "MULTIPLIER", COMBO_TABLE_OPTIONS, "comboTable"),
-    kickTable: normalizeOption(input.kickTable ?? "SRS+", KICK_TABLE_OPTIONS, "kickTable"),
+    spins: normalizeOption(input.spins ?? TETRIO_TL_OPTIONS.spinbonuses, SPIN_OPTIONS, "spins"),
+    comboTable: normalizeOption(input.comboTable ?? TETRIO_TL_OPTIONS.combotable, COMBO_TABLE_OPTIONS, "comboTable"),
+    kickTable: normalizeOption(input.kickTable ?? TETRIO_TL_OPTIONS.kickset, KICK_TABLE_OPTIONS, "kickTable"),
     gravity: normalizeGravity(input.gravity),
     garbage: normalizeGarbage(input.garbage)
   };

@@ -164,7 +164,7 @@ export function resolveOpenerRotation(input: OpenerRotationResolutionInput): Nat
 }
 
 export function detectOpenerSpin(input: OpenerPlacementReachabilityInput): NativeSpinDetection {
-  return loadNativeBinding().detectOpenerSpin(input.rows, input.piece, input.rotation, input.x, input.y, input.spinMode);
+  return loadNativeBinding().detectOpenerSpin(input.rows, input.piece, input.rotation, input.x, input.y, input.spinMode, input.kickTable);
 }
 
 export function estimateOpenerTSpinPotential(rows: Uint16Array, kickTable?: NativeKickTable): number {

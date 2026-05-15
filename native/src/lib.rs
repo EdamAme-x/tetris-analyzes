@@ -24,15 +24,17 @@ use firepower::{
     quad_well_continuation_score, score_state, FirepowerEvent, FirepowerState,
 };
 use movement::{
-    can_place, can_place_in_bounds, is_reachable_placement, is_reachable_placement_with_cache,
-    lock_shape, parse_kick_table, resolve_rotation_state, MovementState, ReachabilityCache,
+    can_place, can_place_in_bounds, find_reachable_rotation_entry, is_reachable_placement,
+    is_reachable_placement_with_cache, lock_shape, parse_kick_table, resolve_rotation_state,
+    MovementState, ReachabilityCache,
 };
 use pieces::{
     format_placement, parse_piece_string, parse_queue, piece_name, piece_shapes,
     placement_shape_indices, Piece, Shape,
 };
 use spin::{
-    detect_spin, detect_spin_for_mode, parse_spin_mode, spin_kind_name, SpinDetection, SpinMode,
+    could_spin_for_mode, detect_spin_for_mode_after_rotation, parse_spin_mode, spin_kind_name,
+    SpinDetection, SpinMode,
 };
 use tetrio_tables::{ComboTable, KickTable};
 
@@ -518,6 +520,7 @@ pub fn detect_opener_spin(
     x: i32,
     y: i32,
     spin_mode: Option<String>,
+    kick_table: Option<String>,
 ) -> Result<BeamSpinDetection> {
     let board = board::rows_to_array(rows.as_ref())?;
     let piece = parse_piece_string(&piece)?;
@@ -544,18 +547,34 @@ pub fn detect_opener_spin(
         )));
     };
     let cleared_lines = board::count_full_lines_array(&locked);
-    let spin = match spin_mode {
-        Some(spin_mode) => detect_spin_for_mode(
-            &locked,
+    let kick_table = parse_optional_kick_table(kick_table.as_deref())?;
+    let mut reachable_cache = ReachabilityCache::new(&board, piece, kick_table);
+    let spin_mode = parse_optional_spin_mode(spin_mode.as_deref())?;
+    let rotation_kick_index = if could_spin_for_mode(&board, &locked, piece, shape, x, y, spin_mode)
+    {
+        find_reachable_rotation_entry(
+            &board,
             piece,
-            shape,
+            rotation as usize,
             x,
             y,
-            cleared_lines,
-            parse_spin_mode(&spin_mode)?,
-        ),
-        None => detect_spin(&locked, piece, shape, x, y, cleared_lines),
+            kick_table,
+            &mut reachable_cache,
+        )
+    } else {
+        None
     };
+    let spin = detect_spin_for_mode_after_rotation(
+        &board,
+        &locked,
+        piece,
+        shape,
+        x,
+        y,
+        cleared_lines,
+        spin_mode,
+        rotation_kick_index,
+    );
     Ok(BeamSpinDetection::from(spin))
 }
 
@@ -1490,7 +1509,31 @@ fn place_grounded_at_y(
         placed[base_y + dy] |= shape.row_masks[dy] << x_shift;
     }
     let (cleared_rows, cleared_lines) = board::clear_full_lines_array_with_count(placed);
-    let spin = detect_spin_for_mode(&placed, choice.piece, shape, x, y, cleared_lines, spin_mode);
+    let rotation_kick_index =
+        if could_spin_for_mode(rows, &placed, choice.piece, shape, x, y, spin_mode) {
+            find_reachable_rotation_entry(
+                rows,
+                choice.piece,
+                shape_index,
+                x,
+                y,
+                kick_table,
+                reachable_cache,
+            )
+        } else {
+            None
+        };
+    let spin = detect_spin_for_mode_after_rotation(
+        rows,
+        &placed,
+        choice.piece,
+        shape,
+        x,
+        y,
+        cleared_lines,
+        spin_mode,
+        rotation_kick_index,
+    );
     Some(PlacedBoard {
         rows: cleared_rows,
         y,
@@ -1681,7 +1724,7 @@ fn parse_optional_spin_mode(input: Option<&str>) -> Result<SpinMode> {
     input
         .map(parse_spin_mode)
         .transpose()
-        .map(|spin_mode| spin_mode.unwrap_or(SpinMode::TSpins))
+        .map(|spin_mode| spin_mode.unwrap_or(SpinMode::AllMiniPlus))
 }
 
 impl From<SearchState> for BeamSearchNode {

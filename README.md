@@ -28,6 +28,8 @@ Executable examples live in `tests/`.
 - [x] Add native bag-1 all-queue template mining and reproducibility ranking
 - [x] Add a fumen-ready opener generation command from native mining
 - [x] Add generated tetrio.js movement snapshot coverage for native rotation parity
+- [ ] Add generated tetrio.js spin-state snapshots for HasRotated/mini/kick-index parity
+- [ ] Wire TETR.IO `allow180`, `bagtype`, handling, ARE, locktime, and gravity options into search settings
 - [ ] Add exact placement frontier enumeration for bag-1 templates
 - [ ] Add known-opener fumen fixtures and recall@K benchmarks
 - [x] Confirm the current TETR.IO TL spin/B2B profile from extracted client tables
@@ -148,3 +150,5 @@ Executable examples live in `tests/`.
 - [x] Extract current TETR.IO TL options from tetrio.js and use ALL-MINI+ / SRS+ / multiplier defaults in opener generation
 - [x] Match TL all-clear, mini-spin B2B, flat B2B bonus, and B2B charge firepower accounting
 - [x] Add tetrio.js-derived firepower snapshot tests for TL line clear, combo, B2B, and all-clear parity
+- [x] Require a reachable final rotation before native opener search can score a spin clear
+- [x] Use extracted TETR.IO TL defaults for public ruleset helpers and native spin detection helpers

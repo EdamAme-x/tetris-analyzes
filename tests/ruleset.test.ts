@@ -94,11 +94,16 @@ describe("TETR.IO-derived ruleset helpers", () => {
     expect(usesStaticGravity(ruleset)).toBe(true);
     expect(ruleset).toMatchObject({
       hold: { mode: "ON", infinite: "OFF" },
-      spins: "T-SPINS",
+      spins: "ALL-MINI+",
       comboTable: "MULTIPLIER",
       kickTable: "SRS+",
       gravity: { mode: "STATIC", staticGravity: 20 },
       garbage: { mode: "OFF", cheeseLayerHeight: 6, cheeseTimerInterval: 4, cheeseMessinessPercent: 100 }
+    });
+    expect(toTetrioConfig(ruleset)).toMatchObject({
+      spins: TETRIO_TL_OPTIONS.spinbonuses,
+      combotable: TETRIO_TL_OPTIONS.combotable,
+      kickset: TETRIO_TL_OPTIONS.kickset
     });
   });
 

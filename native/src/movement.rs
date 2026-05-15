@@ -50,6 +50,10 @@ impl ReachabilityCache {
 }
 
 impl ReachablePlacementSet {
+    fn contains_exact(&self, state: MovementState) -> bool {
+        movement_state_index(state).is_some_and(|index| self.visited[index])
+    }
+
     fn contains(
         &self,
         piece: Piece,
@@ -70,6 +74,23 @@ impl ReachablePlacementSet {
                 })
                 .is_some_and(|index| self.visited[index])
             })
+    }
+}
+
+impl ReachabilityCache {
+    fn reachable_set(
+        &mut self,
+        rows: &BoardRows,
+        piece: Piece,
+        kick_table: KickTable,
+    ) -> Option<&ReachablePlacementSet> {
+        if !self.spawn_open {
+            return None;
+        }
+        if self.reachable.is_none() {
+            self.reachable = Some(build_reachable_placement_set(rows, piece, kick_table));
+        }
+        self.reachable.as_ref()
     }
 }
 
@@ -382,6 +403,70 @@ pub(crate) fn resolve_rotation_state(
                 state: next,
                 kick_index: kick_table_index.checked_sub(1),
             });
+        }
+    }
+
+    None
+}
+
+pub(crate) fn find_reachable_rotation_entry(
+    rows: &BoardRows,
+    piece: Piece,
+    target_shape_index: usize,
+    target_x: i8,
+    target_y: i8,
+    kick_table: KickTable,
+    reachable_cache: &mut ReachabilityCache,
+) -> Option<usize> {
+    let shapes = piece_shapes(piece);
+    let target_shape = *shapes.get(target_shape_index)?;
+    if !can_place_for_movement(rows, target_shape, target_x, target_y) {
+        return None;
+    }
+
+    let reachable = reachable_cache.reachable_set(rows, piece, kick_table)?;
+    let to_rotation = target_shape.rotation;
+    let (to_anchor_x, to_anchor_y) = shape_anchor_offset(piece, target_shape_index);
+    let to_offset = kick_table_piece_offset(kick_table, piece, to_rotation);
+
+    for direction in [-1_i8, 1_i8, 2_i8] {
+        let from_rotation = (i16::from(to_rotation) - i16::from(direction)).rem_euclid(4) as u8;
+        let from_shape_index = from_rotation as usize;
+        let from_shape = *shapes.get(from_shape_index)?;
+        let (from_anchor_x, from_anchor_y) = shape_anchor_offset(piece, from_shape_index);
+        let from_offset = kick_table_piece_offset(kick_table, piece, from_rotation);
+        let offset_delta_x = to_offset.x - from_offset.x;
+        let offset_delta_y = to_offset.y - from_offset.y;
+
+        for (raw_kick_index, kick) in kicks_for(kick_table, piece, from_rotation, to_rotation)
+            .iter()
+            .enumerate()
+        {
+            let from_x = target_x + to_anchor_x - offset_delta_x - kick.x - from_anchor_x;
+            let from_y = target_y + to_anchor_y - offset_delta_y - kick.y - from_anchor_y;
+            let from_state = MovementState {
+                shape_index: from_shape_index,
+                x: from_x,
+                y: from_y,
+            };
+            if !reachable.contains_exact(from_state) {
+                continue;
+            }
+            if !can_place_for_movement(rows, from_shape, from_x, from_y) {
+                continue;
+            }
+
+            let Some(resolution) =
+                resolve_rotation_state(rows, piece, shapes, from_state, direction, kick_table)
+            else {
+                continue;
+            };
+            if resolution.state.shape_index == target_shape_index
+                && resolution.state.x == target_x
+                && resolution.state.y == target_y
+            {
+                return Some(raw_kick_index);
+            }
         }
     }
 

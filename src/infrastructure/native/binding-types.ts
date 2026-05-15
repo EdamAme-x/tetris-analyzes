@@ -255,7 +255,8 @@ export interface NativeBinding {
     rotation: number,
     x: number,
     y: number,
-    spinMode?: NativeSpinMode
+    spinMode?: NativeSpinMode,
+    kickTable?: NativeKickTable
   ): NativeSpinDetection;
   estimateOpenerTSpinPotential(rows: Uint16Array, kickTable?: NativeKickTable): number;
   evaluateOpenerFirepower(events: NativeFirepowerInput[]): NativeFirepowerSummary;
