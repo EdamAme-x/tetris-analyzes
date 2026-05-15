@@ -12,6 +12,11 @@ const MOVEMENT_HIDDEN_ROWS: usize = BOARD_HEIGHT;
 const MOVEMENT_BOARD_HEIGHT: usize = BOARD_HEIGHT + MOVEMENT_HIDDEN_ROWS;
 const MOVEMENT_STATE_CAPACITY: usize =
     MOVEMENT_ROTATION_CAPACITY * BOARD_WIDTH * MOVEMENT_BOARD_HEIGHT;
+const MOVEMENT_VISITED_WORDS: usize =
+    (MOVEMENT_STATE_CAPACITY + u64::BITS as usize - 1) / u64::BITS as usize;
+
+type MovementVisitedSet = [u64; MOVEMENT_VISITED_WORDS];
+type MovementQueue = [u16; MOVEMENT_STATE_CAPACITY];
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub(crate) struct MovementState {
@@ -21,7 +26,7 @@ pub(crate) struct MovementState {
 }
 
 pub(crate) struct ReachablePlacementSet {
-    visited: [bool; MOVEMENT_STATE_CAPACITY],
+    visited: MovementVisitedSet,
 }
 
 pub(crate) struct ReachabilityCache {
@@ -57,7 +62,7 @@ impl ReachabilityCache {
 
 impl ReachablePlacementSet {
     fn contains_exact(&self, state: MovementState) -> bool {
-        movement_state_index(state).is_some_and(|index| self.visited[index])
+        movement_state_index(state).is_some_and(|index| visited_contains(&self.visited, index))
     }
 
     fn contains(
@@ -69,17 +74,26 @@ impl ReachablePlacementSet {
         target_y: i8,
     ) -> bool {
         let target_rotation = shapes[target_shape_index].rotation;
-        equivalent_shape_indices(piece, target_rotation)
-            .iter()
-            .copied()
-            .any(|shape_index| {
-                movement_state_index(MovementState {
-                    shape_index,
-                    x: target_x,
-                    y: target_y,
-                })
-                .is_some_and(|index| self.visited[index])
-            })
+        match piece {
+            Piece::O => (0..MOVEMENT_ROTATION_CAPACITY)
+                .any(|shape_index| self.contains_shape_index(shape_index, target_x, target_y)),
+            Piece::I | Piece::S | Piece::Z if matches!(target_rotation, 0 | 2) => {
+                self.contains_shape_index(0, target_x, target_y)
+                    || self.contains_shape_index(2, target_x, target_y)
+            }
+            Piece::I | Piece::S | Piece::Z if matches!(target_rotation, 1 | 3) => {
+                self.contains_shape_index(1, target_x, target_y)
+                    || self.contains_shape_index(3, target_x, target_y)
+            }
+            Piece::T | Piece::J | Piece::L | Piece::I | Piece::S | Piece::Z => {
+                self.contains_shape_index(target_shape_index, target_x, target_y)
+            }
+        }
+    }
+
+    fn contains_shape_index(&self, shape_index: usize, x: i8, y: i8) -> bool {
+        movement_state_index(MovementState { shape_index, x, y })
+            .is_some_and(|index| visited_contains(&self.visited, index))
     }
 }
 
@@ -185,14 +199,14 @@ fn build_reachable_placement_set(
         kick_table,
     );
 
-    let mut visited = [false; MOVEMENT_STATE_CAPACITY];
-    let mut queue = [spawn; MOVEMENT_STATE_CAPACITY];
+    let mut visited = [0_u64; MOVEMENT_VISITED_WORDS];
+    let mut queue = [0_u16; MOVEMENT_STATE_CAPACITY];
     let mut head = 0_usize;
     let mut tail = 0_usize;
     push_known_movement_state(spawn, &mut visited, &mut queue, &mut tail);
 
     while head < tail {
-        let state = queue[head];
+        let state = movement_state_from_index(usize::from(queue[head]));
         head += 1;
 
         push_movement_state(
@@ -265,24 +279,6 @@ fn build_reachable_placement_set(
     ReachablePlacementSet { visited }
 }
 
-fn equivalent_shape_indices(piece: Piece, rotation: u8) -> &'static [usize] {
-    match piece {
-        Piece::O => &[0, 1, 2, 3],
-        Piece::I | Piece::S | Piece::Z => match rotation {
-            0 | 2 => &[0, 2],
-            1 | 3 => &[1, 3],
-            _ => &[],
-        },
-        Piece::T | Piece::J | Piece::L => match rotation {
-            0 => &[0],
-            1 => &[1],
-            2 => &[2],
-            3 => &[3],
-            _ => &[],
-        },
-    }
-}
-
 pub(crate) fn has_clear_vertical_drop(
     rows: &BoardRows,
     piece: Piece,
@@ -296,7 +292,8 @@ pub(crate) fn has_clear_vertical_drop(
     if target_y > spawn_y {
         return false;
     }
-    for y in target_y..=spawn_y {
+    let highest_visible_y = BOARD_HEIGHT as i8 - shape.height;
+    for y in target_y..=spawn_y.min(highest_visible_y) {
         if !can_place_for_movement(rows, shape, x, y) {
             return false;
         }
@@ -321,9 +318,11 @@ fn has_clear_horizontal_entry_drop(
     } else {
         (target_x, spawn_x)
     };
-    for x in left..=right {
-        if !can_place_for_movement(rows, shape, x, spawn_y) {
-            return false;
+    if spawn_y < BOARD_HEIGHT as i8 {
+        for x in left..=right {
+            if !can_place_for_movement(rows, shape, x, spawn_y) {
+                return false;
+            }
         }
     }
     has_clear_vertical_drop(
@@ -343,15 +342,15 @@ pub(crate) fn push_movement_state(
     shape_index: usize,
     x: i8,
     y: i8,
-    visited: &mut [bool; MOVEMENT_STATE_CAPACITY],
-    queue: &mut [MovementState; MOVEMENT_STATE_CAPACITY],
+    visited: &mut MovementVisitedSet,
+    queue: &mut MovementQueue,
     tail: &mut usize,
 ) {
     let next = MovementState { shape_index, x, y };
     let Some(index) = movement_state_index(next) else {
         return;
     };
-    if visited[index] || *tail >= queue.len() {
+    if visited_contains(visited, index) || *tail >= queue.len() {
         return;
     }
 
@@ -360,7 +359,7 @@ pub(crate) fn push_movement_state(
         return;
     }
 
-    push_indexed_movement_state(next, index, visited, queue, tail);
+    push_indexed_movement_state(index, visited, queue, tail);
 }
 
 pub(crate) fn push_rotation_states(
@@ -370,8 +369,8 @@ pub(crate) fn push_rotation_states(
     state: MovementState,
     direction: i8,
     kick_table: KickTable,
-    visited: &mut [bool; MOVEMENT_STATE_CAPACITY],
-    queue: &mut [MovementState; MOVEMENT_STATE_CAPACITY],
+    visited: &mut MovementVisitedSet,
+    queue: &mut MovementQueue,
     tail: &mut usize,
 ) {
     let Some(resolution) =
@@ -382,10 +381,10 @@ pub(crate) fn push_rotation_states(
     let Some(index) = movement_state_index(resolution.state) else {
         return;
     };
-    if visited[index] || *tail >= queue.len() {
+    if visited_contains(visited, index) || *tail >= queue.len() {
         return;
     }
-    push_indexed_movement_state(resolution.state, index, visited, queue, tail);
+    push_indexed_movement_state(index, visited, queue, tail);
 }
 
 pub(crate) fn resolve_rotation_state(
@@ -462,7 +461,6 @@ pub(crate) fn find_reachable_rotation_entry(
         }
         let from_rotation = (i16::from(to_rotation) - i16::from(direction)).rem_euclid(4) as u8;
         let from_shape_index = from_rotation as usize;
-        let from_shape = *shapes.get(from_shape_index)?;
         let (from_anchor_x, from_anchor_y) = shape_anchor_offset(piece, from_shape_index);
         let from_offset = kick_table_piece_offset(kick_table, piece, from_rotation);
         let offset_delta_x = to_offset.x - from_offset.x;
@@ -480,9 +478,6 @@ pub(crate) fn find_reachable_rotation_entry(
                 y: from_y,
             };
             if !reachable.contains_exact(from_state) {
-                continue;
-            }
-            if !can_place_for_movement(rows, from_shape, from_x, from_y) {
                 continue;
             }
 
@@ -505,31 +500,31 @@ pub(crate) fn find_reachable_rotation_entry(
 
 fn push_known_movement_state(
     state: MovementState,
-    visited: &mut [bool; MOVEMENT_STATE_CAPACITY],
-    queue: &mut [MovementState; MOVEMENT_STATE_CAPACITY],
+    visited: &mut MovementVisitedSet,
+    queue: &mut MovementQueue,
     tail: &mut usize,
 ) {
     let Some(index) = movement_state_index(state) else {
         return;
     };
-    if visited[index] || *tail >= queue.len() {
+    if visited_contains(visited, index) || *tail >= queue.len() {
         return;
     }
-    push_indexed_movement_state(state, index, visited, queue, tail);
+    push_indexed_movement_state(index, visited, queue, tail);
 }
 
 fn push_indexed_movement_state(
-    state: MovementState,
     index: usize,
-    visited: &mut [bool; MOVEMENT_STATE_CAPACITY],
-    queue: &mut [MovementState; MOVEMENT_STATE_CAPACITY],
+    visited: &mut MovementVisitedSet,
+    queue: &mut MovementQueue,
     tail: &mut usize,
 ) {
-    visited[index] = true;
-    queue[*tail] = state;
+    visited_insert(visited, index);
+    queue[*tail] = index as u16;
     *tail += 1;
 }
 
+#[inline]
 fn movement_state_index(state: MovementState) -> Option<usize> {
     if state.shape_index >= MOVEMENT_ROTATION_CAPACITY
         || state.x < 0
@@ -545,6 +540,32 @@ fn movement_state_index(state: MovementState) -> Option<usize> {
             + state.y as usize * BOARD_WIDTH
             + state.x as usize,
     )
+}
+
+#[inline]
+fn movement_state_from_index(index: usize) -> MovementState {
+    let rotation_stride = BOARD_WIDTH * MOVEMENT_BOARD_HEIGHT;
+    let shape_index = index / rotation_stride;
+    let offset = index % rotation_stride;
+    MovementState {
+        shape_index,
+        x: (offset % BOARD_WIDTH) as i8,
+        y: (offset / BOARD_WIDTH) as i8,
+    }
+}
+
+#[inline]
+fn visited_contains(visited: &MovementVisitedSet, index: usize) -> bool {
+    let word = index / u64::BITS as usize;
+    let bit = index % u64::BITS as usize;
+    visited[word] & (1_u64 << bit) != 0
+}
+
+#[inline]
+fn visited_insert(visited: &mut MovementVisitedSet, index: usize) {
+    let word = index / u64::BITS as usize;
+    let bit = index % u64::BITS as usize;
+    visited[word] |= 1_u64 << bit;
 }
 
 fn movement_spawn_state(piece: Piece, shape_index: usize, kick_table: KickTable) -> MovementState {
@@ -724,8 +745,8 @@ mod tests {
             x: 6,
             y: 2,
         };
-        let mut visited = [false; MOVEMENT_STATE_CAPACITY];
-        let mut queue = [state; MOVEMENT_STATE_CAPACITY];
+        let mut visited = [0_u64; MOVEMENT_VISITED_WORDS];
+        let mut queue = [0_u16; MOVEMENT_STATE_CAPACITY];
         let mut tail = 0_usize;
 
         push_rotation_states(
@@ -742,7 +763,7 @@ mod tests {
 
         assert_eq!(tail, 1);
         assert_eq!(
-            queue[0],
+            movement_state_from_index(usize::from(queue[0])),
             MovementState {
                 shape_index: 0,
                 x: 6,
@@ -756,8 +777,8 @@ mod tests {
         let rows = [0_u16; BOARD_HEIGHT];
         let shapes = piece_shapes(Piece::T);
         let state = movement_spawn_state(Piece::T, 0, KickTable::SrsPlus);
-        let mut visited = [false; MOVEMENT_STATE_CAPACITY];
-        let mut queue = [state; MOVEMENT_STATE_CAPACITY];
+        let mut visited = [0_u64; MOVEMENT_VISITED_WORDS];
+        let mut queue = [0_u16; MOVEMENT_STATE_CAPACITY];
         let mut tail = 0_usize;
 
         push_rotation_states(
@@ -774,7 +795,7 @@ mod tests {
 
         assert_eq!(tail, 1);
         assert_eq!(
-            queue[0],
+            movement_state_from_index(usize::from(queue[0])),
             MovementState {
                 shape_index: 1,
                 x: 4,
@@ -792,8 +813,8 @@ mod tests {
             x: 3,
             y: 2,
         };
-        let mut visited = [false; MOVEMENT_STATE_CAPACITY];
-        let mut queue = [state; MOVEMENT_STATE_CAPACITY];
+        let mut visited = [0_u64; MOVEMENT_VISITED_WORDS];
+        let mut queue = [0_u16; MOVEMENT_STATE_CAPACITY];
         let mut tail = 0_usize;
 
         push_rotation_states(
@@ -810,7 +831,7 @@ mod tests {
 
         assert_eq!(tail, 1);
         assert_eq!(
-            queue[0],
+            movement_state_from_index(usize::from(queue[0])),
             MovementState {
                 shape_index: 2,
                 x: 3,
@@ -828,6 +849,22 @@ mod tests {
         assert!(reachable.contains(Piece::I, shapes, 0, 3, 0));
         assert!(reachable.contains(Piece::I, shapes, 2, 3, 0));
         assert!(!reachable.contains(Piece::I, shapes, 2, 10, 0));
+    }
+
+    #[test]
+    fn packed_movement_state_index_round_trips_and_sets_bits() {
+        let state = MovementState {
+            shape_index: 3,
+            x: 9,
+            y: 39,
+        };
+        let index = movement_state_index(state).expect("state should fit movement index");
+        let mut visited = [0_u64; MOVEMENT_VISITED_WORDS];
+
+        assert_eq!(movement_state_from_index(index), state);
+        assert!(!visited_contains(&visited, index));
+        visited_insert(&mut visited, index);
+        assert!(visited_contains(&visited, index));
     }
 }
 

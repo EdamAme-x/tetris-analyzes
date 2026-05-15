@@ -1446,8 +1446,14 @@ fn score_t_spin_setup_potential(
     spin_mode: SpinMode,
     allow_180: bool,
 ) {
-    let mut potential_by_rows = FastHashMap::<BoardRows, u32>::default();
-    let mut quad_well_by_rows = FastHashMap::<BoardRows, u32>::default();
+    let mut potential_by_rows = FastHashMap::<BoardRows, u32>::with_capacity_and_hasher(
+        beam.len(),
+        BuildHasherDefault::<FastHasher>::default(),
+    );
+    let mut quad_well_by_rows = FastHashMap::<BoardRows, u32>::with_capacity_and_hasher(
+        beam.len(),
+        BuildHasherDefault::<FastHasher>::default(),
+    );
     let allows_t_spin_potential = spin_mode_allows_t_spin_potential(spin_mode);
     let pruning_baseline = if max_depth >= 21 {
         setup_potential_pruning_baseline(beam)
@@ -1659,10 +1665,17 @@ fn place_grounded_at_y(
     let mut placed = *rows;
     let x_shift = u32::try_from(x).ok()?;
     let base_y = usize::try_from(y).ok()?;
+    let mut touched_full_line = false;
     for dy in 0..shape.height as usize {
-        placed[base_y + dy] |= shape.row_masks[dy] << x_shift;
+        let row_y = base_y + dy;
+        placed[row_y] |= shape.row_masks[dy] << x_shift;
+        touched_full_line |= placed[row_y] == board::ROW_MASK;
     }
-    let (cleared_rows, cleared_lines) = board::clear_full_lines_array_with_count(placed);
+    let (cleared_rows, cleared_lines) = if touched_full_line {
+        board::clear_full_lines_array_with_count(placed)
+    } else {
+        (placed, 0)
+    };
     let spin = if could_spin_grounded_for_mode(rows, &placed, choice.piece, shape, x, y, spin_mode)
     {
         let rotation_kick_index = find_reachable_rotation_entry(

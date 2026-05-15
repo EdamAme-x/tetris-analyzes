@@ -139,6 +139,10 @@ Executable examples live in `tests/`.
 - [x] Include continuation potential in replay quality matching
 - [x] Remove measured holeless continuation queues from the TL production preset
 - [x] Skip native path-history cloning for compact replay and bag evaluation searches
+- [x] Pack native movement reachability sets and queues for faster BFS cache checks
+- [x] Skip hidden-row direct-drop collision scans during native reachability checks
+- [x] Fast-path native no-clear placements without a full line-clear scan
+- [x] Measure opener experiments with compact native search by default
 - [x] Keep setup-pool tuning as a CLI option instead of per-queue overrides
 - [x] Add a bench regression gate for holeless no-PC 10-attack triple T-spin continuation lines
 - [x] Stop promoting sampled continuation queues into production presets
