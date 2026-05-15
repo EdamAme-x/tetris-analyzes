@@ -73,7 +73,7 @@ describe("opener experiment runner", () => {
   });
 
   test("provides a three-bag continuation preset for B2B T-spin chain experiments", () => {
-    expect(CONTINUATION_OPENER_EXPERIMENT_SCENARIOS).toHaveLength(28);
+    expect(CONTINUATION_OPENER_EXPERIMENT_SCENARIOS).toHaveLength(31);
     expect(CONTINUATION_OPENER_EXPERIMENT_SCENARIOS.every((scenario) => scenario.name.startsWith("continuation-"))).toBe(true);
     expect(new Set(CONTINUATION_OPENER_EXPERIMENT_SCENARIOS.map((scenario) => scenario.queue)).size).toBe(
       CONTINUATION_OPENER_EXPERIMENT_SCENARIOS.length
@@ -89,6 +89,9 @@ describe("opener experiment runner", () => {
       )
     ).toEqual([
       "ZSTILOJJLITZOSIOLJZTS",
+      "JZSIOTLJILTSOZJISOZTL",
+      "ZOISJLTSLITOZJIOZLSJT",
+      "ZISJTLOZLJTOSIZOSTJIL",
       "OISLJZTIJTSOZLSJZTIOL",
       "ZTSLOJIZJTILSOLTIZJSO",
       "SZLITJOOZTLSIJJOSZTLI",
@@ -103,6 +106,9 @@ describe("opener experiment runner", () => {
       )
     ).toEqual({
       "continuation-tl-3spin-00": 26,
+      "continuation-tl-3spin-05": 18,
+      "continuation-tl-3spin-06": 18,
+      "continuation-tl-3spin-07": 26,
       "continuation-discover-96": 26,
       "continuation-tl-3spin-01": 26,
       "continuation-tl-3spin-02": 18,

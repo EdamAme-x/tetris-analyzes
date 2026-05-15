@@ -123,3 +123,4 @@ Executable examples live in `tests/`.
 - [x] Promote another sampled holeless 14-attack triple T-spin continuation queue
 - [x] Promote a sampled holeless 24-attack triple T-spin continuation queue
 - [x] Show peak TL firepower first in replayed console summaries while retaining replay metrics
+- [x] Promote additional sampled holeless 24-attack continuation queues with lower setup-pool cost
