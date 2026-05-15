@@ -88,6 +88,18 @@ describe("opener experiment runner", () => {
         (scenario) => scenario.queue
       )
     ).toEqual(["OISLJZTIJTSOZLSJZTIOL", "ZTSLOJIZJTILSOLTIZJSO", "SZLITJOOZTLSIJJOSZTLI"]);
+    expect(
+      Object.fromEntries(
+        CONTINUATION_OPENER_EXPERIMENT_SCENARIOS.filter((scenario) => scenario.setupPoolMultiplier !== undefined).map((scenario) => [
+          scenario.name,
+          scenario.setupPoolMultiplier
+        ])
+      )
+    ).toEqual({
+      "continuation-discover-96": 26,
+      "continuation-tl-3spin-01": 26,
+      "continuation-tl-3spin-02": 18
+    });
   });
 
   test("defaults continuation CLI runs to wide template replay instead of firepower-only output", () => {

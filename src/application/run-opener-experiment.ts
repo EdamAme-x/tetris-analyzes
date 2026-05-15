@@ -289,9 +289,9 @@ const CONTINUATION_THREE_BAG_QUEUES = [
   ["discover-88", "JSZTLOISTZIOJLIZOJSTL"],
   ["discover-92", "LZISOJTTJZILOSSILJTOZ"],
   ["discover-93", "OITJZLSTZIJSOLZTJSOLI"],
-  ["discover-96", "OZSLTJIJLSZITOIOJTSLZ"],
-  ["tl-3spin-01", "OISLJZTIJTSOZLSJZTIOL"],
-  ["tl-3spin-02", "ZTSLOJIZJTILSOLTIZJSO"],
+  ["discover-96", "OZSLTJIJLSZITOIOJTSLZ", 26],
+  ["tl-3spin-01", "OISLJZTIJTSOZLSJZTIOL", 26],
+  ["tl-3spin-02", "ZTSLOJIZJTILSOLTIZJSO", 18],
   ["tl-3spin-03", "SZLITJOOZTLSIJJOSZTLI"]
 ] as const;
 const DEFAULT_TWO_BAG_QUALITY_GATE = {
@@ -357,12 +357,13 @@ export const SURVEY_OPENER_EXPERIMENT_SCENARIOS: readonly OpenerExperimentScenar
 }));
 
 export const CONTINUATION_OPENER_EXPERIMENT_SCENARIOS: readonly OpenerExperimentScenario[] = CONTINUATION_THREE_BAG_QUEUES.map(
-  ([name, queue]) => ({
+  ([name, queue, setupPoolMultiplier]) => ({
     name: `continuation-${name}`,
     queue,
     hold: true,
     beamWidth: 256,
     maxDepth: 21,
+    ...(setupPoolMultiplier === undefined ? {} : { setupPoolMultiplier }),
     rules: TETRIO_TL_OPENER_SEARCH_RULES,
     qualityGate: CONTINUATION_QUALITY_GATE,
     warmups: 0,
