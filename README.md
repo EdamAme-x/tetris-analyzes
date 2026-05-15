@@ -156,6 +156,7 @@ Executable examples live in `tests/`.
 - [x] Extract current TETR.IO TL options from tetrio.js and use ALL-MINI+ / SRS+ / multiplier defaults in opener generation
 - [x] Match TL all-clear, mini-spin B2B, flat B2B bonus, and B2B charge firepower accounting
 - [x] Add tetrio.js-derived firepower snapshot tests for TL line clear, combo, B2B, and all-clear parity
+- [x] Cover every native TETR.IO clear kind, all-clear line clear, combo table, and B2B clear in firepower snapshots
 - [x] Require a reachable final rotation before native opener search can score a spin clear
 - [x] Use extracted TETR.IO TL defaults for public ruleset helpers and native spin detection helpers
 - [x] Extract TETR.IO TL `allow180` and propagate it through native reachability, search, and opener reports

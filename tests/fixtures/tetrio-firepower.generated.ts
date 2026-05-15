@@ -5,10 +5,23 @@ export const TETRIO_FIREPOWER_SNAPSHOT = {
     asset: "https://tetr.io/js/tetrio.js?hv=7eebfc9cd.987f91854aad.20260504T210001",
     lastModified: "Fri, 15 May 2026 05:42:44 GMT",
     tlOptions: {
+      bagtype: "7-bag",
       allow180: true,
       spinbonuses: "all-mini+",
       kickset: "SRS+",
       combotable: "multiplier",
+      are: 0,
+      lineclear_are: 0,
+      g: 0.02,
+      gincrease: 0.0035,
+      gmargin: 7200,
+      gravitymay20g: true,
+      locktime: 30,
+      lockresets: 15,
+      room_handling: false,
+      room_handling_arr: 2,
+      room_handling_das: 10,
+      room_handling_sdf: 6,
       b2bchaining: false,
       b2bcharging: true,
       b2bextras: false,
@@ -24,9 +37,2809 @@ export const TETRIO_FIREPOWER_SNAPSHOT = {
       roundmode: "down",
       openerphase: 14
     },
+    clearNames: [
+      "NONE",
+      "SINGLE",
+      "DOUBLE",
+      "TRIPLE",
+      "QUAD",
+      "PENTA",
+      "TSPIN",
+      "TSPIN_MINI",
+      "TSPIN_MINI_SINGLE",
+      "TSPIN_SINGLE",
+      "TSPIN_MINI_DOUBLE",
+      "TSPIN_DOUBLE",
+      "TSPIN_MINI_TRIPLE",
+      "TSPIN_TRIPLE",
+      "TSPIN_MINI_QUAD",
+      "TSPIN_QUAD",
+      "TSPIN_PENTA"
+    ],
+    comboTables: ["MULTIPLIER", "NONE", "CLASSIC GUIDELINE", "MODERN GUIDELINE"],
     generator: "scripts/generate-tetrio-firepower-snapshots.ts"
   },
   cases: [
+    {
+      name: "tl-clear-kind-none",
+      events: [
+        {
+          clearName: "NONE"
+        }
+      ],
+      expected: {
+        attack: 0,
+        points: 0,
+        combo: 0,
+        maxCombo: 0,
+        backToBackChain: 0,
+        allClears: 0,
+        difficultClears: 0,
+        difficultAttack: 0,
+        spinClears: 0,
+        spinAttack: 0,
+        tSpinClears: 0,
+        tSpinAttack: 0,
+        events: [
+          {
+            clearName: "NONE",
+            attack: 0,
+            baseAttack: 0,
+            points: 0,
+            combo: 0,
+            backToBackChain: 0,
+            backToBack: false,
+            backToBackBonus: 0,
+            backToBackChargeAttack: 0,
+            allClear: false,
+            allClearBonus: 0
+          }
+        ]
+      }
+    },
+    {
+      name: "tl-clear-kind-single",
+      events: [
+        {
+          clearName: "SINGLE"
+        }
+      ],
+      expected: {
+        attack: 0,
+        points: 100,
+        combo: 1,
+        maxCombo: 1,
+        backToBackChain: 0,
+        allClears: 0,
+        difficultClears: 0,
+        difficultAttack: 0,
+        spinClears: 0,
+        spinAttack: 0,
+        tSpinClears: 0,
+        tSpinAttack: 0,
+        events: [
+          {
+            clearName: "SINGLE",
+            attack: 0,
+            baseAttack: 0,
+            points: 100,
+            combo: 1,
+            backToBackChain: 0,
+            backToBack: false,
+            backToBackBonus: 0,
+            backToBackChargeAttack: 0,
+            allClear: false,
+            allClearBonus: 0
+          }
+        ]
+      }
+    },
+    {
+      name: "tl-clear-kind-double",
+      events: [
+        {
+          clearName: "DOUBLE"
+        }
+      ],
+      expected: {
+        attack: 1,
+        points: 300,
+        combo: 1,
+        maxCombo: 1,
+        backToBackChain: 0,
+        allClears: 0,
+        difficultClears: 0,
+        difficultAttack: 0,
+        spinClears: 0,
+        spinAttack: 0,
+        tSpinClears: 0,
+        tSpinAttack: 0,
+        events: [
+          {
+            clearName: "DOUBLE",
+            attack: 1,
+            baseAttack: 1,
+            points: 300,
+            combo: 1,
+            backToBackChain: 0,
+            backToBack: false,
+            backToBackBonus: 0,
+            backToBackChargeAttack: 0,
+            allClear: false,
+            allClearBonus: 0
+          }
+        ]
+      }
+    },
+    {
+      name: "tl-clear-kind-triple",
+      events: [
+        {
+          clearName: "TRIPLE"
+        }
+      ],
+      expected: {
+        attack: 2,
+        points: 500,
+        combo: 1,
+        maxCombo: 1,
+        backToBackChain: 0,
+        allClears: 0,
+        difficultClears: 0,
+        difficultAttack: 0,
+        spinClears: 0,
+        spinAttack: 0,
+        tSpinClears: 0,
+        tSpinAttack: 0,
+        events: [
+          {
+            clearName: "TRIPLE",
+            attack: 2,
+            baseAttack: 2,
+            points: 500,
+            combo: 1,
+            backToBackChain: 0,
+            backToBack: false,
+            backToBackBonus: 0,
+            backToBackChargeAttack: 0,
+            allClear: false,
+            allClearBonus: 0
+          }
+        ]
+      }
+    },
+    {
+      name: "tl-clear-kind-quad",
+      events: [
+        {
+          clearName: "QUAD"
+        }
+      ],
+      expected: {
+        attack: 4,
+        points: 800,
+        combo: 1,
+        maxCombo: 1,
+        backToBackChain: 1,
+        allClears: 0,
+        difficultClears: 1,
+        difficultAttack: 4,
+        spinClears: 0,
+        spinAttack: 0,
+        tSpinClears: 0,
+        tSpinAttack: 0,
+        events: [
+          {
+            clearName: "QUAD",
+            attack: 4,
+            baseAttack: 4,
+            points: 800,
+            combo: 1,
+            backToBackChain: 1,
+            backToBack: false,
+            backToBackBonus: 0,
+            backToBackChargeAttack: 0,
+            allClear: false,
+            allClearBonus: 0
+          }
+        ]
+      }
+    },
+    {
+      name: "tl-clear-kind-penta",
+      events: [
+        {
+          clearName: "PENTA"
+        }
+      ],
+      expected: {
+        attack: 5,
+        points: 1200,
+        combo: 1,
+        maxCombo: 1,
+        backToBackChain: 1,
+        allClears: 0,
+        difficultClears: 1,
+        difficultAttack: 5,
+        spinClears: 0,
+        spinAttack: 0,
+        tSpinClears: 0,
+        tSpinAttack: 0,
+        events: [
+          {
+            clearName: "PENTA",
+            attack: 5,
+            baseAttack: 5,
+            points: 1200,
+            combo: 1,
+            backToBackChain: 1,
+            backToBack: false,
+            backToBackBonus: 0,
+            backToBackChargeAttack: 0,
+            allClear: false,
+            allClearBonus: 0
+          }
+        ]
+      }
+    },
+    {
+      name: "tl-clear-kind-tspin",
+      events: [
+        {
+          clearName: "TSPIN"
+        }
+      ],
+      expected: {
+        attack: 0,
+        points: 400,
+        combo: 0,
+        maxCombo: 0,
+        backToBackChain: 0,
+        allClears: 0,
+        difficultClears: 0,
+        difficultAttack: 0,
+        spinClears: 0,
+        spinAttack: 0,
+        tSpinClears: 0,
+        tSpinAttack: 0,
+        events: [
+          {
+            clearName: "TSPIN",
+            attack: 0,
+            baseAttack: 0,
+            points: 400,
+            combo: 0,
+            backToBackChain: 0,
+            backToBack: false,
+            backToBackBonus: 0,
+            backToBackChargeAttack: 0,
+            allClear: false,
+            allClearBonus: 0
+          }
+        ]
+      }
+    },
+    {
+      name: "tl-clear-kind-tspin_mini",
+      events: [
+        {
+          clearName: "TSPIN_MINI"
+        }
+      ],
+      expected: {
+        attack: 0,
+        points: 100,
+        combo: 0,
+        maxCombo: 0,
+        backToBackChain: 0,
+        allClears: 0,
+        difficultClears: 0,
+        difficultAttack: 0,
+        spinClears: 0,
+        spinAttack: 0,
+        tSpinClears: 0,
+        tSpinAttack: 0,
+        events: [
+          {
+            clearName: "TSPIN_MINI",
+            attack: 0,
+            baseAttack: 0,
+            points: 100,
+            combo: 0,
+            backToBackChain: 0,
+            backToBack: false,
+            backToBackBonus: 0,
+            backToBackChargeAttack: 0,
+            allClear: false,
+            allClearBonus: 0
+          }
+        ]
+      }
+    },
+    {
+      name: "tl-clear-kind-tspin_mini_single",
+      events: [
+        {
+          clearName: "TSPIN_MINI_SINGLE"
+        }
+      ],
+      expected: {
+        attack: 0,
+        points: 200,
+        combo: 1,
+        maxCombo: 1,
+        backToBackChain: 1,
+        allClears: 0,
+        difficultClears: 1,
+        difficultAttack: 0,
+        spinClears: 1,
+        spinAttack: 0,
+        tSpinClears: 1,
+        tSpinAttack: 0,
+        events: [
+          {
+            clearName: "TSPIN_MINI_SINGLE",
+            attack: 0,
+            baseAttack: 0,
+            points: 200,
+            combo: 1,
+            backToBackChain: 1,
+            backToBack: false,
+            backToBackBonus: 0,
+            backToBackChargeAttack: 0,
+            allClear: false,
+            allClearBonus: 0
+          }
+        ]
+      }
+    },
+    {
+      name: "tl-clear-kind-tspin_single",
+      events: [
+        {
+          clearName: "TSPIN_SINGLE"
+        }
+      ],
+      expected: {
+        attack: 2,
+        points: 800,
+        combo: 1,
+        maxCombo: 1,
+        backToBackChain: 1,
+        allClears: 0,
+        difficultClears: 1,
+        difficultAttack: 2,
+        spinClears: 1,
+        spinAttack: 2,
+        tSpinClears: 1,
+        tSpinAttack: 2,
+        events: [
+          {
+            clearName: "TSPIN_SINGLE",
+            attack: 2,
+            baseAttack: 2,
+            points: 800,
+            combo: 1,
+            backToBackChain: 1,
+            backToBack: false,
+            backToBackBonus: 0,
+            backToBackChargeAttack: 0,
+            allClear: false,
+            allClearBonus: 0
+          }
+        ]
+      }
+    },
+    {
+      name: "tl-clear-kind-tspin_mini_double",
+      events: [
+        {
+          clearName: "TSPIN_MINI_DOUBLE"
+        }
+      ],
+      expected: {
+        attack: 1,
+        points: 400,
+        combo: 1,
+        maxCombo: 1,
+        backToBackChain: 1,
+        allClears: 0,
+        difficultClears: 1,
+        difficultAttack: 1,
+        spinClears: 1,
+        spinAttack: 1,
+        tSpinClears: 1,
+        tSpinAttack: 1,
+        events: [
+          {
+            clearName: "TSPIN_MINI_DOUBLE",
+            attack: 1,
+            baseAttack: 1,
+            points: 400,
+            combo: 1,
+            backToBackChain: 1,
+            backToBack: false,
+            backToBackBonus: 0,
+            backToBackChargeAttack: 0,
+            allClear: false,
+            allClearBonus: 0
+          }
+        ]
+      }
+    },
+    {
+      name: "tl-clear-kind-tspin_double",
+      events: [
+        {
+          clearName: "TSPIN_DOUBLE"
+        }
+      ],
+      expected: {
+        attack: 4,
+        points: 1200,
+        combo: 1,
+        maxCombo: 1,
+        backToBackChain: 1,
+        allClears: 0,
+        difficultClears: 1,
+        difficultAttack: 4,
+        spinClears: 1,
+        spinAttack: 4,
+        tSpinClears: 1,
+        tSpinAttack: 4,
+        events: [
+          {
+            clearName: "TSPIN_DOUBLE",
+            attack: 4,
+            baseAttack: 4,
+            points: 1200,
+            combo: 1,
+            backToBackChain: 1,
+            backToBack: false,
+            backToBackBonus: 0,
+            backToBackChargeAttack: 0,
+            allClear: false,
+            allClearBonus: 0
+          }
+        ]
+      }
+    },
+    {
+      name: "tl-clear-kind-tspin_mini_triple",
+      events: [
+        {
+          clearName: "TSPIN_MINI_TRIPLE"
+        }
+      ],
+      expected: {
+        attack: 2,
+        points: 800,
+        combo: 1,
+        maxCombo: 1,
+        backToBackChain: 1,
+        allClears: 0,
+        difficultClears: 1,
+        difficultAttack: 2,
+        spinClears: 1,
+        spinAttack: 2,
+        tSpinClears: 1,
+        tSpinAttack: 2,
+        events: [
+          {
+            clearName: "TSPIN_MINI_TRIPLE",
+            attack: 2,
+            baseAttack: 2,
+            points: 800,
+            combo: 1,
+            backToBackChain: 1,
+            backToBack: false,
+            backToBackBonus: 0,
+            backToBackChargeAttack: 0,
+            allClear: false,
+            allClearBonus: 0
+          }
+        ]
+      }
+    },
+    {
+      name: "tl-clear-kind-tspin_triple",
+      events: [
+        {
+          clearName: "TSPIN_TRIPLE"
+        }
+      ],
+      expected: {
+        attack: 6,
+        points: 1600,
+        combo: 1,
+        maxCombo: 1,
+        backToBackChain: 1,
+        allClears: 0,
+        difficultClears: 1,
+        difficultAttack: 6,
+        spinClears: 1,
+        spinAttack: 6,
+        tSpinClears: 1,
+        tSpinAttack: 6,
+        events: [
+          {
+            clearName: "TSPIN_TRIPLE",
+            attack: 6,
+            baseAttack: 6,
+            points: 1600,
+            combo: 1,
+            backToBackChain: 1,
+            backToBack: false,
+            backToBackBonus: 0,
+            backToBackChargeAttack: 0,
+            allClear: false,
+            allClearBonus: 0
+          }
+        ]
+      }
+    },
+    {
+      name: "tl-clear-kind-tspin_mini_quad",
+      events: [
+        {
+          clearName: "TSPIN_MINI_QUAD"
+        }
+      ],
+      expected: {
+        attack: 4,
+        points: 1600,
+        combo: 1,
+        maxCombo: 1,
+        backToBackChain: 1,
+        allClears: 0,
+        difficultClears: 1,
+        difficultAttack: 4,
+        spinClears: 1,
+        spinAttack: 4,
+        tSpinClears: 1,
+        tSpinAttack: 4,
+        events: [
+          {
+            clearName: "TSPIN_MINI_QUAD",
+            attack: 4,
+            baseAttack: 4,
+            points: 1600,
+            combo: 1,
+            backToBackChain: 1,
+            backToBack: false,
+            backToBackBonus: 0,
+            backToBackChargeAttack: 0,
+            allClear: false,
+            allClearBonus: 0
+          }
+        ]
+      }
+    },
+    {
+      name: "tl-clear-kind-tspin_quad",
+      events: [
+        {
+          clearName: "TSPIN_QUAD"
+        }
+      ],
+      expected: {
+        attack: 10,
+        points: 2600,
+        combo: 1,
+        maxCombo: 1,
+        backToBackChain: 1,
+        allClears: 0,
+        difficultClears: 1,
+        difficultAttack: 10,
+        spinClears: 1,
+        spinAttack: 10,
+        tSpinClears: 1,
+        tSpinAttack: 10,
+        events: [
+          {
+            clearName: "TSPIN_QUAD",
+            attack: 10,
+            baseAttack: 10,
+            points: 2600,
+            combo: 1,
+            backToBackChain: 1,
+            backToBack: false,
+            backToBackBonus: 0,
+            backToBackChargeAttack: 0,
+            allClear: false,
+            allClearBonus: 0
+          }
+        ]
+      }
+    },
+    {
+      name: "tl-clear-kind-tspin_penta",
+      events: [
+        {
+          clearName: "TSPIN_PENTA"
+        }
+      ],
+      expected: {
+        attack: 12,
+        points: 3200,
+        combo: 1,
+        maxCombo: 1,
+        backToBackChain: 1,
+        allClears: 0,
+        difficultClears: 1,
+        difficultAttack: 12,
+        spinClears: 1,
+        spinAttack: 12,
+        tSpinClears: 1,
+        tSpinAttack: 12,
+        events: [
+          {
+            clearName: "TSPIN_PENTA",
+            attack: 12,
+            baseAttack: 12,
+            points: 3200,
+            combo: 1,
+            backToBackChain: 1,
+            backToBack: false,
+            backToBackBonus: 0,
+            backToBackChargeAttack: 0,
+            allClear: false,
+            allClearBonus: 0
+          }
+        ]
+      }
+    },
+    {
+      name: "tl-all-clear-single",
+      events: [
+        {
+          clearName: "SINGLE",
+          allClear: true
+        }
+      ],
+      expected: {
+        attack: 5,
+        points: 3600,
+        combo: 1,
+        maxCombo: 1,
+        backToBackChain: 1,
+        allClears: 1,
+        difficultClears: 0,
+        difficultAttack: 0,
+        spinClears: 0,
+        spinAttack: 0,
+        tSpinClears: 0,
+        tSpinAttack: 0,
+        events: [
+          {
+            clearName: "SINGLE",
+            attack: 5,
+            baseAttack: 0,
+            points: 3600,
+            combo: 1,
+            backToBackChain: 1,
+            backToBack: false,
+            backToBackBonus: 0,
+            backToBackChargeAttack: 0,
+            allClear: true,
+            allClearBonus: 5
+          }
+        ]
+      }
+    },
+    {
+      name: "tl-all-clear-double",
+      events: [
+        {
+          clearName: "DOUBLE",
+          allClear: true
+        }
+      ],
+      expected: {
+        attack: 6,
+        points: 3800,
+        combo: 1,
+        maxCombo: 1,
+        backToBackChain: 1,
+        allClears: 1,
+        difficultClears: 0,
+        difficultAttack: 0,
+        spinClears: 0,
+        spinAttack: 0,
+        tSpinClears: 0,
+        tSpinAttack: 0,
+        events: [
+          {
+            clearName: "DOUBLE",
+            attack: 6,
+            baseAttack: 1,
+            points: 3800,
+            combo: 1,
+            backToBackChain: 1,
+            backToBack: false,
+            backToBackBonus: 0,
+            backToBackChargeAttack: 0,
+            allClear: true,
+            allClearBonus: 5
+          }
+        ]
+      }
+    },
+    {
+      name: "tl-all-clear-triple",
+      events: [
+        {
+          clearName: "TRIPLE",
+          allClear: true
+        }
+      ],
+      expected: {
+        attack: 7,
+        points: 4000,
+        combo: 1,
+        maxCombo: 1,
+        backToBackChain: 1,
+        allClears: 1,
+        difficultClears: 0,
+        difficultAttack: 0,
+        spinClears: 0,
+        spinAttack: 0,
+        tSpinClears: 0,
+        tSpinAttack: 0,
+        events: [
+          {
+            clearName: "TRIPLE",
+            attack: 7,
+            baseAttack: 2,
+            points: 4000,
+            combo: 1,
+            backToBackChain: 1,
+            backToBack: false,
+            backToBackBonus: 0,
+            backToBackChargeAttack: 0,
+            allClear: true,
+            allClearBonus: 5
+          }
+        ]
+      }
+    },
+    {
+      name: "tl-all-clear-quad",
+      events: [
+        {
+          clearName: "QUAD",
+          allClear: true
+        }
+      ],
+      expected: {
+        attack: 10,
+        points: 4700,
+        combo: 1,
+        maxCombo: 1,
+        backToBackChain: 2,
+        allClears: 1,
+        difficultClears: 1,
+        difficultAttack: 10,
+        spinClears: 0,
+        spinAttack: 0,
+        tSpinClears: 0,
+        tSpinAttack: 0,
+        events: [
+          {
+            clearName: "QUAD",
+            attack: 10,
+            baseAttack: 4,
+            points: 4700,
+            combo: 1,
+            backToBackChain: 2,
+            backToBack: true,
+            backToBackBonus: 1,
+            backToBackChargeAttack: 0,
+            allClear: true,
+            allClearBonus: 5
+          }
+        ]
+      }
+    },
+    {
+      name: "tl-all-clear-penta",
+      events: [
+        {
+          clearName: "PENTA",
+          allClear: true
+        }
+      ],
+      expected: {
+        attack: 11,
+        points: 5300,
+        combo: 1,
+        maxCombo: 1,
+        backToBackChain: 2,
+        allClears: 1,
+        difficultClears: 1,
+        difficultAttack: 11,
+        spinClears: 0,
+        spinAttack: 0,
+        tSpinClears: 0,
+        tSpinAttack: 0,
+        events: [
+          {
+            clearName: "PENTA",
+            attack: 11,
+            baseAttack: 5,
+            points: 5300,
+            combo: 1,
+            backToBackChain: 2,
+            backToBack: true,
+            backToBackBonus: 1,
+            backToBackChargeAttack: 0,
+            allClear: true,
+            allClearBonus: 5
+          }
+        ]
+      }
+    },
+    {
+      name: "tl-all-clear-tspin_mini_single",
+      events: [
+        {
+          clearName: "TSPIN_MINI_SINGLE",
+          allClear: true
+        }
+      ],
+      expected: {
+        attack: 6,
+        points: 3800,
+        combo: 1,
+        maxCombo: 1,
+        backToBackChain: 2,
+        allClears: 1,
+        difficultClears: 1,
+        difficultAttack: 6,
+        spinClears: 1,
+        spinAttack: 6,
+        tSpinClears: 1,
+        tSpinAttack: 6,
+        events: [
+          {
+            clearName: "TSPIN_MINI_SINGLE",
+            attack: 6,
+            baseAttack: 0,
+            points: 3800,
+            combo: 1,
+            backToBackChain: 2,
+            backToBack: true,
+            backToBackBonus: 1,
+            backToBackChargeAttack: 0,
+            allClear: true,
+            allClearBonus: 5
+          }
+        ]
+      }
+    },
+    {
+      name: "tl-all-clear-tspin_single",
+      events: [
+        {
+          clearName: "TSPIN_SINGLE",
+          allClear: true
+        }
+      ],
+      expected: {
+        attack: 8,
+        points: 4700,
+        combo: 1,
+        maxCombo: 1,
+        backToBackChain: 2,
+        allClears: 1,
+        difficultClears: 1,
+        difficultAttack: 8,
+        spinClears: 1,
+        spinAttack: 8,
+        tSpinClears: 1,
+        tSpinAttack: 8,
+        events: [
+          {
+            clearName: "TSPIN_SINGLE",
+            attack: 8,
+            baseAttack: 2,
+            points: 4700,
+            combo: 1,
+            backToBackChain: 2,
+            backToBack: true,
+            backToBackBonus: 1,
+            backToBackChargeAttack: 0,
+            allClear: true,
+            allClearBonus: 5
+          }
+        ]
+      }
+    },
+    {
+      name: "tl-all-clear-tspin_mini_double",
+      events: [
+        {
+          clearName: "TSPIN_MINI_DOUBLE",
+          allClear: true
+        }
+      ],
+      expected: {
+        attack: 7,
+        points: 4100,
+        combo: 1,
+        maxCombo: 1,
+        backToBackChain: 2,
+        allClears: 1,
+        difficultClears: 1,
+        difficultAttack: 7,
+        spinClears: 1,
+        spinAttack: 7,
+        tSpinClears: 1,
+        tSpinAttack: 7,
+        events: [
+          {
+            clearName: "TSPIN_MINI_DOUBLE",
+            attack: 7,
+            baseAttack: 1,
+            points: 4100,
+            combo: 1,
+            backToBackChain: 2,
+            backToBack: true,
+            backToBackBonus: 1,
+            backToBackChargeAttack: 0,
+            allClear: true,
+            allClearBonus: 5
+          }
+        ]
+      }
+    },
+    {
+      name: "tl-all-clear-tspin_double",
+      events: [
+        {
+          clearName: "TSPIN_DOUBLE",
+          allClear: true
+        }
+      ],
+      expected: {
+        attack: 10,
+        points: 5300,
+        combo: 1,
+        maxCombo: 1,
+        backToBackChain: 2,
+        allClears: 1,
+        difficultClears: 1,
+        difficultAttack: 10,
+        spinClears: 1,
+        spinAttack: 10,
+        tSpinClears: 1,
+        tSpinAttack: 10,
+        events: [
+          {
+            clearName: "TSPIN_DOUBLE",
+            attack: 10,
+            baseAttack: 4,
+            points: 5300,
+            combo: 1,
+            backToBackChain: 2,
+            backToBack: true,
+            backToBackBonus: 1,
+            backToBackChargeAttack: 0,
+            allClear: true,
+            allClearBonus: 5
+          }
+        ]
+      }
+    },
+    {
+      name: "tl-all-clear-tspin_mini_triple",
+      events: [
+        {
+          clearName: "TSPIN_MINI_TRIPLE",
+          allClear: true
+        }
+      ],
+      expected: {
+        attack: 8,
+        points: 4700,
+        combo: 1,
+        maxCombo: 1,
+        backToBackChain: 2,
+        allClears: 1,
+        difficultClears: 1,
+        difficultAttack: 8,
+        spinClears: 1,
+        spinAttack: 8,
+        tSpinClears: 1,
+        tSpinAttack: 8,
+        events: [
+          {
+            clearName: "TSPIN_MINI_TRIPLE",
+            attack: 8,
+            baseAttack: 2,
+            points: 4700,
+            combo: 1,
+            backToBackChain: 2,
+            backToBack: true,
+            backToBackBonus: 1,
+            backToBackChargeAttack: 0,
+            allClear: true,
+            allClearBonus: 5
+          }
+        ]
+      }
+    },
+    {
+      name: "tl-all-clear-tspin_triple",
+      events: [
+        {
+          clearName: "TSPIN_TRIPLE",
+          allClear: true
+        }
+      ],
+      expected: {
+        attack: 12,
+        points: 5900,
+        combo: 1,
+        maxCombo: 1,
+        backToBackChain: 2,
+        allClears: 1,
+        difficultClears: 1,
+        difficultAttack: 12,
+        spinClears: 1,
+        spinAttack: 12,
+        tSpinClears: 1,
+        tSpinAttack: 12,
+        events: [
+          {
+            clearName: "TSPIN_TRIPLE",
+            attack: 12,
+            baseAttack: 6,
+            points: 5900,
+            combo: 1,
+            backToBackChain: 2,
+            backToBack: true,
+            backToBackBonus: 1,
+            backToBackChargeAttack: 0,
+            allClear: true,
+            allClearBonus: 5
+          }
+        ]
+      }
+    },
+    {
+      name: "tl-all-clear-tspin_mini_quad",
+      events: [
+        {
+          clearName: "TSPIN_MINI_QUAD",
+          allClear: true
+        }
+      ],
+      expected: {
+        attack: 10,
+        points: 5900,
+        combo: 1,
+        maxCombo: 1,
+        backToBackChain: 2,
+        allClears: 1,
+        difficultClears: 1,
+        difficultAttack: 10,
+        spinClears: 1,
+        spinAttack: 10,
+        tSpinClears: 1,
+        tSpinAttack: 10,
+        events: [
+          {
+            clearName: "TSPIN_MINI_QUAD",
+            attack: 10,
+            baseAttack: 4,
+            points: 5900,
+            combo: 1,
+            backToBackChain: 2,
+            backToBack: true,
+            backToBackBonus: 1,
+            backToBackChargeAttack: 0,
+            allClear: true,
+            allClearBonus: 5
+          }
+        ]
+      }
+    },
+    {
+      name: "tl-all-clear-tspin_quad",
+      events: [
+        {
+          clearName: "TSPIN_QUAD",
+          allClear: true
+        }
+      ],
+      expected: {
+        attack: 16,
+        points: 7400,
+        combo: 1,
+        maxCombo: 1,
+        backToBackChain: 2,
+        allClears: 1,
+        difficultClears: 1,
+        difficultAttack: 16,
+        spinClears: 1,
+        spinAttack: 16,
+        tSpinClears: 1,
+        tSpinAttack: 16,
+        events: [
+          {
+            clearName: "TSPIN_QUAD",
+            attack: 16,
+            baseAttack: 10,
+            points: 7400,
+            combo: 1,
+            backToBackChain: 2,
+            backToBack: true,
+            backToBackBonus: 1,
+            backToBackChargeAttack: 0,
+            allClear: true,
+            allClearBonus: 5
+          }
+        ]
+      }
+    },
+    {
+      name: "tl-all-clear-tspin_penta",
+      events: [
+        {
+          clearName: "TSPIN_PENTA",
+          allClear: true
+        }
+      ],
+      expected: {
+        attack: 18,
+        points: 8300,
+        combo: 1,
+        maxCombo: 1,
+        backToBackChain: 2,
+        allClears: 1,
+        difficultClears: 1,
+        difficultAttack: 18,
+        spinClears: 1,
+        spinAttack: 18,
+        tSpinClears: 1,
+        tSpinAttack: 18,
+        events: [
+          {
+            clearName: "TSPIN_PENTA",
+            attack: 18,
+            baseAttack: 12,
+            points: 8300,
+            combo: 1,
+            backToBackChain: 2,
+            backToBack: true,
+            backToBackBonus: 1,
+            backToBackChargeAttack: 0,
+            allClear: true,
+            allClearBonus: 5
+          }
+        ]
+      }
+    },
+    {
+      name: "tl-combo-table-multiplier",
+      events: [
+        {
+          clearName: "DOUBLE",
+          comboTable: "MULTIPLIER"
+        },
+        {
+          clearName: "DOUBLE",
+          comboTable: "MULTIPLIER"
+        },
+        {
+          clearName: "DOUBLE",
+          comboTable: "MULTIPLIER"
+        },
+        {
+          clearName: "DOUBLE",
+          comboTable: "MULTIPLIER"
+        },
+        {
+          clearName: "DOUBLE",
+          comboTable: "MULTIPLIER"
+        },
+        {
+          clearName: "DOUBLE",
+          comboTable: "MULTIPLIER"
+        },
+        {
+          clearName: "DOUBLE",
+          comboTable: "MULTIPLIER"
+        },
+        {
+          clearName: "DOUBLE",
+          comboTable: "MULTIPLIER"
+        },
+        {
+          clearName: "DOUBLE",
+          comboTable: "MULTIPLIER"
+        },
+        {
+          clearName: "DOUBLE",
+          comboTable: "MULTIPLIER"
+        },
+        {
+          clearName: "DOUBLE",
+          comboTable: "MULTIPLIER"
+        },
+        {
+          clearName: "DOUBLE",
+          comboTable: "MULTIPLIER"
+        },
+        {
+          clearName: "DOUBLE",
+          comboTable: "MULTIPLIER"
+        },
+        {
+          clearName: "DOUBLE",
+          comboTable: "MULTIPLIER"
+        }
+      ],
+      expected: {
+        attack: 32,
+        points: 8750,
+        combo: 14,
+        maxCombo: 14,
+        backToBackChain: 0,
+        allClears: 0,
+        difficultClears: 0,
+        difficultAttack: 0,
+        spinClears: 0,
+        spinAttack: 0,
+        tSpinClears: 0,
+        tSpinAttack: 0,
+        events: [
+          {
+            clearName: "DOUBLE",
+            attack: 1,
+            baseAttack: 1,
+            points: 300,
+            combo: 1,
+            backToBackChain: 0,
+            backToBack: false,
+            backToBackBonus: 0,
+            backToBackChargeAttack: 0,
+            allClear: false,
+            allClearBonus: 0
+          },
+          {
+            clearName: "DOUBLE",
+            attack: 1,
+            baseAttack: 1,
+            points: 350,
+            combo: 2,
+            backToBackChain: 0,
+            backToBack: false,
+            backToBackBonus: 0,
+            backToBackChargeAttack: 0,
+            allClear: false,
+            allClearBonus: 0
+          },
+          {
+            clearName: "DOUBLE",
+            attack: 1,
+            baseAttack: 1,
+            points: 400,
+            combo: 3,
+            backToBackChain: 0,
+            backToBack: false,
+            backToBackBonus: 0,
+            backToBackChargeAttack: 0,
+            allClear: false,
+            allClearBonus: 0
+          },
+          {
+            clearName: "DOUBLE",
+            attack: 1,
+            baseAttack: 1,
+            points: 450,
+            combo: 4,
+            backToBackChain: 0,
+            backToBack: false,
+            backToBackBonus: 0,
+            backToBackChargeAttack: 0,
+            allClear: false,
+            allClearBonus: 0
+          },
+          {
+            clearName: "DOUBLE",
+            attack: 2,
+            baseAttack: 1,
+            points: 500,
+            combo: 5,
+            backToBackChain: 0,
+            backToBack: false,
+            backToBackBonus: 0,
+            backToBackChargeAttack: 0,
+            allClear: false,
+            allClearBonus: 0
+          },
+          {
+            clearName: "DOUBLE",
+            attack: 2,
+            baseAttack: 1,
+            points: 550,
+            combo: 6,
+            backToBackChain: 0,
+            backToBack: false,
+            backToBackBonus: 0,
+            backToBackChargeAttack: 0,
+            allClear: false,
+            allClearBonus: 0
+          },
+          {
+            clearName: "DOUBLE",
+            attack: 2,
+            baseAttack: 1,
+            points: 600,
+            combo: 7,
+            backToBackChain: 0,
+            backToBack: false,
+            backToBackBonus: 0,
+            backToBackChargeAttack: 0,
+            allClear: false,
+            allClearBonus: 0
+          },
+          {
+            clearName: "DOUBLE",
+            attack: 2,
+            baseAttack: 1,
+            points: 650,
+            combo: 8,
+            backToBackChain: 0,
+            backToBack: false,
+            backToBackBonus: 0,
+            backToBackChargeAttack: 0,
+            allClear: false,
+            allClearBonus: 0
+          },
+          {
+            clearName: "DOUBLE",
+            attack: 3,
+            baseAttack: 1,
+            points: 700,
+            combo: 9,
+            backToBackChain: 0,
+            backToBack: false,
+            backToBackBonus: 0,
+            backToBackChargeAttack: 0,
+            allClear: false,
+            allClearBonus: 0
+          },
+          {
+            clearName: "DOUBLE",
+            attack: 3,
+            baseAttack: 1,
+            points: 750,
+            combo: 10,
+            backToBackChain: 0,
+            backToBack: false,
+            backToBackBonus: 0,
+            backToBackChargeAttack: 0,
+            allClear: false,
+            allClearBonus: 0
+          },
+          {
+            clearName: "DOUBLE",
+            attack: 3,
+            baseAttack: 1,
+            points: 800,
+            combo: 11,
+            backToBackChain: 0,
+            backToBack: false,
+            backToBackBonus: 0,
+            backToBackChargeAttack: 0,
+            allClear: false,
+            allClearBonus: 0
+          },
+          {
+            clearName: "DOUBLE",
+            attack: 3,
+            baseAttack: 1,
+            points: 850,
+            combo: 12,
+            backToBackChain: 0,
+            backToBack: false,
+            backToBackBonus: 0,
+            backToBackChargeAttack: 0,
+            allClear: false,
+            allClearBonus: 0
+          },
+          {
+            clearName: "DOUBLE",
+            attack: 4,
+            baseAttack: 1,
+            points: 900,
+            combo: 13,
+            backToBackChain: 0,
+            backToBack: false,
+            backToBackBonus: 0,
+            backToBackChargeAttack: 0,
+            allClear: false,
+            allClearBonus: 0
+          },
+          {
+            clearName: "DOUBLE",
+            attack: 4,
+            baseAttack: 1,
+            points: 950,
+            combo: 14,
+            backToBackChain: 0,
+            backToBack: false,
+            backToBackBonus: 0,
+            backToBackChargeAttack: 0,
+            allClear: false,
+            allClearBonus: 0
+          }
+        ]
+      }
+    },
+    {
+      name: "tl-combo-table-none",
+      events: [
+        {
+          clearName: "DOUBLE",
+          comboTable: "NONE"
+        },
+        {
+          clearName: "DOUBLE",
+          comboTable: "NONE"
+        },
+        {
+          clearName: "DOUBLE",
+          comboTable: "NONE"
+        },
+        {
+          clearName: "DOUBLE",
+          comboTable: "NONE"
+        },
+        {
+          clearName: "DOUBLE",
+          comboTable: "NONE"
+        },
+        {
+          clearName: "DOUBLE",
+          comboTable: "NONE"
+        },
+        {
+          clearName: "DOUBLE",
+          comboTable: "NONE"
+        },
+        {
+          clearName: "DOUBLE",
+          comboTable: "NONE"
+        },
+        {
+          clearName: "DOUBLE",
+          comboTable: "NONE"
+        },
+        {
+          clearName: "DOUBLE",
+          comboTable: "NONE"
+        },
+        {
+          clearName: "DOUBLE",
+          comboTable: "NONE"
+        },
+        {
+          clearName: "DOUBLE",
+          comboTable: "NONE"
+        },
+        {
+          clearName: "DOUBLE",
+          comboTable: "NONE"
+        },
+        {
+          clearName: "DOUBLE",
+          comboTable: "NONE"
+        }
+      ],
+      expected: {
+        attack: 14,
+        points: 8750,
+        combo: 14,
+        maxCombo: 14,
+        backToBackChain: 0,
+        allClears: 0,
+        difficultClears: 0,
+        difficultAttack: 0,
+        spinClears: 0,
+        spinAttack: 0,
+        tSpinClears: 0,
+        tSpinAttack: 0,
+        events: [
+          {
+            clearName: "DOUBLE",
+            attack: 1,
+            baseAttack: 1,
+            points: 300,
+            combo: 1,
+            backToBackChain: 0,
+            backToBack: false,
+            backToBackBonus: 0,
+            backToBackChargeAttack: 0,
+            allClear: false,
+            allClearBonus: 0
+          },
+          {
+            clearName: "DOUBLE",
+            attack: 1,
+            baseAttack: 1,
+            points: 350,
+            combo: 2,
+            backToBackChain: 0,
+            backToBack: false,
+            backToBackBonus: 0,
+            backToBackChargeAttack: 0,
+            allClear: false,
+            allClearBonus: 0
+          },
+          {
+            clearName: "DOUBLE",
+            attack: 1,
+            baseAttack: 1,
+            points: 400,
+            combo: 3,
+            backToBackChain: 0,
+            backToBack: false,
+            backToBackBonus: 0,
+            backToBackChargeAttack: 0,
+            allClear: false,
+            allClearBonus: 0
+          },
+          {
+            clearName: "DOUBLE",
+            attack: 1,
+            baseAttack: 1,
+            points: 450,
+            combo: 4,
+            backToBackChain: 0,
+            backToBack: false,
+            backToBackBonus: 0,
+            backToBackChargeAttack: 0,
+            allClear: false,
+            allClearBonus: 0
+          },
+          {
+            clearName: "DOUBLE",
+            attack: 1,
+            baseAttack: 1,
+            points: 500,
+            combo: 5,
+            backToBackChain: 0,
+            backToBack: false,
+            backToBackBonus: 0,
+            backToBackChargeAttack: 0,
+            allClear: false,
+            allClearBonus: 0
+          },
+          {
+            clearName: "DOUBLE",
+            attack: 1,
+            baseAttack: 1,
+            points: 550,
+            combo: 6,
+            backToBackChain: 0,
+            backToBack: false,
+            backToBackBonus: 0,
+            backToBackChargeAttack: 0,
+            allClear: false,
+            allClearBonus: 0
+          },
+          {
+            clearName: "DOUBLE",
+            attack: 1,
+            baseAttack: 1,
+            points: 600,
+            combo: 7,
+            backToBackChain: 0,
+            backToBack: false,
+            backToBackBonus: 0,
+            backToBackChargeAttack: 0,
+            allClear: false,
+            allClearBonus: 0
+          },
+          {
+            clearName: "DOUBLE",
+            attack: 1,
+            baseAttack: 1,
+            points: 650,
+            combo: 8,
+            backToBackChain: 0,
+            backToBack: false,
+            backToBackBonus: 0,
+            backToBackChargeAttack: 0,
+            allClear: false,
+            allClearBonus: 0
+          },
+          {
+            clearName: "DOUBLE",
+            attack: 1,
+            baseAttack: 1,
+            points: 700,
+            combo: 9,
+            backToBackChain: 0,
+            backToBack: false,
+            backToBackBonus: 0,
+            backToBackChargeAttack: 0,
+            allClear: false,
+            allClearBonus: 0
+          },
+          {
+            clearName: "DOUBLE",
+            attack: 1,
+            baseAttack: 1,
+            points: 750,
+            combo: 10,
+            backToBackChain: 0,
+            backToBack: false,
+            backToBackBonus: 0,
+            backToBackChargeAttack: 0,
+            allClear: false,
+            allClearBonus: 0
+          },
+          {
+            clearName: "DOUBLE",
+            attack: 1,
+            baseAttack: 1,
+            points: 800,
+            combo: 11,
+            backToBackChain: 0,
+            backToBack: false,
+            backToBackBonus: 0,
+            backToBackChargeAttack: 0,
+            allClear: false,
+            allClearBonus: 0
+          },
+          {
+            clearName: "DOUBLE",
+            attack: 1,
+            baseAttack: 1,
+            points: 850,
+            combo: 12,
+            backToBackChain: 0,
+            backToBack: false,
+            backToBackBonus: 0,
+            backToBackChargeAttack: 0,
+            allClear: false,
+            allClearBonus: 0
+          },
+          {
+            clearName: "DOUBLE",
+            attack: 1,
+            baseAttack: 1,
+            points: 900,
+            combo: 13,
+            backToBackChain: 0,
+            backToBack: false,
+            backToBackBonus: 0,
+            backToBackChargeAttack: 0,
+            allClear: false,
+            allClearBonus: 0
+          },
+          {
+            clearName: "DOUBLE",
+            attack: 1,
+            baseAttack: 1,
+            points: 950,
+            combo: 14,
+            backToBackChain: 0,
+            backToBack: false,
+            backToBackBonus: 0,
+            backToBackChargeAttack: 0,
+            allClear: false,
+            allClearBonus: 0
+          }
+        ]
+      }
+    },
+    {
+      name: "tl-combo-table-classic-guideline",
+      events: [
+        {
+          clearName: "DOUBLE",
+          comboTable: "CLASSIC GUIDELINE"
+        },
+        {
+          clearName: "DOUBLE",
+          comboTable: "CLASSIC GUIDELINE"
+        },
+        {
+          clearName: "DOUBLE",
+          comboTable: "CLASSIC GUIDELINE"
+        },
+        {
+          clearName: "DOUBLE",
+          comboTable: "CLASSIC GUIDELINE"
+        },
+        {
+          clearName: "DOUBLE",
+          comboTable: "CLASSIC GUIDELINE"
+        },
+        {
+          clearName: "DOUBLE",
+          comboTable: "CLASSIC GUIDELINE"
+        },
+        {
+          clearName: "DOUBLE",
+          comboTable: "CLASSIC GUIDELINE"
+        },
+        {
+          clearName: "DOUBLE",
+          comboTable: "CLASSIC GUIDELINE"
+        },
+        {
+          clearName: "DOUBLE",
+          comboTable: "CLASSIC GUIDELINE"
+        },
+        {
+          clearName: "DOUBLE",
+          comboTable: "CLASSIC GUIDELINE"
+        },
+        {
+          clearName: "DOUBLE",
+          comboTable: "CLASSIC GUIDELINE"
+        },
+        {
+          clearName: "DOUBLE",
+          comboTable: "CLASSIC GUIDELINE"
+        },
+        {
+          clearName: "DOUBLE",
+          comboTable: "CLASSIC GUIDELINE"
+        },
+        {
+          clearName: "DOUBLE",
+          comboTable: "CLASSIC GUIDELINE"
+        }
+      ],
+      expected: {
+        attack: 53,
+        points: 8750,
+        combo: 14,
+        maxCombo: 14,
+        backToBackChain: 0,
+        allClears: 0,
+        difficultClears: 0,
+        difficultAttack: 0,
+        spinClears: 0,
+        spinAttack: 0,
+        tSpinClears: 0,
+        tSpinAttack: 0,
+        events: [
+          {
+            clearName: "DOUBLE",
+            attack: 1,
+            baseAttack: 1,
+            points: 300,
+            combo: 1,
+            backToBackChain: 0,
+            backToBack: false,
+            backToBackBonus: 0,
+            backToBackChargeAttack: 0,
+            allClear: false,
+            allClearBonus: 0
+          },
+          {
+            clearName: "DOUBLE",
+            attack: 1,
+            baseAttack: 1,
+            points: 350,
+            combo: 2,
+            backToBackChain: 0,
+            backToBack: false,
+            backToBackBonus: 0,
+            backToBackChargeAttack: 0,
+            allClear: false,
+            allClearBonus: 0
+          },
+          {
+            clearName: "DOUBLE",
+            attack: 2,
+            baseAttack: 1,
+            points: 400,
+            combo: 3,
+            backToBackChain: 0,
+            backToBack: false,
+            backToBackBonus: 0,
+            backToBackChargeAttack: 0,
+            allClear: false,
+            allClearBonus: 0
+          },
+          {
+            clearName: "DOUBLE",
+            attack: 2,
+            baseAttack: 1,
+            points: 450,
+            combo: 4,
+            backToBackChain: 0,
+            backToBack: false,
+            backToBackBonus: 0,
+            backToBackChargeAttack: 0,
+            allClear: false,
+            allClearBonus: 0
+          },
+          {
+            clearName: "DOUBLE",
+            attack: 3,
+            baseAttack: 1,
+            points: 500,
+            combo: 5,
+            backToBackChain: 0,
+            backToBack: false,
+            backToBackBonus: 0,
+            backToBackChargeAttack: 0,
+            allClear: false,
+            allClearBonus: 0
+          },
+          {
+            clearName: "DOUBLE",
+            attack: 3,
+            baseAttack: 1,
+            points: 550,
+            combo: 6,
+            backToBackChain: 0,
+            backToBack: false,
+            backToBackBonus: 0,
+            backToBackChargeAttack: 0,
+            allClear: false,
+            allClearBonus: 0
+          },
+          {
+            clearName: "DOUBLE",
+            attack: 4,
+            baseAttack: 1,
+            points: 600,
+            combo: 7,
+            backToBackChain: 0,
+            backToBack: false,
+            backToBackBonus: 0,
+            backToBackChargeAttack: 0,
+            allClear: false,
+            allClearBonus: 0
+          },
+          {
+            clearName: "DOUBLE",
+            attack: 4,
+            baseAttack: 1,
+            points: 650,
+            combo: 8,
+            backToBackChain: 0,
+            backToBack: false,
+            backToBackBonus: 0,
+            backToBackChargeAttack: 0,
+            allClear: false,
+            allClearBonus: 0
+          },
+          {
+            clearName: "DOUBLE",
+            attack: 5,
+            baseAttack: 1,
+            points: 700,
+            combo: 9,
+            backToBackChain: 0,
+            backToBack: false,
+            backToBackBonus: 0,
+            backToBackChargeAttack: 0,
+            allClear: false,
+            allClearBonus: 0
+          },
+          {
+            clearName: "DOUBLE",
+            attack: 5,
+            baseAttack: 1,
+            points: 750,
+            combo: 10,
+            backToBackChain: 0,
+            backToBack: false,
+            backToBackBonus: 0,
+            backToBackChargeAttack: 0,
+            allClear: false,
+            allClearBonus: 0
+          },
+          {
+            clearName: "DOUBLE",
+            attack: 5,
+            baseAttack: 1,
+            points: 800,
+            combo: 11,
+            backToBackChain: 0,
+            backToBack: false,
+            backToBackBonus: 0,
+            backToBackChargeAttack: 0,
+            allClear: false,
+            allClearBonus: 0
+          },
+          {
+            clearName: "DOUBLE",
+            attack: 6,
+            baseAttack: 1,
+            points: 850,
+            combo: 12,
+            backToBackChain: 0,
+            backToBack: false,
+            backToBackBonus: 0,
+            backToBackChargeAttack: 0,
+            allClear: false,
+            allClearBonus: 0
+          },
+          {
+            clearName: "DOUBLE",
+            attack: 6,
+            baseAttack: 1,
+            points: 900,
+            combo: 13,
+            backToBackChain: 0,
+            backToBack: false,
+            backToBackBonus: 0,
+            backToBackChargeAttack: 0,
+            allClear: false,
+            allClearBonus: 0
+          },
+          {
+            clearName: "DOUBLE",
+            attack: 6,
+            baseAttack: 1,
+            points: 950,
+            combo: 14,
+            backToBackChain: 0,
+            backToBack: false,
+            backToBackBonus: 0,
+            backToBackChargeAttack: 0,
+            allClear: false,
+            allClearBonus: 0
+          }
+        ]
+      }
+    },
+    {
+      name: "tl-combo-table-modern-guideline",
+      events: [
+        {
+          clearName: "DOUBLE",
+          comboTable: "MODERN GUIDELINE"
+        },
+        {
+          clearName: "DOUBLE",
+          comboTable: "MODERN GUIDELINE"
+        },
+        {
+          clearName: "DOUBLE",
+          comboTable: "MODERN GUIDELINE"
+        },
+        {
+          clearName: "DOUBLE",
+          comboTable: "MODERN GUIDELINE"
+        },
+        {
+          clearName: "DOUBLE",
+          comboTable: "MODERN GUIDELINE"
+        },
+        {
+          clearName: "DOUBLE",
+          comboTable: "MODERN GUIDELINE"
+        },
+        {
+          clearName: "DOUBLE",
+          comboTable: "MODERN GUIDELINE"
+        },
+        {
+          clearName: "DOUBLE",
+          comboTable: "MODERN GUIDELINE"
+        },
+        {
+          clearName: "DOUBLE",
+          comboTable: "MODERN GUIDELINE"
+        },
+        {
+          clearName: "DOUBLE",
+          comboTable: "MODERN GUIDELINE"
+        },
+        {
+          clearName: "DOUBLE",
+          comboTable: "MODERN GUIDELINE"
+        },
+        {
+          clearName: "DOUBLE",
+          comboTable: "MODERN GUIDELINE"
+        },
+        {
+          clearName: "DOUBLE",
+          comboTable: "MODERN GUIDELINE"
+        },
+        {
+          clearName: "DOUBLE",
+          comboTable: "MODERN GUIDELINE"
+        }
+      ],
+      expected: {
+        attack: 44,
+        points: 8750,
+        combo: 14,
+        maxCombo: 14,
+        backToBackChain: 0,
+        allClears: 0,
+        difficultClears: 0,
+        difficultAttack: 0,
+        spinClears: 0,
+        spinAttack: 0,
+        tSpinClears: 0,
+        tSpinAttack: 0,
+        events: [
+          {
+            clearName: "DOUBLE",
+            attack: 1,
+            baseAttack: 1,
+            points: 300,
+            combo: 1,
+            backToBackChain: 0,
+            backToBack: false,
+            backToBackBonus: 0,
+            backToBackChargeAttack: 0,
+            allClear: false,
+            allClearBonus: 0
+          },
+          {
+            clearName: "DOUBLE",
+            attack: 1,
+            baseAttack: 1,
+            points: 350,
+            combo: 2,
+            backToBackChain: 0,
+            backToBack: false,
+            backToBackBonus: 0,
+            backToBackChargeAttack: 0,
+            allClear: false,
+            allClearBonus: 0
+          },
+          {
+            clearName: "DOUBLE",
+            attack: 2,
+            baseAttack: 1,
+            points: 400,
+            combo: 3,
+            backToBackChain: 0,
+            backToBack: false,
+            backToBackBonus: 0,
+            backToBackChargeAttack: 0,
+            allClear: false,
+            allClearBonus: 0
+          },
+          {
+            clearName: "DOUBLE",
+            attack: 2,
+            baseAttack: 1,
+            points: 450,
+            combo: 4,
+            backToBackChain: 0,
+            backToBack: false,
+            backToBackBonus: 0,
+            backToBackChargeAttack: 0,
+            allClear: false,
+            allClearBonus: 0
+          },
+          {
+            clearName: "DOUBLE",
+            attack: 3,
+            baseAttack: 1,
+            points: 500,
+            combo: 5,
+            backToBackChain: 0,
+            backToBack: false,
+            backToBackBonus: 0,
+            backToBackChargeAttack: 0,
+            allClear: false,
+            allClearBonus: 0
+          },
+          {
+            clearName: "DOUBLE",
+            attack: 3,
+            baseAttack: 1,
+            points: 550,
+            combo: 6,
+            backToBackChain: 0,
+            backToBack: false,
+            backToBackBonus: 0,
+            backToBackChargeAttack: 0,
+            allClear: false,
+            allClearBonus: 0
+          },
+          {
+            clearName: "DOUBLE",
+            attack: 3,
+            baseAttack: 1,
+            points: 600,
+            combo: 7,
+            backToBackChain: 0,
+            backToBack: false,
+            backToBackBonus: 0,
+            backToBackChargeAttack: 0,
+            allClear: false,
+            allClearBonus: 0
+          },
+          {
+            clearName: "DOUBLE",
+            attack: 4,
+            baseAttack: 1,
+            points: 650,
+            combo: 8,
+            backToBackChain: 0,
+            backToBack: false,
+            backToBackBonus: 0,
+            backToBackChargeAttack: 0,
+            allClear: false,
+            allClearBonus: 0
+          },
+          {
+            clearName: "DOUBLE",
+            attack: 4,
+            baseAttack: 1,
+            points: 700,
+            combo: 9,
+            backToBackChain: 0,
+            backToBack: false,
+            backToBackBonus: 0,
+            backToBackChargeAttack: 0,
+            allClear: false,
+            allClearBonus: 0
+          },
+          {
+            clearName: "DOUBLE",
+            attack: 4,
+            baseAttack: 1,
+            points: 750,
+            combo: 10,
+            backToBackChain: 0,
+            backToBack: false,
+            backToBackBonus: 0,
+            backToBackChargeAttack: 0,
+            allClear: false,
+            allClearBonus: 0
+          },
+          {
+            clearName: "DOUBLE",
+            attack: 4,
+            baseAttack: 1,
+            points: 800,
+            combo: 11,
+            backToBackChain: 0,
+            backToBack: false,
+            backToBackBonus: 0,
+            backToBackChargeAttack: 0,
+            allClear: false,
+            allClearBonus: 0
+          },
+          {
+            clearName: "DOUBLE",
+            attack: 4,
+            baseAttack: 1,
+            points: 850,
+            combo: 12,
+            backToBackChain: 0,
+            backToBack: false,
+            backToBackBonus: 0,
+            backToBackChargeAttack: 0,
+            allClear: false,
+            allClearBonus: 0
+          },
+          {
+            clearName: "DOUBLE",
+            attack: 4,
+            baseAttack: 1,
+            points: 900,
+            combo: 13,
+            backToBackChain: 0,
+            backToBack: false,
+            backToBackBonus: 0,
+            backToBackChargeAttack: 0,
+            allClear: false,
+            allClearBonus: 0
+          },
+          {
+            clearName: "DOUBLE",
+            attack: 5,
+            baseAttack: 1,
+            points: 950,
+            combo: 14,
+            backToBackChain: 0,
+            backToBack: false,
+            backToBackBonus: 0,
+            backToBackChargeAttack: 0,
+            allClear: false,
+            allClearBonus: 0
+          }
+        ]
+      }
+    },
+    {
+      name: "tl-b2b-pair-quad",
+      events: [
+        {
+          clearName: "QUAD"
+        },
+        {
+          clearName: "QUAD"
+        }
+      ],
+      expected: {
+        attack: 10,
+        points: 2050,
+        combo: 2,
+        maxCombo: 2,
+        backToBackChain: 2,
+        allClears: 0,
+        difficultClears: 2,
+        difficultAttack: 10,
+        spinClears: 0,
+        spinAttack: 0,
+        tSpinClears: 0,
+        tSpinAttack: 0,
+        events: [
+          {
+            clearName: "QUAD",
+            attack: 4,
+            baseAttack: 4,
+            points: 800,
+            combo: 1,
+            backToBackChain: 1,
+            backToBack: false,
+            backToBackBonus: 0,
+            backToBackChargeAttack: 0,
+            allClear: false,
+            allClearBonus: 0
+          },
+          {
+            clearName: "QUAD",
+            attack: 6,
+            baseAttack: 4,
+            points: 1250,
+            combo: 2,
+            backToBackChain: 2,
+            backToBack: true,
+            backToBackBonus: 1,
+            backToBackChargeAttack: 0,
+            allClear: false,
+            allClearBonus: 0
+          }
+        ]
+      }
+    },
+    {
+      name: "tl-b2b-pair-penta",
+      events: [
+        {
+          clearName: "PENTA"
+        },
+        {
+          clearName: "PENTA"
+        }
+      ],
+      expected: {
+        attack: 12,
+        points: 3050,
+        combo: 2,
+        maxCombo: 2,
+        backToBackChain: 2,
+        allClears: 0,
+        difficultClears: 2,
+        difficultAttack: 12,
+        spinClears: 0,
+        spinAttack: 0,
+        tSpinClears: 0,
+        tSpinAttack: 0,
+        events: [
+          {
+            clearName: "PENTA",
+            attack: 5,
+            baseAttack: 5,
+            points: 1200,
+            combo: 1,
+            backToBackChain: 1,
+            backToBack: false,
+            backToBackBonus: 0,
+            backToBackChargeAttack: 0,
+            allClear: false,
+            allClearBonus: 0
+          },
+          {
+            clearName: "PENTA",
+            attack: 7,
+            baseAttack: 5,
+            points: 1850,
+            combo: 2,
+            backToBackChain: 2,
+            backToBack: true,
+            backToBackBonus: 1,
+            backToBackChargeAttack: 0,
+            allClear: false,
+            allClearBonus: 0
+          }
+        ]
+      }
+    },
+    {
+      name: "tl-b2b-pair-tspin_mini_single",
+      events: [
+        {
+          clearName: "TSPIN_MINI_SINGLE"
+        },
+        {
+          clearName: "TSPIN_MINI_SINGLE"
+        }
+      ],
+      expected: {
+        attack: 1,
+        points: 550,
+        combo: 2,
+        maxCombo: 2,
+        backToBackChain: 2,
+        allClears: 0,
+        difficultClears: 2,
+        difficultAttack: 1,
+        spinClears: 2,
+        spinAttack: 1,
+        tSpinClears: 2,
+        tSpinAttack: 1,
+        events: [
+          {
+            clearName: "TSPIN_MINI_SINGLE",
+            attack: 0,
+            baseAttack: 0,
+            points: 200,
+            combo: 1,
+            backToBackChain: 1,
+            backToBack: false,
+            backToBackBonus: 0,
+            backToBackChargeAttack: 0,
+            allClear: false,
+            allClearBonus: 0
+          },
+          {
+            clearName: "TSPIN_MINI_SINGLE",
+            attack: 1,
+            baseAttack: 0,
+            points: 350,
+            combo: 2,
+            backToBackChain: 2,
+            backToBack: true,
+            backToBackBonus: 1,
+            backToBackChargeAttack: 0,
+            allClear: false,
+            allClearBonus: 0
+          }
+        ]
+      }
+    },
+    {
+      name: "tl-b2b-pair-tspin_single",
+      events: [
+        {
+          clearName: "TSPIN_SINGLE"
+        },
+        {
+          clearName: "TSPIN_SINGLE"
+        }
+      ],
+      expected: {
+        attack: 5,
+        points: 2050,
+        combo: 2,
+        maxCombo: 2,
+        backToBackChain: 2,
+        allClears: 0,
+        difficultClears: 2,
+        difficultAttack: 5,
+        spinClears: 2,
+        spinAttack: 5,
+        tSpinClears: 2,
+        tSpinAttack: 5,
+        events: [
+          {
+            clearName: "TSPIN_SINGLE",
+            attack: 2,
+            baseAttack: 2,
+            points: 800,
+            combo: 1,
+            backToBackChain: 1,
+            backToBack: false,
+            backToBackBonus: 0,
+            backToBackChargeAttack: 0,
+            allClear: false,
+            allClearBonus: 0
+          },
+          {
+            clearName: "TSPIN_SINGLE",
+            attack: 3,
+            baseAttack: 2,
+            points: 1250,
+            combo: 2,
+            backToBackChain: 2,
+            backToBack: true,
+            backToBackBonus: 1,
+            backToBackChargeAttack: 0,
+            allClear: false,
+            allClearBonus: 0
+          }
+        ]
+      }
+    },
+    {
+      name: "tl-b2b-pair-tspin_mini_double",
+      events: [
+        {
+          clearName: "TSPIN_MINI_DOUBLE"
+        },
+        {
+          clearName: "TSPIN_MINI_DOUBLE"
+        }
+      ],
+      expected: {
+        attack: 3,
+        points: 1050,
+        combo: 2,
+        maxCombo: 2,
+        backToBackChain: 2,
+        allClears: 0,
+        difficultClears: 2,
+        difficultAttack: 3,
+        spinClears: 2,
+        spinAttack: 3,
+        tSpinClears: 2,
+        tSpinAttack: 3,
+        events: [
+          {
+            clearName: "TSPIN_MINI_DOUBLE",
+            attack: 1,
+            baseAttack: 1,
+            points: 400,
+            combo: 1,
+            backToBackChain: 1,
+            backToBack: false,
+            backToBackBonus: 0,
+            backToBackChargeAttack: 0,
+            allClear: false,
+            allClearBonus: 0
+          },
+          {
+            clearName: "TSPIN_MINI_DOUBLE",
+            attack: 2,
+            baseAttack: 1,
+            points: 650,
+            combo: 2,
+            backToBackChain: 2,
+            backToBack: true,
+            backToBackBonus: 1,
+            backToBackChargeAttack: 0,
+            allClear: false,
+            allClearBonus: 0
+          }
+        ]
+      }
+    },
+    {
+      name: "tl-b2b-pair-tspin_double",
+      events: [
+        {
+          clearName: "TSPIN_DOUBLE"
+        },
+        {
+          clearName: "TSPIN_DOUBLE"
+        }
+      ],
+      expected: {
+        attack: 10,
+        points: 3050,
+        combo: 2,
+        maxCombo: 2,
+        backToBackChain: 2,
+        allClears: 0,
+        difficultClears: 2,
+        difficultAttack: 10,
+        spinClears: 2,
+        spinAttack: 10,
+        tSpinClears: 2,
+        tSpinAttack: 10,
+        events: [
+          {
+            clearName: "TSPIN_DOUBLE",
+            attack: 4,
+            baseAttack: 4,
+            points: 1200,
+            combo: 1,
+            backToBackChain: 1,
+            backToBack: false,
+            backToBackBonus: 0,
+            backToBackChargeAttack: 0,
+            allClear: false,
+            allClearBonus: 0
+          },
+          {
+            clearName: "TSPIN_DOUBLE",
+            attack: 6,
+            baseAttack: 4,
+            points: 1850,
+            combo: 2,
+            backToBackChain: 2,
+            backToBack: true,
+            backToBackBonus: 1,
+            backToBackChargeAttack: 0,
+            allClear: false,
+            allClearBonus: 0
+          }
+        ]
+      }
+    },
+    {
+      name: "tl-b2b-pair-tspin_mini_triple",
+      events: [
+        {
+          clearName: "TSPIN_MINI_TRIPLE"
+        },
+        {
+          clearName: "TSPIN_MINI_TRIPLE"
+        }
+      ],
+      expected: {
+        attack: 5,
+        points: 2050,
+        combo: 2,
+        maxCombo: 2,
+        backToBackChain: 2,
+        allClears: 0,
+        difficultClears: 2,
+        difficultAttack: 5,
+        spinClears: 2,
+        spinAttack: 5,
+        tSpinClears: 2,
+        tSpinAttack: 5,
+        events: [
+          {
+            clearName: "TSPIN_MINI_TRIPLE",
+            attack: 2,
+            baseAttack: 2,
+            points: 800,
+            combo: 1,
+            backToBackChain: 1,
+            backToBack: false,
+            backToBackBonus: 0,
+            backToBackChargeAttack: 0,
+            allClear: false,
+            allClearBonus: 0
+          },
+          {
+            clearName: "TSPIN_MINI_TRIPLE",
+            attack: 3,
+            baseAttack: 2,
+            points: 1250,
+            combo: 2,
+            backToBackChain: 2,
+            backToBack: true,
+            backToBackBonus: 1,
+            backToBackChargeAttack: 0,
+            allClear: false,
+            allClearBonus: 0
+          }
+        ]
+      }
+    },
+    {
+      name: "tl-b2b-pair-tspin_triple",
+      events: [
+        {
+          clearName: "TSPIN_TRIPLE"
+        },
+        {
+          clearName: "TSPIN_TRIPLE"
+        }
+      ],
+      expected: {
+        attack: 14,
+        points: 4050,
+        combo: 2,
+        maxCombo: 2,
+        backToBackChain: 2,
+        allClears: 0,
+        difficultClears: 2,
+        difficultAttack: 14,
+        spinClears: 2,
+        spinAttack: 14,
+        tSpinClears: 2,
+        tSpinAttack: 14,
+        events: [
+          {
+            clearName: "TSPIN_TRIPLE",
+            attack: 6,
+            baseAttack: 6,
+            points: 1600,
+            combo: 1,
+            backToBackChain: 1,
+            backToBack: false,
+            backToBackBonus: 0,
+            backToBackChargeAttack: 0,
+            allClear: false,
+            allClearBonus: 0
+          },
+          {
+            clearName: "TSPIN_TRIPLE",
+            attack: 8,
+            baseAttack: 6,
+            points: 2450,
+            combo: 2,
+            backToBackChain: 2,
+            backToBack: true,
+            backToBackBonus: 1,
+            backToBackChargeAttack: 0,
+            allClear: false,
+            allClearBonus: 0
+          }
+        ]
+      }
+    },
+    {
+      name: "tl-b2b-pair-tspin_mini_quad",
+      events: [
+        {
+          clearName: "TSPIN_MINI_QUAD"
+        },
+        {
+          clearName: "TSPIN_MINI_QUAD"
+        }
+      ],
+      expected: {
+        attack: 10,
+        points: 4050,
+        combo: 2,
+        maxCombo: 2,
+        backToBackChain: 2,
+        allClears: 0,
+        difficultClears: 2,
+        difficultAttack: 10,
+        spinClears: 2,
+        spinAttack: 10,
+        tSpinClears: 2,
+        tSpinAttack: 10,
+        events: [
+          {
+            clearName: "TSPIN_MINI_QUAD",
+            attack: 4,
+            baseAttack: 4,
+            points: 1600,
+            combo: 1,
+            backToBackChain: 1,
+            backToBack: false,
+            backToBackBonus: 0,
+            backToBackChargeAttack: 0,
+            allClear: false,
+            allClearBonus: 0
+          },
+          {
+            clearName: "TSPIN_MINI_QUAD",
+            attack: 6,
+            baseAttack: 4,
+            points: 2450,
+            combo: 2,
+            backToBackChain: 2,
+            backToBack: true,
+            backToBackBonus: 1,
+            backToBackChargeAttack: 0,
+            allClear: false,
+            allClearBonus: 0
+          }
+        ]
+      }
+    },
+    {
+      name: "tl-b2b-pair-tspin_quad",
+      events: [
+        {
+          clearName: "TSPIN_QUAD"
+        },
+        {
+          clearName: "TSPIN_QUAD"
+        }
+      ],
+      expected: {
+        attack: 23,
+        points: 6550,
+        combo: 2,
+        maxCombo: 2,
+        backToBackChain: 2,
+        allClears: 0,
+        difficultClears: 2,
+        difficultAttack: 23,
+        spinClears: 2,
+        spinAttack: 23,
+        tSpinClears: 2,
+        tSpinAttack: 23,
+        events: [
+          {
+            clearName: "TSPIN_QUAD",
+            attack: 10,
+            baseAttack: 10,
+            points: 2600,
+            combo: 1,
+            backToBackChain: 1,
+            backToBack: false,
+            backToBackBonus: 0,
+            backToBackChargeAttack: 0,
+            allClear: false,
+            allClearBonus: 0
+          },
+          {
+            clearName: "TSPIN_QUAD",
+            attack: 13,
+            baseAttack: 10,
+            points: 3950,
+            combo: 2,
+            backToBackChain: 2,
+            backToBack: true,
+            backToBackBonus: 1,
+            backToBackChargeAttack: 0,
+            allClear: false,
+            allClearBonus: 0
+          }
+        ]
+      }
+    },
+    {
+      name: "tl-b2b-pair-tspin_penta",
+      events: [
+        {
+          clearName: "TSPIN_PENTA"
+        },
+        {
+          clearName: "TSPIN_PENTA"
+        }
+      ],
+      expected: {
+        attack: 28,
+        points: 8050,
+        combo: 2,
+        maxCombo: 2,
+        backToBackChain: 2,
+        allClears: 0,
+        difficultClears: 2,
+        difficultAttack: 28,
+        spinClears: 2,
+        spinAttack: 28,
+        tSpinClears: 2,
+        tSpinAttack: 28,
+        events: [
+          {
+            clearName: "TSPIN_PENTA",
+            attack: 12,
+            baseAttack: 12,
+            points: 3200,
+            combo: 1,
+            backToBackChain: 1,
+            backToBack: false,
+            backToBackBonus: 0,
+            backToBackChargeAttack: 0,
+            allClear: false,
+            allClearBonus: 0
+          },
+          {
+            clearName: "TSPIN_PENTA",
+            attack: 16,
+            baseAttack: 12,
+            points: 4850,
+            combo: 2,
+            backToBackChain: 2,
+            backToBack: true,
+            backToBackBonus: 1,
+            backToBackChargeAttack: 0,
+            allClear: false,
+            allClearBonus: 0
+          }
+        ]
+      }
+    },
     {
       name: "tl-single-all-clear-uses-5-garbage-and-b2b-credit",
       events: [

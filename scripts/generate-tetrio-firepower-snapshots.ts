@@ -35,6 +35,26 @@ const TETRIO_SPIN_LINE_CLEARS = new Set<NativeClearName>([
   "TSPIN_QUAD",
   "TSPIN_PENTA"
 ]);
+const CLEAR_NAMES = [
+  "NONE",
+  "SINGLE",
+  "DOUBLE",
+  "TRIPLE",
+  "QUAD",
+  "PENTA",
+  "TSPIN",
+  "TSPIN_MINI",
+  "TSPIN_MINI_SINGLE",
+  "TSPIN_SINGLE",
+  "TSPIN_MINI_DOUBLE",
+  "TSPIN_DOUBLE",
+  "TSPIN_MINI_TRIPLE",
+  "TSPIN_TRIPLE",
+  "TSPIN_MINI_QUAD",
+  "TSPIN_QUAD",
+  "TSPIN_PENTA"
+] as const satisfies readonly NativeClearName[];
+const COMBO_TABLES = ["MULTIPLIER", "NONE", "CLASSIC GUIDELINE", "MODERN GUIDELINE"] as const satisfies readonly NativeComboTable[];
 
 interface GenerateOptions {
   readonly output: string;
@@ -134,7 +154,23 @@ function readValue(args: readonly string[], index: number, flag: string): string
 }
 
 function createSnapshot(): { source: Record<string, unknown>; cases: readonly SnapshotCase[] } {
-  const definitions = [
+  const definitions: { name: string; events: readonly SnapshotEventInput[] }[] = [
+    ...CLEAR_NAMES.map((clearName) => ({
+      name: `tl-clear-kind-${clearName.toLowerCase()}`,
+      events: [{ clearName }]
+    })),
+    ...CLEAR_NAMES.filter((clearName) => clearLines(clearName) > 0).map((clearName) => ({
+      name: `tl-all-clear-${clearName.toLowerCase()}`,
+      events: [{ clearName, allClear: true }]
+    })),
+    ...COMBO_TABLES.map((comboTable) => ({
+      name: `tl-combo-table-${comboTable.toLowerCase().replaceAll(" ", "-")}`,
+      events: Array.from({ length: 14 }, () => ({ clearName: "DOUBLE", comboTable }) satisfies SnapshotEventInput)
+    })),
+    ...[...TETRIO_BACK_TO_BACK_CLEARS].map((clearName) => ({
+      name: `tl-b2b-pair-${clearName.toLowerCase()}`,
+      events: [{ clearName }, { clearName }]
+    })),
     {
       name: "tl-single-all-clear-uses-5-garbage-and-b2b-credit",
       events: [{ clearName: "SINGLE", allClear: true }]
@@ -176,13 +212,15 @@ function createSnapshot(): { source: Record<string, unknown>; cases: readonly Sn
       name: "tl-ordinary-line-clear-resets-b2b-after-scoring",
       events: [{ clearName: "TSPIN_DOUBLE" }, { clearName: "SINGLE" }, { clearName: "TSPIN_DOUBLE" }]
     }
-  ] as const satisfies readonly { name: string; events: readonly SnapshotEventInput[] }[];
+  ];
 
   return {
     source: {
       asset: TETRIO_TABLE_SOURCE.asset,
       lastModified: TETRIO_TABLE_SOURCE.lastModified,
       tlOptions: TETRIO_TL_OPTIONS,
+      clearNames: CLEAR_NAMES,
+      comboTables: COMBO_TABLES,
       generator: "scripts/generate-tetrio-firepower-snapshots.ts"
     },
     cases: definitions.map((definition) => ({
